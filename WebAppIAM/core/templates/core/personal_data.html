@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container glass" style="max-width:520px;margin:3em auto 0 auto;padding:2.5em 2em;">
+  <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Personal Data</h2>
+  <div class="alert alert-info" style="font-size:1.1em;">
+    <span class="risk-indicator risk-{{ session.risk_level|lower }}"></span>
+    Risk: <strong>{{ session.risk_level }}</strong>
+  </div>
+  <div class="glass" style="padding:1.5em 1.2em;margin-top:1.2em;">
+    <h3 style="margin-bottom:0.7em;">&#128100; Your Personal Data</h3>
+    <ul style="list-style:none;padding:0;">
+      <li style="margin-bottom:0.7em;"><strong>Username:</strong> {{ user.username }}</li>
+      <li style="margin-bottom:0.7em;"><strong>Email:</strong> {{ user.email }}</li>
+      <li style="margin-bottom:0.7em;"><strong>Role:</strong> {{ user.role }}</li>
+      <li style="margin-bottom:0.7em;"><strong>Face Enrolled:</strong> {{ user.FACE_ENROLLED|yesno:'✔,✖' }}</li>
+      <li style="margin-bottom:0.7em;"><strong>Fingerprint Enrolled:</strong> {{ user.FINGERPRINT_ENROLLED|yesno:'✔,✖' }}</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

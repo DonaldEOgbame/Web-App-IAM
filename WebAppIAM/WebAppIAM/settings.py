@@ -127,6 +127,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'core.CustomUser'
 
 
+# Email settings (update for production)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.yourprovider.com'
+EMAIL_PORT = 587
+EMAIL_HOST_USER = 'your-email@yourdomain.com'
+EMAIL_HOST_PASSWORD = 'your-email-password'
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = 'WebAppIAM <no-reply@yourdomain.com>'
+ADMINS = [('Admin', 'admin@yourdomain.com')]
+
 # Azure Face API
 AZURE_FACE_API_KEY = 'your-azure-face-api-key'
 AZURE_FACE_API_ENDPOINT = 'https://your-region.api.cognitive.microsoft.com/'

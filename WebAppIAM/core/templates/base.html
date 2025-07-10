@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebAppIAM</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:400,600,700&display=swap">
+    <link rel="stylesheet" href="{% static 'css/main.css' %}">
+    <script src="{% static 'js/main.js' %}" defer></script>
+    <style>
+      body { background: linear-gradient(135deg, #e3e9f7 0%, #f8fafc 100%); }
+      .glass {
+        background: rgba(255,255,255,0.7);
+        box-shadow: 0 8px 32px 0 rgba(31,38,135,0.18);
+        backdrop-filter: blur(8px);
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,0.18);
+      }
+      .navbar {
+        background: linear-gradient(90deg, #23243a 0%, #6c63ff 100%);
+        box-shadow: 0 4px 24px rgba(76,99,255,0.10);
+        position: sticky; top: 0; z-index: 100;
+      }
+      .navbar-brand {
+        font-size: 2em;
+        letter-spacing: 2px;
+        background: linear-gradient(90deg, #6c63ff, #48c6ef);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+      }
+      .navbar-links a, .navbar-user {
+        font-size: 1.1em;
+        margin-left: 2em;
+        transition: color 0.2s, text-shadow 0.2s;
+      }
+      .navbar-links a:hover {
+        color: #48c6ef;
+        text-shadow: 0 2px 8px #6c63ff33;
+      }
+      .footer {
+        background: linear-gradient(90deg, #23243a 0%, #6c63ff 100%);
+        color: #fff;
+        font-size: 1.1em;
+        letter-spacing: 1px;
+        box-shadow: 0 -2px 8px rgba(76,99,255,0.10);
+      }
+      @media (max-width: 700px) {
+        .navbar, .footer { padding: 1em 1em; }
+        .navbar-links a, .navbar-user { margin-left: 1em; font-size: 1em; }
+      }
+    </style>
+</head>
+<body>
+    <nav class="navbar glass">
+        <div class="navbar-brand">WebAppIAM</div>
+        <div class="navbar-links">
+            {% if user.is_authenticated %}
+                <span class="navbar-user">Welcome, {{ user.username }}</span>
+                <a href="{% url 'core:dashboard' %}">Dashboard</a>
+                {% if user.role == 'ADMIN' %}
+                    <a href="{% url 'core:admin_dashboard' %}">Admin</a>
+                {% endif %}
+                <a href="{% url 'core:logout' %}">Logout</a>
+            {% else %}
+                <a href="{% url 'core:login' %}">Login</a>
+                <a href="{% url 'core:register' %}">Register</a>
+            {% endif %}
+        </div>
+    </nav>
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    <footer class="footer glass">
+        <span>&copy; {{ now|date:'Y' }} WebAppIAM. All rights reserved.</span>
+    </footer>
+    <div id="global-toast-container"></div>
+</body>
+</html>

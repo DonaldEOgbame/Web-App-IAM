@@ -1,0 +1,10 @@
+{% autoescape off %}
+Hi {{ user.username }},
+
+A high-risk login was detected for your account at {{ timestamp }} from IP {{ ip_address }}.
+
+If this was not you, please change your password immediately or contact support.
+
+Thank you,
+WebAppIAM Security Team
+{% endautoescape %}

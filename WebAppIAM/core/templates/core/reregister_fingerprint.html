@@ -1,0 +1,34 @@
+{% block content %}
+<div class="container">
+  <h2>Re-register Fingerprint</h2>
+  <form id="webauthn-register-form" method="post">
+    {% csrf_token %}
+    <button class="btn" type="button" onclick="startWebAuthnRegistration()">Start Fingerprint Registration</button>
+  </form>
+  <script src="{% static 'js/main.js' %}"></script>
+  <script>
+    function startWebAuthnRegistration() {
+      // JS logic for WebAuthn registration (to be implemented)
+      alert('WebAuthn registration flow will start here.');
+    }
+  </script>
+</div>
+{% endblock %}
+
+{% extends 'base.html' %}
+{% block content %}
+<div class="container glass" style="max-width:440px;margin:3em auto 0 auto;padding:2.5em 2em;">
+  <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Re-register Fingerprint</h2>
+  <form id="webauthn-register-form" method="post" style="margin-bottom:0;">
+    {% csrf_token %}
+    <button class="btn" type="button" style="width:100%;font-size:1.1em;" onclick="startWebAuthnRegistration()">&#128307; Start Fingerprint Registration</button>
+  </form>
+  <script src="{% static 'js/main.js' %}"></script>
+  <script>
+    function startWebAuthnRegistration() {
+      // JS logic for WebAuthn registration (to be implemented)
+      showToast('WebAuthn registration flow will start here.', 'info');
+    }
+  </script>
+</div>
+{% endblock %}

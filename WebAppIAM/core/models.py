@@ -6,10 +6,10 @@ class User(AbstractUser):
     FACE_ENROLLED = models.BooleanField(default=False)
     FINGERPRINT_ENROLLED = models.BooleanField(default=False)
     role = models.CharField(max_length=10, choices=[('USER', 'User'), ('ADMIN', 'Admin')], default='USER')
-    
-    # Azure Face API fields
     azure_face_id = models.CharField(max_length=100, blank=True, null=True)
-    
+    last_activity = models.DateTimeField(null=True, blank=True)
+    email_verified = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.username} ({self.role})"
 
@@ -40,6 +40,7 @@ class UserSession(models.Model):
     session_key = models.CharField(max_length=40)
     ip_address = models.GenericIPAddressField()
     user_agent = models.TextField()
+    device_fingerprint = models.CharField(max_length=255, blank=True, null=True)
     login_time = models.DateTimeField(auto_now_add=True)
     logout_time = models.DateTimeField(null=True, blank=True)
     face_match_score = models.FloatField(null=True, blank=True, validators=[MinValueValidator(0.0), MaxValueValidator(1.0)])
@@ -53,6 +54,7 @@ class UserSession(models.Model):
     ], default='LOW')
     access_granted = models.BooleanField(default=False)
     flagged_reason = models.TextField(blank=True, null=True)
+    forced_logout = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['-login_time']

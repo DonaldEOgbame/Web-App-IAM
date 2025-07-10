@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container admin-dashboard-container glass" style="padding:2.5em 2em; margin-top:2em;">
+  <h2 class="center" style="font-size:2.2em; margin-bottom:1.2em; letter-spacing:1px; background: linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Admin Dashboard</h2>
+  <div class="card shadow mb-3 glass" style="backdrop-filter: blur(6px);">
+    <h3 class="center" style="font-size:1.3em;">User Accounts</h3>
+    <div class="table-responsive">
+      <table class="modern-table" style="border-radius:12px;overflow:hidden;">
+        <thead>
+          <tr style="background:linear-gradient(90deg,#e3e9f7,#f8fafc);">
+            <th>Username</th>
+            <th>Role</th>
+            <th>Face</th>
+            <th>Fingerprint</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for user in users %}
+          <tr style="transition:background 0.2s;">
+            <td>{{ user.username }}</td>
+            <td>{{ user.role }}</td>
+            <td>{% if user.FACE_ENROLLED %}<span class="risk-indicator risk-low"></span>&#10004;{% else %}<span class="risk-indicator risk-high"></span>&#10006;{% endif %}</td>
+            <td>{% if user.FINGERPRINT_ENROLLED %}<span class="risk-indicator risk-low"></span>&#10004;{% else %}<span class="risk-indicator risk-high"></span>&#10006;{% endif %}</td>
+            <td>{% if user.is_active %}<span class="alert-success">Active</span>{% else %}<span class="alert-danger">Locked</span>{% endif %}</td>
+            <td style="display:flex;gap:0.5em;">
+              <a class="btn" href="{% url 'core:lock_user' user.id %}">&#128274; Lock</a>
+              <a class="btn" href="{% url 'core:unlock_user' user.id %}">&#128275; Unlock</a>
+              <a class="btn" href="{% url 'core:force_reenroll' user.id %}">&#128248; Force Re-enroll</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="center">No users found.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card shadow mb-3 glass center" style="backdrop-filter: blur(6px);">
+    <a class="btn" href="{% url 'core:policy_editor' %}" style="margin-right:1em;">&#9881; Edit Risk Policy</a>
+    <a class="btn" href="{% url 'core:audit_logs' %}">&#128221; View Audit Logs</a>
+  </div>
+</div>
+{% endblock %}
