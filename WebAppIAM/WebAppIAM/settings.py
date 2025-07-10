@@ -63,6 +63,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.views.base_context',
             ],
         },
     },
@@ -124,7 +125,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Use custom user model
-AUTH_USER_MODEL = 'core.CustomUser'
+AUTH_USER_MODEL = 'core.User'
 
 
 # Email settings (update for production)

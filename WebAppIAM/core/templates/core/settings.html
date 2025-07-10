@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container glass" style="max-width:700px;margin:3em auto 0 auto;padding:2.5em 2em;">
+  <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Settings</h2>
+  <form method="post" action="{% url 'core:password_change' %}" style="margin-bottom:2em;">
+    {% csrf_token %}
+    <h3>🔑 Change Password <span class="help-icon" title="Change your account password. Password must meet security requirements.">?</span></h3>
+    {{ password_form.as_p }}
+    <button class="btn" type="submit">Change Password</button>
+  </form>
+  <form method="post" action="{% url 'core:reenroll_face' %}" enctype="multipart/form-data" style="margin-bottom:2em;">
+    {% csrf_token %}
+    <h3>Re-enroll Face <span class="help-icon" title="Re-enroll your face for biometric authentication. Required for secure document access.">?</span></h3>
+    {{ face_form.as_p }}
+    <button class="btn" type="submit" {% if user.last_session and user.last_session.risk_level == 'HIGH' %}disabled title="High-risk users cannot update biometrics."{% endif %}>Re-enroll Face</button>
+    {% if user.last_session and user.last_session.risk_level == 'HIGH' %}
+      <div class="alert alert-warning mt-2">High-risk users cannot update biometrics.</div>
+    {% endif %}
+  </form>
+  <form method="post" action="{% url 'core:reregister_fingerprint' %}" style="margin-bottom:2em;">
+    {% csrf_token %}
+    <h3>Re-register Fingerprint <span class="help-icon" title="Re-register your fingerprint (WebAuthn/FIDO2). Required for secure document access.">?</span></h3>
+    {{ fingerprint_form.as_p }}
+    <button class="btn" type="submit" {% if user.last_session and user.last_session.risk_level == 'HIGH' %}disabled title="High-risk users cannot update biometrics."{% endif %}>Re-register Fingerprint</button>
+    {% if user.last_session and user.last_session.risk_level == 'HIGH' %}
+      <div class="alert alert-warning mt-2">High-risk users cannot update biometrics.</div>
+    {% endif %}
+  </form>
+  <form method="post" action="" style="margin-bottom:2em;">
+    {% csrf_token %}
+    <div class="profile-section">
+      <h3>🧩 Behavior Preferences <span class="help-icon" title="Control risk and biometric display preferences on your dashboard.">?</span></h3>
+      <label><input type="checkbox" name="show_risk_alerts" {% if show_risk_alerts %}checked{% endif %}> Show risk alerts on dashboard <span class="help-icon" title="Enable to see risk-based security alerts and warnings.">?</span></label><br>
+      <label><input type="checkbox" name="show_face_match" {% if show_face_match %}checked{% endif %}> Show face match % <span class="help-icon" title="Enable to display your face match confidence score after login.">?</span></label>
+      <button class="btn" type="submit" style="margin-top:1em;">Save Preferences</button>
+    </div>
+  </form>
+  <div class="mt-3" style="font-size:0.95em;color:#888;">
+    <span class="help-icon" style="font-size:1.1em;">?</span> <b>Note:</b> Some settings are restricted for high-risk sessions. Biometric re-enrollment is required for secure document access.
+  </div>
+</div>
+{% endblock %}

@@ -39,4 +39,15 @@ urlpatterns = [
     path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    # Document Vault URLs
+    path('documents/', views.document_list, name='document_list'),
+    path('documents/upload/', views.document_upload, name='document_upload'),
+    path('documents/download/<int:doc_id>/', views.document_download, name='document_download'),
+    path('documents/reverify/<int:doc_id>/', views.document_reverify, name='document_reverify'),
+    path('documents/access_logs/', views.document_access_logs, name='document_access_logs'),
+    path('documents/restore/<int:doc_id>/', views.restore_document_version, name='restore_document_version'),
+    # User Profile & Settings
+    path('profile/', views.profile, name='profile'),
+    path('settings/', views.settings, name='settings'),
+    path('notifications/', views.notifications, name='notifications'),
 ]

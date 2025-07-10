@@ -1,4 +1,3 @@
-def calculate_risk_score(face_match_score, fingerprint_verified, behavior_anomaly_score):
 
 # --- PLUG-AND-PLAY AI/ML COMPONENTS ---
 from django.conf import settings

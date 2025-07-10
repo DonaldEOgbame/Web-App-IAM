@@ -1,3 +1,24 @@
+# --- Utility: Admin check ---
+def is_admin(user):
+    return user.role == 'ADMIN'
+
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required, user_passes_test
+# --- Admin: Restore Previous Document Version ---
+@login_required
+@user_passes_test(is_admin)
+@require_POST
+def restore_document_version(request, doc_id):
+    doc = get_object_or_404(Document, id=doc_id, deleted=True)
+    # Find the current active version (if any)
+    current = Document.objects.filter(title=doc.title, category=doc.category, department=doc.department, deleted=False).order_by('-version').first()
+    if current:
+        current.deleted = True
+        current.save()
+    doc.deleted = False
+    doc.save()
+    AuditLog.objects.create(user=request.user, action='DOCUMENT_RESTORE', details=f'Restored version v{doc.version} of "{doc.title}"', ip_address=get_client_ip(request))
+    return redirect('core:document_access_logs')
 import json
 import logging
 from datetime import datetime, time
@@ -11,7 +32,7 @@ from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from .models import (
     User, UserBehaviorProfile, WebAuthnCredential, 
-    UserSession, RiskPolicy, AuditLog
+    UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog
 )
 from .webauthn_utils import (
     generate_registration_options,
@@ -22,13 +43,10 @@ from .webauthn_utils import (
 from .face_api import verify_face, enroll_face
 from .risk_engine import calculate_risk_score
 from .forms import (
-    RegistrationForm, LoginForm, FaceEnrollForm, FingerprintReRegisterForm, RiskPolicyForm, ReportSubmissionForm, CustomPasswordChangeForm
+    RegistrationForm, LoginForm, FaceEnrollForm, FingerprintReRegisterForm, RiskPolicyForm, ReportSubmissionForm, CustomPasswordChangeForm, DocumentUploadForm
 )
 
 logger = logging.getLogger(__name__)
-
-def is_admin(user):
-    return user.role == 'ADMIN'
 
 # Registration Views
 def register(request):
@@ -38,16 +56,18 @@ def register(request):
         role = request.POST.get('role', 'USER')
         
         if User.objects.filter(username=username).exists():
-            return render(request, 'register.html', {'error': 'Username already exists'})
+            return render(request, 'core/register.html', {'error': 'Username already exists'})
         
         user = User.objects.create_user(username=username, password=password, role=role)
         UserBehaviorProfile.objects.create(user=user)
+        from .models import UserPreference
+        UserPreference.objects.create(user=user)
         
         # Store user ID in session for multi-step registration
         request.session['registration_user_id'] = user.id
         return redirect('register_biometrics')
     
-    return render(request, 'register.html')
+    return render(request, 'core/register.html')
 
 @login_required
 def register_biometrics(request):
@@ -126,11 +146,15 @@ def webauthn_registration_verify(request):
 def login(request):
     # Rate limit login attempts
     if not rate_limit(request, 'login', limit=5, window=60):
-        return render(request, 'login.html', {'error': 'Too many login attempts. Please try again later.'})
+        return render(request, 'core/login.html', {'error': 'Too many login attempts. Please try again later.'})
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
         user = authenticate(request, username=username, password=password)
+        if user is not None:
+            # Ensure UserPreference exists
+            from .models import UserPreference
+            UserPreference.objects.get_or_create(user=user)
         if user is None:
             AuditLog.objects.create(
                 user=None,
@@ -142,7 +166,7 @@ def login(request):
             # Optional: notify admin of repeated failed logins
             if AuditLog.objects.filter(action='LOGIN_ATTEMPT', ip_address=get_client_ip(request), timestamp__gte=timezone.now()-timezone.timedelta(hours=1)).count() > 5:
                 notify_admin('Repeated Failed Logins', f'IP {get_client_ip(request)} had multiple failed logins in the past hour.')
-            return render(request, 'login.html', {'error': 'Invalid credentials'})
+            return render(request, 'core/login.html', {'error': 'Invalid credentials'})
         # Create a session record (not authenticated yet - waiting for biometrics)
         session = UserSession.objects.create(
             user=user,
@@ -166,7 +190,7 @@ def login(request):
             # If no biometrics, proceed with risk evaluation
             session = finalize_authentication(request, session)
             return redirect('core:dashboard')
-    return render(request, 'login.html')
+    return render(request, 'core/login.html')
 
 @login_required
 def verify_biometrics(request):
@@ -250,11 +274,12 @@ def webauthn_authentication_verify(request):
         logger.error(f"WebAuthn authentication failed: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-@login_required
+
 import time as pytime
 from django.core.mail import send_mail
 from django.utils import timezone
 from django.core.cache import cache
+@login_required
 
 def rate_limit(request, key_prefix, limit=5, window=60):
     key = f"rate:{key_prefix}:{request.META.get('REMOTE_ADDR')}"
@@ -403,6 +428,7 @@ def finalize_authentication(request, session=None):
             notify_admin('Repeated High-Risk Logins', context)
     return session
 
+
 # Dashboard Views
 @login_required
 def dashboard(request):
@@ -418,6 +444,74 @@ def dashboard(request):
     }
     return render(request, 'dashboard.html', context)
 
+# --- User Profile Page ---
+@login_required
+def profile(request):
+    user = request.user
+    sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:10]
+    downloads = DocumentAccessLog.objects.filter(user=user, was_blocked=False).order_by('-timestamp')[:10]
+    context = {
+        'user': user,
+        'sessions': sessions,
+        'downloads': downloads,
+        'face_enrolled': user.FACE_ENROLLED,
+        'fingerprint_enrolled': user.FINGERPRINT_ENROLLED,
+    }
+    return render(request, 'core/profile.html', context)
+
+# --- User Settings Page ---
+@login_required
+def settings(request):
+    user = request.user
+    password_form = CustomPasswordChangeForm(user=user)
+    face_form = FaceEnrollForm()
+    fingerprint_form = FingerprintReRegisterForm()
+    # Use persistent UserPreference
+    preference, _ = user.preference if hasattr(user, 'preference') else (None, False)
+    if not preference:
+        from .models import UserPreference
+        preference, _ = UserPreference.objects.get_or_create(user=user)
+    show_risk_alerts = preference.show_risk_alerts
+    show_face_match = preference.show_face_match
+    if request.method == 'POST':
+        # Restrict high-risk users from updating security settings
+        session = UserSession.objects.filter(user=user).order_by('-login_time').first()
+        if session and session.risk_level == 'HIGH':
+            return render(request, 'core/access_denied.html', {'reason': 'High-risk users cannot update security settings.'})
+        if 'old_password' in request.POST:
+            password_form = CustomPasswordChangeForm(user=user, data=request.POST)
+            if password_form.is_valid():
+                password_form.save()
+                AuditLog.objects.create(user=user, action='PASSWORD_CHANGE', details='Password changed', ip_address=get_client_ip(request))
+                return redirect('core:settings')
+        elif 'face_image' in request.FILES:
+            face_form = FaceEnrollForm(request.POST, request.FILES)
+            if face_form.is_valid():
+                face_image = face_form.cleaned_data['face_image']
+                try:
+                    face_id = enroll_face(user, face_image)
+                    user.azure_face_id = face_id
+                    user.FACE_ENROLLED = True
+                    user.save()
+                    AuditLog.objects.create(user=user, action='FACE_ENROLL', details='Face re-enrolled', ip_address=get_client_ip(request))
+                    return redirect('core:settings')
+                except Exception as e:
+                    face_form.add_error(None, str(e))
+        elif 'show_risk_alerts' in request.POST or 'show_face_match' in request.POST:
+            preference.show_risk_alerts = 'show_risk_alerts' in request.POST
+            preference.show_face_match = 'show_face_match' in request.POST
+            preference.save()
+            return redirect('core:settings')
+    context = {
+        'user': user,
+        'password_form': password_form,
+        'face_form': face_form,
+        'fingerprint_form': fingerprint_form,
+        'show_risk_alerts': show_risk_alerts,
+        'show_face_match': show_face_match,
+    }
+    return render(request, 'core/settings.html', context)
+
 @login_required
 @user_passes_test(is_admin)
 def admin_dashboard(request):
@@ -432,6 +526,154 @@ def admin_dashboard(request):
         'active_policy': RiskPolicy.objects.filter(is_active=True).first(),
     }
     return render(request, 'admin_dashboard.html', context)
+
+# Document Vault Views
+@login_required
+def document_list(request):
+    user = request.user
+    q = request.GET.get('q', '')
+    category = request.GET.get('category', '')
+    docs = Document.objects.filter(deleted=False)
+    if user.role != 'ADMIN':
+        docs = docs.filter(
+            Q(access_level='USER') |
+            Q(access_level='DEPT', department=user.groups.first().name if user.groups.exists() else None)
+        )
+    if q:
+        docs = docs.filter(Q(title__icontains=q) | Q(description__icontains=q))
+    if category:
+        docs = docs.filter(category=category)
+    docs = docs.order_by('-created_at')
+    session = UserSession.objects.filter(user=user).order_by('-login_time').first()
+    today = timezone.now().date()
+    for doc in docs:
+        doc.can_download = (
+            not doc.is_expired() and session and session.access_granted and session.face_match_score is not None and session.fingerprint_verified and session.risk_level == 'LOW'
+        )
+        # In-app notification for expiry
+        if doc.expiry_date:
+            if doc.expiry_date == today:
+                from .models import UserNotification
+                UserNotification.objects.get_or_create(
+                    user=user,
+                    message=f'Document "{doc.title}" expires today.',
+                    type='expiry',
+                    link=f'/documents/download/{doc.id}/'
+                )
+            elif doc.expiry_date < today:
+                from .models import UserNotification
+                UserNotification.objects.get_or_create(
+                    user=user,
+                    message=f'Document "{doc.title}" has expired.',
+                    type='expiry',
+                    link=f'/documents/download/{doc.id}/'
+                )
+    # In-app notification for high risk
+    if session and session.risk_level == 'HIGH' and user.email:
+        from .models import UserNotification
+        UserNotification.objects.get_or_create(
+            user=user,
+            message='Your recent session was flagged as HIGH RISK. Please review your account activity and contact support if this was not you.',
+            type='risk',
+            link='/settings/'
+        )
+    return render(request, 'core/document_list.html', {
+        'documents': docs,
+        'category_choices': Document.CATEGORY_CHOICES,
+        'today': today,
+    })
+# --- User Notification Center ---
+@login_required
+def notifications(request):
+    user = request.user
+    notifications = user.notifications.all()
+    if request.method == 'POST':
+        notif_id = request.POST.get('notif_id')
+        if notif_id:
+            notif = user.notifications.filter(id=notif_id).first()
+            if notif:
+                notif.read = True
+                notif.save()
+    return render(request, 'core/notifications.html', {'notifications': notifications})
+
+@login_required
+@user_passes_test(lambda u: u.role == 'ADMIN')
+def document_upload(request):
+    if request.method == 'POST':
+        form = DocumentUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            doc = form.save(commit=False)
+            doc.uploaded_by = request.user
+            # Versioning: if uploading a new version of an existing doc (by title/category/department), increment version
+            latest = Document.objects.filter(
+                title=doc.title,
+                category=doc.category,
+                department=doc.department,
+                deleted=False
+            ).order_by('-version').first()
+            if latest:
+                doc.version = latest.version + 1
+                doc.parent = latest
+                latest.deleted = True  # Soft-delete previous version
+                latest.save()
+            doc.save()
+            return redirect('core:document_list')
+    else:
+        form = DocumentUploadForm()
+    return render(request, 'core/document_upload.html', {'form': form})
+
+@login_required
+def document_download(request, doc_id):
+    doc = get_object_or_404(Document, id=doc_id, deleted=False)
+    user = request.user
+    session = UserSession.objects.filter(user=user).order_by('-login_time').first()
+    allowed = (
+        not doc.is_expired() and session and session.access_granted and session.face_match_score is not None and session.fingerprint_verified and session.risk_level == 'LOW'
+    )
+    was_blocked = not allowed
+    # Log every attempt
+    DocumentAccessLog.objects.create(
+        user=user,
+        document=doc,
+        face_score=session.face_match_score if session else None,
+        fingerprint_status=session.fingerprint_verified if session else False,
+        risk_score=session.risk_score if session else None,
+        was_blocked=was_blocked,
+        session=session,
+        ip_address=request.META.get('REMOTE_ADDR'),
+    )
+    if not allowed:
+        return redirect('core:document_reverify', doc_id=doc.id)
+    try:
+        # Serve watermarked PDF if PDF, else original file
+        if doc.file.name.lower().endswith('.pdf'):
+            watermarked_path = doc.get_watermarked_file()
+            from django.core.files.storage import default_storage
+            file_handle = default_storage.open(watermarked_path, 'rb')
+            filename = doc.file.name.split('/')[-1].replace('.pdf', '_watermarked.pdf')
+            from django.http import FileResponse
+            return FileResponse(file_handle, as_attachment=True, filename=filename)
+        else:
+            from django.http import FileResponse
+            return FileResponse(doc.file.open('rb'), as_attachment=True, filename=doc.file.name.split('/')[-1])
+    except Exception:
+        from django.http import Http404
+        raise Http404('File not found')
+
+@login_required
+def document_reverify(request, doc_id):
+    # Optionally trigger re-authentication/biometric flow
+    return render(request, 'core/access_denied.html', {'reason': 'Biometric or risk check required for this document.'})
+
+@login_required
+@user_passes_test(lambda u: u.role == 'ADMIN')
+def document_access_logs(request):
+    q = request.GET.get('q', '')
+    logs = DocumentAccessLog.objects.all()
+    if q:
+        logs = logs.filter(Q(user__username__icontains=q) | Q(document__title__icontains=q) | Q(ip_address__icontains=q))
+    logs = logs.order_by('-timestamp')[:200]
+    return render(request, 'core/document_access_logs.html', {'logs': logs})
 
 # Utility functions
 def get_client_ip(request):
@@ -474,10 +716,10 @@ def reenroll_face(request):
                 AuditLog.objects.create(user=user, action='FACE_ENROLL', details='Face re-enrolled', ip_address=get_client_ip(request))
                 return redirect('core:dashboard')
             except Exception as e:
-                return render(request, 'reenroll_face.html', {'form': form, 'error': str(e)})
+                return render(request, 'core/reenroll_face.html', {'form': form, 'error': str(e)})
     else:
         form = FaceEnrollForm()
-    return render(request, 'reenroll_face.html', {'form': form})
+    return render(request, 'core/reenroll_face.html', {'form': form})
 
 @login_required
 def reregister_fingerprint(request):
@@ -489,7 +731,7 @@ def reregister_fingerprint(request):
         AuditLog.objects.create(user=user, action='FINGERPRINT_ENROLL', details='Fingerprint re-registered', ip_address=get_client_ip(request))
         return redirect('core:dashboard')
     form = FingerprintReRegisterForm()
-    return render(request, 'reregister_fingerprint.html', {'form': form})
+    return render(request, 'core/reregister_fingerprint.html', {'form': form})
 
 # --- Password Change ---
 @login_required
@@ -502,7 +744,7 @@ def password_change(request):
             return redirect('core:dashboard')
     else:
         form = CustomPasswordChangeForm(user=request.user)
-    return render(request, 'password_change.html', {'form': form})
+    return render(request, 'core/password_change.html', {'form': form})
 
 # --- Policy Editor ---
 @login_required
@@ -600,4 +842,10 @@ def personal_data(request):
 
 def access_denied(request):
     reason = request.GET.get('reason', 'Access denied due to risk or policy.')
-    return render(request, 'access_denied.html', {'reason': reason})
+    return render(request, 'core/access_denied.html', {'reason': reason})
+
+def base_context(request):
+    unread_notifications_count = 0
+    if request.user.is_authenticated:
+        unread_notifications_count = request.user.notifications.filter(read=False).count()
+    return {'unread_notifications_count': unread_notifications_count}

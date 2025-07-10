@@ -1,13 +1,5 @@
-{% block content %}
-  <h2>Register</h2>
-  <form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Register</button>
-  </form>
-{% endblock %}
-
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
 <div class="container glass" style="max-width:440px;margin:3em auto 0 auto;padding:2.5em 2em;">
   <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Register</h2>

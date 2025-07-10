@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
-from .models import User, RiskPolicy
+from .models import User, RiskPolicy, Document
 
 class RegistrationForm(UserCreationForm):
     role = forms.ChoiceField(choices=[('USER', 'User'), ('ADMIN', 'Admin')], initial='USER')
@@ -29,3 +29,11 @@ class ReportSubmissionForm(forms.Form):
 
 class CustomPasswordChangeForm(PasswordChangeForm):
     pass
+
+class DocumentUploadForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ['title', 'file', 'description', 'access_level', 'category', 'department', 'expiry_date']
+        widgets = {
+            'expiry_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        }

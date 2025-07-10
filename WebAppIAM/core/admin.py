@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import User, UserBehaviorProfile, WebAuthnCredential, UserSession, RiskPolicy, AuditLog
+from .models import User, UserBehaviorProfile, WebAuthnCredential, UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 @admin.register(User)
@@ -42,3 +42,15 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ('user', 'action', 'timestamp', 'ip_address')
     search_fields = ('user__username', 'action', 'ip_address', 'details')
     list_filter = ('action',)
+
+@admin.register(Document)
+class DocumentAdmin(admin.ModelAdmin):
+    list_display = ('title', 'access_level', 'category', 'department', 'uploaded_by', 'created_at', 'expiry_date')
+    list_filter = ('access_level', 'category', 'department', 'expiry_date')
+    search_fields = ('title', 'description', 'department')
+
+@admin.register(DocumentAccessLog)
+class DocumentAccessLogAdmin(admin.ModelAdmin):
+    list_display = ('user', 'document', 'timestamp', 'face_score', 'fingerprint_status', 'risk_score', 'was_blocked', 'ip_address')
+    list_filter = ('was_blocked', 'risk_score')
+    search_fields = ('user__username', 'document__title', 'ip_address')

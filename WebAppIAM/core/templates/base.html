@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -57,12 +58,17 @@
         <div class="navbar-brand">WebAppIAM</div>
         <div class="navbar-links">
             {% if user.is_authenticated %}
-                <span class="navbar-user">Welcome, {{ user.username }}</span>
                 <a href="{% url 'core:dashboard' %}">Dashboard</a>
+                <a href="{% url 'core:document_list' %}">Documents</a>
+                <a href="{% url 'core:profile' %}">Profile</a>
+                <a href="{% url 'core:settings' %}">Settings</a>
+                {# Django templates do not support method calls or filter chaining. Use a template variable from the view instead. #}
+                <a href="{% url 'core:notifications' %}">Notifications{% if unread_notifications_count %} <span class="badge badge-danger">{{ unread_notifications_count }}</span>{% endif %}</a>
                 {% if user.role == 'ADMIN' %}
                     <a href="{% url 'core:admin_dashboard' %}">Admin</a>
                 {% endif %}
                 <a href="{% url 'core:logout' %}">Logout</a>
+                <span class="navbar-user">Welcome, {{ user.username }}</span>
             {% else %}
                 <a href="{% url 'core:login' %}">Login</a>
                 <a href="{% url 'core:register' %}">Register</a>

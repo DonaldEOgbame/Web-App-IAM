@@ -1,22 +1,17 @@
-{% block content %}
-<div class="container">
-  <h2>Access Denied</h2>
-  <div class="alert alert-danger">
-    <strong>Access Blocked:</strong> {{ reason }}
-  </div>
-  <a class="btn" href="{% url 'core:login' %}">Return to Login</a>
-</div>
-{% endblock %}
-
 {% extends 'base.html' %}
+{% load static %}
 {% block content %}
 <div class="container glass" style="max-width:420px;margin:4em auto 0 auto;padding:2.5em 2em;">
   <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#f44336,#ff9800);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Access Denied</h2>
   <div class="alert alert-danger" style="font-size:1.1em;">
     <strong>&#9940; Access Blocked:</strong> {{ reason }}
   </div>
-  <div class="center">
-    <a class="btn" href="{% url 'core:login' %}" style="width:100%;font-size:1.1em;">&#128274; Return to Login</a>
+  <div class="center" style="margin-top:1.5em;">
+    {% if user.is_authenticated %}
+      <a class="btn" href="javascript:history.back()" style="width:100%;font-size:1.1em;">&#8592; Go Back</a>
+    {% else %}
+      <a class="btn" href="{% url 'core:login' %}" style="width:100%;font-size:1.1em;">&#128274; Return to Login</a>
+    {% endif %}
   </div>
 </div>
 {% endblock %}

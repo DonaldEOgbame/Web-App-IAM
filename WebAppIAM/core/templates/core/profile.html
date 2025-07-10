@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container glass" style="max-width:700px;margin:3em auto 0 auto;padding:2.5em 2em;">
+  <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">User Profile</h2>
+  <div class="profile-section">
+    <h3>👤 Profile Details</h3>
+    <ul class="profile-list">
+      <li><strong>Username:</strong> {{ user.username }}</li>
+      <li><strong>Full Name:</strong> {{ user.get_full_name|default:user.username }}</li>
+      <li><strong>Role:</strong> {{ user.get_role_display }}</li>
+      <li><strong>Registered:</strong> {{ user.date_joined|date:'Y-m-d H:i' }}</li>
+      <li><strong>Last Login:</strong> {{ user.last_login|date:'Y-m-d H:i' }}</li>
+      <li><strong>Face Match Status:</strong> {% if face_enrolled %}<span class="badge badge-success" title="Face biometrics enrolled">&#128064; Enrolled</span>{% else %}<span class="badge badge-danger" title="Not enrolled">&#9940; Not Enrolled</span>{% endif %}</li>
+      <li><strong>Fingerprint Status:</strong> {% if fingerprint_enrolled %}<span class="badge badge-success" title="Fingerprint registered">&#128307; Registered</span>{% else %}<span class="badge badge-danger" title="Not registered">&#9940; Not Registered</span>{% endif %}</li>
+    </ul>
+  </div>
+  <div class="profile-section">
+    <h3>🟢 Risk History</h3>
+    <div style="display:flex;gap:1em;flex-wrap:wrap;">
+      {% for session in sessions %}
+        <div class="risk-indicator risk-{{ session.risk_level|lower }}" title="{{ session.risk_level }} ({{ session.risk_score|floatformat:2 }})">
+          {% if session.risk_level == 'HIGH' %}&#9888;{% elif session.risk_level == 'MEDIUM' %}&#128308;{% else %}&#9989;{% endif %}
+          {{ session.risk_level }}<br><small>{{ session.risk_score|floatformat:2 }}</small>
+        </div>
+      {% empty %}
+        <span>No recent sessions.</span>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="profile-section">
+    <h3>📂 My Downloads</h3>
+    <ul class="profile-list">
+      {% for log in downloads %}
+        <li>{{ log.document.title }}
+          {% if log.document.version > 1 %}<span class="badge badge-info badge-version" title="Version">v{{ log.document.version }}</span>{% endif %}
+          {% if log.document.deleted %}<span class="badge badge-secondary ml-1">Archived</span>{% endif %}
+          <span class="badge badge-info">{{ log.timestamp|date:'Y-m-d H:i' }}</span>
+        </li>
+      {% empty %}
+        <li>No downloads yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  <div class="profile-section">
+    <h3>🧠 Behavioral Summary</h3>
+    <ul class="profile-list">
+      <li><strong>Common Login Time:</strong> {{ user.behavior_profile.typical_login_time|default:'-' }}</li>
+      <li><strong>Devices Used:</strong> {{ user.behavior_profile.typical_device|default:'-' }}</li>
+      <li><strong>Session Flags:</strong> {% for s in sessions %}{% if s.flagged_reason %}<span class="badge badge-warning" title="{{ s.flagged_reason }}">⚠️</span>{% endif %}{% endfor %}{% if not sessions|length %}-{% endif %}</li>
+    </ul>
+  </div>
+  <div class="center" style="margin-top:2em;">
+    <a class="btn" href="{% url 'core:settings' %}">&#9881; Settings</a>
+  </div>
+</div>
+{% endblock %}

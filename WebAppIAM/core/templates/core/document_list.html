@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container glass" style="max-width:900px;margin:3em auto 0 auto;padding:2.5em 2em;">
+  <h2 class="center" style="font-size:2em;margin-bottom:1.2em;background:linear-gradient(90deg,#6c63ff,#48c6ef);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Document Vault</h2>
+  <form method="get" class="mb-3" style="display:flex;gap:1em;align-items:center;justify-content:center;margin-bottom:2em;">
+    <input class="form-control" type="text" name="q" placeholder="Search documents..." value="{{ request.GET.q }}" style="max-width:320px;">
+    <select class="form-control" name="category" style="max-width:180px;">
+      <option value="">All Categories</option>
+      {% for cat, cat_label in category_choices %}
+        <option value="{{ cat }}" {% if request.GET.category == cat %}selected{% endif %}>{{ cat_label }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn" type="submit">&#128269; Search</button>
+    {% if user.is_authenticated and user.role == 'ADMIN' %}
+      <a class="btn" href="{% url 'core:document_upload' %}">&#11014; Upload</a>
+    {% endif %}
+  </form>
+  <div class="table-responsive">
+    <table class="modern-table" style="border-radius:12px;overflow:hidden;">
+      <thead>
+        <tr style="background:linear-gradient(90deg,#e3e9f7,#f8fafc);">
+          <th>Title</th>
+          <th>Category</th>
+          <th>Access</th>
+          <th>Uploaded</th>
+          <th>Expiry</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for doc in documents %}
+        <tr>
+          <td>
+            {{ doc.title }}
+            {% if doc.version > 1 %}<span class="badge badge-info" title="Version">v{{ doc.version }}</span>{% endif %}
+            {% if doc.deleted %}<span class="badge badge-secondary ml-1">Archived</span>{% endif %}
+            {% if doc.file.name|lower|endswith:'.pdf' %}<span class="badge badge-primary ml-1" title="Watermarked PDF">&#128166; Watermarked</span>{% endif %}
+            {% if user.is_authenticated and user.role == 'ADMIN' and doc.version > 1 %}
+              <a href="{% url 'core:document_access_logs' %}?q={{ doc.title|urlencode }}" class="btn btn-sm btn-outline-info ml-1" title="View Previous Versions">&#128196; Versions</a>
+            {% endif %}
+          </td>
+          <td>{{ doc.get_category_display }}</td>
+          <td>{{ doc.get_access_level_display }}</td>
+          <td>{{ doc.created_at|date:'Y-m-d H:i' }}</td>
+          <td>
+            {% if doc.expiry_date %}
+              <span class="badge badge-warning" title="Expiry Date">{{ doc.expiry_date|date:'Y-m-d' }}</span>
+              {% if doc.is_expired %}<span class="badge badge-danger ml-1">Expired</span>{% endif %}
+            {% else %}-{% endif %}
+          </td>
+          <td>
+            {% with badge=doc.get_status_badge %}
+              <span class="badge badge-{{ badge.1 }}">{{ badge.0 }}</span>
+            {% endwith %}
+          </td>
+          <td style="min-width:120px;">
+            {% if doc.is_expired %}
+              <span class="alert alert-warning">Expired</span>
+            {% elif doc.can_download %}
+              <a class="btn" href="{% url 'core:document_download' doc.id %}">&#128190; Download</a>
+            {% else %}
+              <span class="alert alert-danger">Blocked</span>
+              <a class="btn" href="{% url 'core:document_reverify' doc.id %}">&#128274; Re-verify</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="center">No documents found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if user.is_authenticated and user.role == 'ADMIN' %}
+      <div class="mt-3" style="text-align:right;">
+        <a class="btn btn-outline-success" href="{% url 'core:export_audit_logs' %}">&#128190; Export Audit Logs (CSV)</a>
+      </div>
+    {% endif %}
+    <div class="mt-3" style="font-size:0.95em;color:#888;">
+      <span class="help-icon" style="font-size:1.1em;">?</span> <b>Note:</b> Expired documents cannot be downloaded. Watermarked PDFs are marked with <span class="badge badge-primary">&#128166; Watermarked</span>.<br>
+      {% for doc in documents %}
+        {% if doc.expiry_date and doc.expiry_date|date:'Y-m-d' == today|date:'Y-m-d' %}
+          <span class="alert alert-warning mt-2">&#9888; Document "{{ doc.title }}" expires today!</span><br>
+        {% elif doc.expiry_date and doc.expiry_date < today %}
+          <span class="alert alert-danger mt-2">&#9888; Document "{{ doc.title }}" has expired!</span><br>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}
