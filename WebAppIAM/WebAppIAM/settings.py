@@ -56,14 +56,13 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
-        'APP_DIRS': True,
+        'APP_DIRS': False,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'core.views.base_context',
             ],
         },
     },
@@ -153,3 +152,7 @@ WEBAUTHN_EXPECTED_ORIGIN = 'https://your-domain.com'
 RISK_FACE_WEIGHT = 0.4
 RISK_FINGERPRINT_WEIGHT = 0.4
 RISK_BEHAVIOR_WEIGHT = 0.2
+
+# Feature Flags
+FACE_API_ENABLED = True  # Toggle for Face API availability
+RISK_ENGINE_BYPASS = False  # Maintenance mode for risk engine
