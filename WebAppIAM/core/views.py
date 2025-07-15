@@ -6,7 +6,8 @@ import hashlib
 from datetime import datetime, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.contrib.auth import authenticate, login as auth_login, logout as auth_logout
+from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
@@ -39,7 +40,7 @@ from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
 from .forms import (
     RegistrationForm, LoginForm, FaceEnrollForm, FingerprintReRegisterForm,
     RiskPolicyForm, ReportSubmissionForm, CustomPasswordChangeForm,
-    DocumentUploadForm, ProfileCompletionForm
+    DocumentUploadForm, ProfileCompletionForm, ProfileUpdateForm, PasswordResetForm, PasswordResetConfirmForm
 )
 
 logger = logging.getLogger(__name__)
@@ -91,9 +92,31 @@ def notify_admin(subject, context):
             fail_silently=True
         )
 
-# --- Admin Check ---
+# --- Helper functions ---
 def is_admin(user):
-    return user.role == 'ADMIN'
+    """Check if the user is an administrator"""
+    return user.is_staff and user.is_superuser
+
+# --- Security Logging ---
+def log_security_event(request, event_type, details, success=False):
+    """Log security-related events with detailed context"""
+    user = request.user if request.user.is_authenticated else None
+    username = user.username if user else request.POST.get('username', 'anonymous')
+    
+    # Create audit log entry
+    AuditLog.objects.create(
+        user=user,
+        action=f"SECURITY_{event_type}",
+        details=details,
+        ip_address=get_client_ip(request)
+    )
+    
+    # Log to application logs with additional context
+    log_message = f"Security event: {event_type} | User: {username} | IP: {get_client_ip(request)} | Success: {success} | Details: {details}"
+    if success:
+        logger.info(log_message)
+    else:
+        logger.warning(log_message)
 
 # --- Account Lifecycle Views ---
 @login_required
@@ -294,46 +317,123 @@ def webauthn_registration_verify(request):
 
 # --- Authentication Views ---
 def login(request):
+    """User login view with rate limiting and security checks"""
     if request.method == 'POST':
         form = LoginForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data['email']
+            username = form.cleaned_data['username']
             password = form.cleaned_data['password']
-            user = authenticate(request, username=email, password=password)
             
-            if user is not None:
-                if not user.is_active:
-                    return render(request, 'core/login.html', {
-                        'form': form,
-                        'error': 'Account is not activated yet.'
-                    })
+            # Get the user object
+            try:
+                user = User.objects.get(username=username)
+                
+                # Check for account lockout
+                if user.failed_login_attempts >= settings.MAX_FAILED_LOGINS:
+                    if user.last_failed_login and timezone.now() < user.last_failed_login + timezone.timedelta(minutes=settings.ACCOUNT_LOCKOUT_MINUTES):
+                        AuditLog.objects.create(
+                            user=None,
+                            action='LOGIN_FAIL',
+                            details=f'Login attempt on locked account: {username}',
+                            ip_address=get_client_ip(request)
+                        )
+                        messages.error(request, f'Account locked due to too many failed attempts. Try again in {settings.ACCOUNT_LOCKOUT_MINUTES} minutes.')
+                        return render(request, 'core/login.html', {'form': form})
+                    else:
+                        # Reset failed attempts after lockout period
+                        user.failed_login_attempts = 0
+                        user.save(update_fields=['failed_login_attempts'])
+                
+                # Authenticate the user
+                user_auth = authenticate(request, username=username, password=password)
+                if user_auth is not None:
+                    # Reset failed login attempts on successful login
+                    user.failed_login_attempts = 0
+                    user.save(update_fields=['failed_login_attempts'])
                     
-                # Check if biometrics are enrolled
-                has_biometrics = (
-                    WebAuthnCredential.objects.filter(user=user).exists() or
-                    user.face_data is not None
+                    # Create audit log entry
+                    AuditLog.objects.create(
+                        user=user,
+                        action='LOGIN_SUCCESS',
+                        details='User logged in with password',
+                        ip_address=get_client_ip(request)
+                    )
+                    
+                    # Log the user in
+                    auth_login(request, user_auth)
+                    
+                    # Determine which dashboard to redirect to
+                    if user.role == 'ADMIN':
+                        return redirect('core:admin_dashboard')
+                    else:
+                        return redirect('core:student_dashboard')
+                else:
+                    # Increment failed login attempts
+                    user.failed_login_attempts += 1
+                    user.last_failed_login = timezone.now()
+                    user.save(update_fields=['failed_login_attempts', 'last_failed_login'])
+                    
+                    # Create audit log entry
+                    AuditLog.objects.create(
+                        user=None,
+                        action='LOGIN_FAIL',
+                        details=f'Failed login attempt for {username}',
+                        ip_address=get_client_ip(request)
+                    )
+                    
+                    messages.error(request, 'Invalid username or password.')
+            except User.DoesNotExist:
+                # Create audit log entry for non-existent user
+                AuditLog.objects.create(
+                    user=None,
+                    action='LOGIN_FAIL',
+                    details=f'Login attempt with non-existent username: {username}',
+                    ip_address=get_client_ip(request)
                 )
-                
-                if not has_biometrics:
-                    # Redirect to biometric enrollment
-                    request.session['pending_user_id'] = user.id
-                    return redirect('core:register_biometrics')
-                
-                auth_login(request, user)
-                
-                # Redirect based on user role
-                if user.role == 'ADMIN':
-                    return redirect('core:admin_dashboard')
-                return redirect('core:student_dashboard')
-            else:
-                return render(request, 'core/login.html', {
-                    'form': form,
-                    'error': 'Invalid email or password.'
-                })
+                messages.error(request, 'Invalid username or password.')
     else:
         form = LoginForm()
     
     return render(request, 'core/login.html', {'form': form})
+
+def register(request):
+    """User registration view"""
+    if request.method == 'POST':
+        form = RegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.set_password(form.cleaned_data['password1'])
+            user.save()
+            
+            # Create audit log entry
+            AuditLog.objects.create(
+                user=user,
+                action='USER_REGISTER',
+                details='User registered',
+                ip_address=get_client_ip(request)
+            )
+            
+            # Redirect to the login page with a success message
+            messages.success(request, 'Registration successful! Please log in.')
+            return redirect('core:login')
+    else:
+        form = RegistrationForm()
+    
+    return render(request, 'core/register.html', {'form': form})
+
+@login_required
+def logout(request):
+    """User logout view"""
+    AuditLog.objects.create(
+        user=request.user,
+        action='LOGOUT',
+        details='User logged out',
+        ip_address=get_client_ip(request)
+    )
+    
+    auth_logout(request)
+    messages.success(request, 'You have been logged out successfully.')
+    return redirect('core:login')
 
 def verify_biometrics(request):
     user_id = request.session.get('pending_auth_user_id')
@@ -371,6 +471,11 @@ def verify_biometrics(request):
 def webauthn_authentication_options(request):
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
+    
+    # Verify the session contains a valid CSRF token
+    csrf_token = request.META.get('HTTP_X_CSRFTOKEN')
+    if not csrf_token or not request.session.get('csrf_token') == csrf_token:
+        return JsonResponse({'error': 'CSRF validation failed'}, status=403)
     
     user_id = request.session.get('pending_auth_user_id')
     if not user_id:
@@ -497,22 +602,6 @@ def finalize_authentication(request, session):
     
     return session
 
-def logout(request):
-    if request.user.is_authenticated:
-        session_key = request.session.session_key
-        try:
-            session = UserSession.objects.get(session_key=session_key)
-            session.logout_time = timezone.now()
-            session.save()
-        except UserSession.DoesNotExist:
-            pass
-        
-        request.user.last_activity = timezone.now()
-        request.user.save()
-        auth_logout(request)
-    
-    return redirect('core:login')
-
 # --- Dashboard Views ---
 @login_required
 def dashboard(request):
@@ -548,30 +637,65 @@ def dashboard(request):
 
 @login_required
 def student_dashboard(request):
-    # Ensure biometric enrollment and verification
-    if not request.user.has_biometrics:
-        return redirect('core:register_biometrics')
+    """Student dashboard view"""
+    if request.user.role != 'STUDENT':
+        messages.error(request, "Access denied. You don't have permission to access this page.")
+        return redirect('core:login')
+    
+    # Update last activity timestamp
+    request.user.last_activity = timezone.now()
+    request.user.save(update_fields=['last_activity'])
+    
+    # Get user notifications
+    notifications = Notification.objects.filter(user=request.user, read=False)[:5]
     
     context = {
-        'resources': Document.objects.filter(is_public=True),
-        'notifications': Notification.objects.filter(user=request.user, is_read=False),
-        'sessions': UserSession.objects.filter(user=request.user).order_by('-created_at')[:5]
+        'user': request.user,
+        'notifications': notifications
     }
+    
     return render(request, 'core/student_dashboard.html', context)
 
 @login_required
-@user_passes_test(is_admin)
 def admin_dashboard(request):
-    # Ensure biometric enrollment and verification
-    if not request.user.has_biometrics:
-        return redirect('core:register_biometrics')
+    """Admin dashboard view"""
+    if request.user.role != 'ADMIN':
+        messages.error(request, "Access denied. You don't have permission to access this page.")
+        return redirect('core:login')
+    
+    # Update last activity timestamp
+    request.user.last_activity = timezone.now()
+    request.user.save(update_fields=['last_activity'])
+    
+    # Get basic stats for the dashboard
+    user_count = User.objects.filter(is_active=True).count()
+    active_sessions = UserSession.objects.filter(logout_time__isnull=True).count()
+    recent_logins = UserSession.objects.select_related('user').order_by('-login_time')[:5]
+    security_events = AuditLog.objects.filter(
+        timestamp__gte=timezone.now() - timezone.timedelta(hours=24),
+        action__in=['ACCESS_DENIED', 'LOGIN_FAIL', 'ACCOUNT_LOCK']
+    ).count()
+    
+    # Get system alerts
+    system_alerts = []
+    if active_sessions > 50:  # Example threshold
+        system_alerts.append({
+            'title': 'High number of active sessions',
+            'message': f'There are currently {active_sessions} active sessions.',
+            'timestamp': timezone.now(),
+            'level': 'warning'
+        })
     
     context = {
-        'pending_users': User.objects.filter(is_active=False),
-        'recent_logins': UserSession.objects.all().order_by('-created_at')[:10],
-        'risk_alerts': UserBehaviorProfile.objects.filter(risk_score__gte=settings.HIGH_RISK_THRESHOLD),
-        'document_access': DocumentAccessLog.objects.all().order_by('-timestamp')[:10]
+        'user': request.user,
+        'user_count': user_count,
+        'active_sessions': active_sessions,
+        'security_events': security_events,
+        'recent_logins': recent_logins,
+        'system_alerts': system_alerts,
+        'active_tab': 'dashboard'
     }
+    
     return render(request, 'core/admin_dashboard.html', context)
 
 # --- Document Vault Views ---
@@ -766,15 +890,49 @@ def document_access_logs(request):
 @login_required
 def document_versions(request, doc_id):
     document = get_object_or_404(Document, id=doc_id)
+    query = request.GET.get('q', '')
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
+    version = request.GET.get('version', '')
+    
     versions = Document.objects.filter(
         title=document.title,
         category=document.category,
         department=document.department
     ).order_by('-version')
+    
+    # Apply filters
+    if query:
+        versions = versions.filter(Q(title__icontains=query) | 
+                                  Q(description__icontains=query))
+    
+    if date_from:
+        try:
+            date_from = timezone.datetime.strptime(date_from, '%Y-%m-%d')
+            versions = versions.filter(upload_date__gte=date_from)
+        except ValueError:
+            pass
+    
+    if date_to:
+        try:
+            date_to = timezone.datetime.strptime(date_to, '%Y-%m-%d')
+            versions = versions.filter(upload_date__lte=date_to)
+        except ValueError:
+            pass
+    
+    if version:
+        try:
+            versions = versions.filter(version=int(version))
+        except ValueError:
+            pass
 
     context = {
         'document': document,
         'versions': versions,
+        'query': query,
+        'date_from': date_from,
+        'date_to': date_to,
+        'version': version,
         'show_versions': True
     }
     return render(request, 'core/document_versions.html', context)
@@ -839,14 +997,73 @@ def profile_settings(request):
                 return render(request, template, context)
         # Handle profile update
         else:
-            profile.full_name = request.POST.get('full_name', profile.full_name)
-            profile.department = request.POST.get('department', profile.department)
-            profile.position = request.POST.get('position', profile.position)
-            profile.save()
-            return redirect('core:profile_settings')
+            form = ProfileUpdateForm(request.POST, request.FILES)
+            if form.is_valid():
+                profile.full_name = form.cleaned_data['full_name']
+                profile.department = form.cleaned_data['department']
+                profile.position = form.cleaned_data['position']
+                profile.phone = form.cleaned_data.get('phone_number')
+                
+                # Handle email update with verification
+                if form.cleaned_data['email'] != user.email:
+                    # Generate verification token and expiration
+                    token = Fernet.generate_key().decode()
+                    expiration = timezone.now() + timedelta(hours=24)
+                    
+                    # Store new email in session and token in DB
+                    request.session['pending_email_update'] = form.cleaned_data['email']
+                    user.email_verification_token = token
+                    user.email_verification_expiration = expiration
+                    user.save()
+                    
+                    # Send verification email
+                    verify_url = request.build_absolute_uri(
+                        reverse('core:verify_email_update', kwargs={'token': token})
+                    )
+                    
+                    subject = 'Verify Email Change'
+                    message = render_to_string('emails/verify_email_update.html', {
+                        'user': user,
+                        'verify_link': verify_url,
+                        'new_email': form.cleaned_data['email']
+                    })
+                    
+                    send_mail(
+                        subject,
+                        message,
+                        settings.DEFAULT_FROM_EMAIL,
+                        [form.cleaned_data['email']],
+                        fail_silently=False
+                    )
+                    
+                    messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
+                
+                # Handle profile picture
+                if 'profile_picture' in request.FILES:
+                    profile.profile_picture = request.FILES['profile_picture']
+                
+                profile.save()
+                
+                AuditLog.objects.create(
+                    user=user,
+                    action='PROFILE_UPDATE',
+                    details='Profile information updated',
+                    ip_address=get_client_ip(request)
+                )
+                
+                return redirect('core:profile_settings')
+    else:
+        form = ProfileUpdateForm(initial={
+            'full_name': profile.full_name,
+            'department': profile.department,
+            'position': profile.position,
+            'email': user.email,
+            'phone_number': profile.phone
+        })
     
     context = {
         'profile': profile,
+        'profile_form': form,
         'password_form': CustomPasswordChangeForm(user=user),
         'face_form': FaceEnrollForm(),
         'user': user,
@@ -917,21 +1134,51 @@ def audit_logs(request):
 @login_required
 @user_passes_test(is_admin)
 def export_audit_logs(request):
-    logs = AuditLog.objects.all().order_by('-timestamp')
+    import csv
+    from django.http import HttpResponse
     
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="audit_logs.csv"'
     
+    # Filter params
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    action = request.GET.get('action')
+    user_id = request.GET.get('user_id')
+    
+    logs = AuditLog.objects.all().order_by('-timestamp')
+    
+    # Apply filters
+    if start_date:
+        try:
+            start = timezone.datetime.strptime(start_date, '%Y-%m-%d')
+            logs = logs.filter(timestamp__gte=start)
+        except ValueError:
+            pass
+    
+    if end_date:
+        try:
+            end = timezone.datetime.strptime(end_date, '%Y-%m-%d')
+            logs = logs.filter(timestamp__lte=end)
+        except ValueError:
+            pass
+    
+    if action:
+        logs = logs.filter(action=action)
+    
+    if user_id:
+        logs = logs.filter(user_id=user_id)
+    
     writer = csv.writer(response)
-    writer.writerow(['Timestamp', 'User', 'Action', 'IP Address', 'Details'])
+    writer.writerow(['Timestamp', 'User', 'Action', 'Details', 'IP Address'])
     
     for log in logs:
         writer.writerow([
             log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
             log.user.username if log.user else 'System',
             log.action,
-            log.ip_address,
-            log.details[:200]  # Truncate long details
+            log.details,
+            log.ip_address
         ])
     
     return response
@@ -965,60 +1212,78 @@ def force_reenroll(request, user_id):
 # --- Password Reset ---
 def password_reset_request(request):
     if request.method == 'POST':
-        email = request.POST.get('email')
-        user = User.objects.filter(email=email).first()
-        
-        if user:
-            token = Fernet.generate_key().decode()
-            request.session[f'pwd_reset_{user.id}'] = token
-            
-            reset_url = request.build_absolute_uri(
-                reverse('core:password_reset_confirm', kwargs={
-                    'user_id': user.id,
-                    'token': token
+        form = PasswordResetForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            try:
+                user = User.objects.get(email=email)
+                
+                # Generate token and expiration
+                token = Fernet.generate_key().decode()
+                expiration = timezone.now() + timedelta(hours=24)
+                
+                user.email_verification_token = token
+                user.email_verification_expiration = expiration
+                user.save()
+                
+                # Send password reset email
+                reset_url = request.build_absolute_uri(
+                    reverse('core:password_reset_confirm', kwargs={'user_id': user.id, 'token': token})
+                )
+                
+                subject = 'Password Reset Request'
+                message = render_to_string('emails/password_reset.html', {
+                    'user': user,
+                    'reset_link': reset_url
                 })
-            )
-            
-            subject = 'Password Reset Request'
-            message = render_to_string('emails/password_reset.html', {
-                'user': user,
-                'reset_link': reset_url
-            })
-            plain_message = render_to_string('emails/password_reset.txt', {
-                'user': user,
-                'reset_link': reset_url
-            })
-            
-            send_mail(
-                subject,
-                plain_message,
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                html_message=message,
-                fail_silently=True
-            )
-            return render(request, 'core/login.html', {'message': 'Password reset instructions have been sent to your email.'})
+                
+                send_mail(
+                    subject,
+                    message,
+                    settings.DEFAULT_FROM_EMAIL,
+                    [user.email],
+                    fail_silently=False
+                )
+                
+                return render(request, 'core/password_reset_done.html')
+            except User.DoesNotExist:
+                # Still return success to prevent email enumeration
+                return render(request, 'core/password_reset_done.html')
+    else:
+        form = PasswordResetForm()
     
-    return render(request, 'core/login.html', {'show_password_reset': True})
+    return render(request, 'core/password_reset.html', {'form': form})
 
 def password_reset_confirm(request, user_id, token):
-    session_token = request.session.get(f'pwd_reset_{user_id}')
-    
-    if not session_token or session_token != token:
-        return render(request, 'core/login.html', {'error': 'Invalid password reset link.'})
-    
     user = get_object_or_404(User, id=user_id)
     
-    if request.method == 'POST':
-        form = CustomPasswordChangeForm(user, request.POST)
-        if form.is_valid():
-            form.save()
-            del request.session[f'pwd_reset_{user_id}']
-            return render(request, 'core/login.html', {'message': 'Password has been reset successfully. Please login.'})
-    else:
-        form = CustomPasswordChangeForm(user)
+    # Check token and expiration
+    if user.email_verification_token != token or user.email_verification_expiration < timezone.now():
+        return render(request, 'core/login.html', {
+            'error': 'Password reset link is invalid or has expired.'
+        })
     
-    return render(request, 'core/login.html', {'form': form, 'show_password_reset_confirm': True})
+    if request.method == 'POST':
+        form = PasswordResetConfirmForm(request.POST)
+        if form.is_valid():
+            new_password = form.cleaned_data['new_password']
+            user.set_password(new_password)
+            user.email_verification_token = None
+            user.email_verification_expiration = None
+            user.save()
+            
+            AuditLog.objects.create(
+                user=user,
+                action='PASSWORD_RESET',
+                details='Password reset via email link',
+                ip_address=get_client_ip(request)
+            )
+            
+            return redirect('core:login')
+    else:
+        form = PasswordResetConfirmForm()
+    
+    return render(request, 'core/password_reset_confirm.html', {'form': form})
 
 # --- Access Denied View ---
 def access_denied(request):
@@ -1032,3 +1297,99 @@ def access_denied(request):
         template = 'core/admin_dashboard.html' if request.user.role == 'ADMIN' else 'core/student_dashboard.html'
         return render(request, template, context)
     return render(request, 'core/login.html', context)
+
+# --- Email Update Verification ---
+def verify_email_update(request, token):
+    user = get_object_or_404(User, email_verification_token=token)
+    
+    # Check token and expiration
+    if user.email_verification_expiration < timezone.now():
+        return render(request, 'core/login.html', {
+            'error': 'Email verification link has expired.'
+        })
+    
+    # Get the pending email from session
+    new_email = request.session.get('pending_email_update')
+    if not new_email:
+        return render(request, 'core/login.html', {
+            'error': 'Email update session has expired.'
+        })
+    
+    # Update the email
+    old_email = user.email
+    user.email = new_email
+    user.email_verification_token = None
+    user.email_verification_expiration = None
+    user.save()
+    
+    # Log the change
+    AuditLog.objects.create(
+        user=user,
+        action='EMAIL_CHANGE',
+        details=f'Email changed from {old_email} to {new_email}',
+        ip_address=get_client_ip(request)
+    )
+    
+    # Clear the session
+    if 'pending_email_update' in request.session:
+        del request.session['pending_email_update']
+    
+    # Notify user of successful change
+    messages.success(request, 'Your email has been successfully updated.')
+    
+    # Redirect to profile if logged in, otherwise to login
+    if request.user.is_authenticated:
+        return redirect('core:profile_settings')
+    return redirect('core:login')
+
+# --- System Status ---
+@login_required
+@user_passes_test(is_admin)
+def system_status(request):
+    """
+    System status dashboard for administrators
+    Shows health of all system components and allows toggling features
+    """
+    from .health import check_services
+    
+    system_status = check_services()
+    system_status["response_time_ms"] = 0  # Will be calculated in the template
+    
+    context = {
+        'system_status': system_status,
+        'settings': settings,
+        'show_system_status': True
+    }
+    
+    return render(request, 'core/system_status.html', context)
+
+@login_required
+@user_passes_test(is_admin)
+@require_POST
+def toggle_feature(request):
+    """Toggle a feature flag"""
+    feature = request.POST.get('feature')
+    redirect_url = request.POST.get('redirect_url', 'core:system_status')
+    
+    valid_features = ['FACE_API_ENABLED', 'RISK_ENGINE_BYPASS']
+    
+    if feature in valid_features:
+        # Toggle the feature
+        current_value = getattr(settings, feature, False)
+        setattr(settings, feature, not current_value)
+        
+        # Log the change
+        new_value = getattr(settings, feature, False)
+        AuditLog.objects.create(
+            user=request.user,
+            action=f"TOGGLE_FEATURE_{feature}",
+            details=f"Changed {feature} from {current_value} to {new_value}",
+            ip_address=get_client_ip(request)
+        )
+        
+        # Set message
+        messages.success(request, f"Feature '{feature}' has been {'enabled' if new_value else 'disabled'}")
+    else:
+        messages.error(request, f"Invalid feature: {feature}")
+    
+    return redirect(redirect_url)

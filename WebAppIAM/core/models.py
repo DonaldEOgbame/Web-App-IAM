@@ -47,12 +47,15 @@ class User(AbstractUser):
     two_factor_enabled = models.BooleanField(default=False)
     failed_login_attempts = models.PositiveIntegerField(default=0)
     last_failed_login = models.DateTimeField(null=True, blank=True)
+    emergency_token_hash = models.CharField(max_length=255, blank=True, null=True)
+    emergency_token_expiry = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         permissions = [
             ("can_force_reenroll", "Can force biometric re-enrollment"),
             ("can_lock_account", "Can lock/unlock user accounts"),
             ("bypass_biometrics", "Can bypass biometric authentication"),
+            ("manage_emergency_access", "Can manage emergency access protocol"),
         ]
 
     def __str__(self):
@@ -95,6 +98,7 @@ class UserProfile(models.Model):
     department = models.CharField(max_length=20, choices=DEPT_CHOICES)
     position = models.CharField(max_length=100)
     phone = models.CharField(max_length=20, blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
     profile_completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -407,3 +411,65 @@ class DocumentAccessLog(models.Model):
     def __str__(self):
         action = "accessed" if self.was_successful else "attempted to access"
         return f"{self.user} {action} {self.document} at {self.timestamp}"
+
+class UserBehaviorProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='behavior_profile')
+    typical_login_time = models.TimeField(null=True, blank=True)
+    login_time_variance = models.IntegerField(default=60, help_text="Variance in minutes")
+    typical_device = models.CharField(max_length=255, blank=True, null=True)
+    typical_location = models.CharField(max_length=255, blank=True, null=True)
+    typical_ip_range = models.CharField(max_length=50, blank=True, null=True)
+    keyboard_pattern = models.TextField(blank=True, null=True)
+    mouse_movement_pattern = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Behavior profile for {self.user.username}"
+    
+    def check_time_anomaly(self, login_time):
+        """
+        Check if login time is outside typical pattern
+        Returns anomaly score between 0 and 1
+        """
+        if not self.typical_login_time:
+            return 0.0
+        
+        from datetime import datetime, time
+        import math
+        
+        # Convert login_time to time object if it's a datetime
+        if isinstance(login_time, datetime):
+            login_time = login_time.time()
+            
+        # Calculate minutes difference
+        login_minutes = login_time.hour * 60 + login_time.minute
+        typical_minutes = self.typical_login_time.hour * 60 + self.typical_login_time.minute
+        
+        # Handle time wrapping around midnight
+        diff = min(
+            abs(login_minutes - typical_minutes),
+            abs(login_minutes - typical_minutes + 1440),
+            abs(login_minutes - typical_minutes - 1440)
+        )
+        
+        # Normalize based on variance, capped at 1.0
+        return min(1.0, diff / (self.login_time_variance * 2))
+    
+    def check_location_anomaly(self, location):
+        """Check if location is outside typical pattern"""
+        if not self.typical_location or not location:
+            return 0.0
+        
+        if self.typical_location == location:
+            return 0.0
+        return 1.0  # Simple binary check for now
+    
+    def check_device_anomaly(self, device):
+        """Check if device is outside typical pattern"""
+        if not self.typical_device or not device:
+            return 0.0
+        
+        if self.typical_device == device:
+            return 0.0
+        return 0.8  # New device is suspicious but not definitive

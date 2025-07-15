@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
-from .models import User, RiskPolicy, Document
+from .models import User, RiskPolicy, Document, UserProfile
 
 class RegistrationForm(UserCreationForm):
     role = forms.ChoiceField(choices=[('USER', 'User'), ('ADMIN', 'Admin')], initial='USER')
@@ -8,21 +8,63 @@ class RegistrationForm(UserCreationForm):
         model = User
         fields = ('username', 'role', 'password1', 'password2')
 
+class RegistrationForm(forms.ModelForm):
+    password1 = forms.CharField(
+        label='Password',
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+    password2 = forms.CharField(
+        label='Password confirmation',
+        widget=forms.PasswordInput(attrs={'class': 'form-control'}),
+    )
+    
+    class Meta:
+        model = User
+        fields = ['username', 'email']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+        }
+        
+    def clean_password2(self):
+        password1 = self.cleaned_data.get('password1')
+        password2 = self.cleaned_data.get('password2')
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("Passwords don't match")
+        return password2
+
 class LoginForm(forms.Form):
-    username = forms.CharField(max_length=150)
-    password = forms.CharField(widget=forms.PasswordInput)
+    username = forms.CharField(
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Username'})
+    )
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'})
+    )
 
 class FaceEnrollForm(forms.Form):
-    face_image = forms.ImageField(required=True)
+    face_image = forms.ImageField(
+        label='Upload a clear face image',
+        widget=forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'})
+    )
 
 class FingerprintReRegisterForm(forms.Form):
-    # Placeholder for WebAuthn JS integration
-    pass
+    confirm = forms.BooleanField(
+        required=True,
+        label='I understand that this will delete my existing fingerprint credentials',
+    )
 
 class RiskPolicyForm(forms.ModelForm):
     class Meta:
         model = RiskPolicy
-        fields = ['name', 'description', 'face_match_threshold', 'behavior_anomaly_threshold', 'fingerprint_required', 'high_risk_action', 'is_active']
+        exclude = ['created_at', 'updated_at']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'face_match_threshold': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'max': '1'}),
+            'behavior_anomaly_threshold': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'max': '1'}),
+            'session_timeout': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'lock_after_failed_attempts': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+        }
 
 class ReportSubmissionForm(forms.Form):
     report = forms.CharField(widget=forms.Textarea, required=True)
@@ -31,9 +73,63 @@ class CustomPasswordChangeForm(PasswordChangeForm):
     pass
 
 class DocumentUploadForm(forms.ModelForm):
+    file = forms.FileField(label='File to upload')
+    
     class Meta:
         model = Document
-        fields = ['title', 'file', 'description', 'access_level', 'category', 'department', 'expiry_date']
+        fields = ['title', 'description', 'access_level', 'category', 'department', 'expiry_date']
         widgets = {
             'expiry_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
         }
+        
+    def save(self, commit=True):
+        # Don't save the file directly, it will be encrypted in the view
+        # This is just for the form validation
+        return super().save(commit=commit)
+
+class ProfileCompletionForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['full_name', 'department', 'position', 'phone', 'profile_picture']
+        widgets = {
+            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'position': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1 (555) 555-5555'}),
+        }
+
+class ProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = UserProfile
+        fields = ['full_name', 'department', 'position', 'phone', 'profile_picture', 
+                  'show_risk_alerts', 'show_face_match', 'auto_logout', 'receive_email_alerts']
+        widgets = {
+            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'position': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+class PasswordResetForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Enter your email'})
+    )
+
+class PasswordResetConfirmForm(forms.Form):
+    password1 = forms.CharField(
+        label="New password",
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Enter new password'})
+    )
+    password2 = forms.CharField(
+        label="Confirm password",
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Confirm new password'})
+    )
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get('password1')
+        password2 = cleaned_data.get('password2')
+        
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("Passwords don't match")
+        
+        return cleaned_data

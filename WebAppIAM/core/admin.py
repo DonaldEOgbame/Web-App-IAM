@@ -4,8 +4,14 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('username', 'role', 'FACE_ENROLLED', 'FINGERPRINT_ENROLLED', 'is_active', 'is_staff')
+    list_display = ('username', 'role', 'has_biometrics', 'is_active', 'is_staff')
+    list_filter = ('role', 'is_active', 'is_staff')
     actions = ['lock_user', 'unlock_user', 'force_reenroll']
+
+    def has_biometrics(self, obj):
+        return obj.has_biometrics
+    has_biometrics.short_description = 'Biometrics Enrolled'
+    has_biometrics.boolean = True
 
     def lock_user(self, request, queryset):
         queryset.update(is_active=False)
@@ -16,7 +22,8 @@ class UserAdmin(BaseUserAdmin):
     unlock_user.short_description = 'Unlock selected users'
 
     def force_reenroll(self, request, queryset):
-        queryset.update(FACE_ENROLLED=False, FINGERPRINT_ENROLLED=False)
+        for user in queryset:
+            user.require_reenrollment()
     force_reenroll.short_description = 'Force biometric re-enrollment'
 
 @admin.register(UserBehaviorProfile)
@@ -51,6 +58,6 @@ class DocumentAdmin(admin.ModelAdmin):
 
 @admin.register(DocumentAccessLog)
 class DocumentAccessLogAdmin(admin.ModelAdmin):
-    list_display = ('user', 'document', 'timestamp', 'face_score', 'fingerprint_status', 'risk_score', 'was_blocked', 'ip_address')
-    list_filter = ('was_blocked', 'risk_score')
+    list_display = ('user', 'document', 'timestamp', 'access_type', 'was_successful', 'ip_address')
+    list_filter = ('was_successful', 'access_type')
     search_fields = ('user__username', 'document__title', 'ip_address')

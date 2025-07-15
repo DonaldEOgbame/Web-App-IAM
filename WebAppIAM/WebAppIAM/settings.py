@@ -46,6 +46,10 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'core.security_middleware.StrictTransportSecurityMiddleware',  # HSTS middleware
+    'core.security_middleware.ContentSecurityPolicyMiddleware',  # CSP middleware
+    'core.security_middleware.APICSRFProtectionMiddleware',  # API CSRF protection
+    'core.middleware.SessionSecurityMiddleware',  # Session security middleware
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -156,3 +160,18 @@ RISK_BEHAVIOR_WEIGHT = 0.2
 # Feature Flags
 FACE_API_ENABLED = True  # Toggle for Face API availability
 RISK_ENGINE_BYPASS = False  # Maintenance mode for risk engine
+EMERGENCY_ACCESS_MODE = False  # Emergency access mode for critical situations
+
+# Session Settings
+SESSION_TIMEOUT_SECONDS = 1800  # 30 minutes
+STRICT_SESSION_SECURITY = True  # Enable strict session security checking
+
+# Account Security Settings
+MAX_FAILED_LOGINS = 5  # Maximum failed login attempts before lockout
+ACCOUNT_LOCKOUT_MINUTES = 30  # Lock account for 30 minutes after too many failed attempts
+
+# CSRF Settings
+CSRF_EXEMPT_PATHS = [
+    '/core/webauthn/auth/',  # WebAuthn authentication endpoints
+    '/core/health/'  # Health check endpoint
+]

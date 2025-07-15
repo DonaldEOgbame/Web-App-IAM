@@ -1,0 +1,109 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Emergency Access Protocol{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card border-danger mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h4><i class="fas fa-exclamation-triangle"></i> Emergency Access Protocol</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <strong>Warning:</strong> This page provides emergency access functionality that bypasses normal security protocols. Use only in critical situations.
+                    </div>
+
+                    <h5 class="card-title">Current Status</h5>
+                    <div class="d-flex align-items-center mb-4">
+                        <div class="status-indicator {% if emergency_mode %}bg-danger{% else %}bg-success{% endif %} mr-3"></div>
+                        <div>
+                            <strong>Emergency Mode:</strong>
+                            {% if emergency_mode %}
+                                <span class="badge bg-danger">ACTIVE</span>
+                            {% else %}
+                                <span class="badge bg-success">INACTIVE</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% if emergency_mode %}
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-circle"></i> Emergency mode is currently ACTIVE</h5>
+                        <p>Security protocols are in a reduced state. This should be deactivated as soon as the emergency situation is resolved.</p>
+                    </div>
+                    <form method="POST" action="{% url 'deactivate_emergency' %}" class="mb-4">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="deactivate_reason" class="form-label">Reason for deactivation:</label>
+                            <textarea class="form-control" name="reason" id="deactivate_reason" rows="2" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-shield-alt"></i> Deactivate Emergency Mode
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="{% url 'activate_emergency' %}" class="mb-4">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="activate_reason" class="form-label">Reason for activation:</label>
+                            <textarea class="form-control" name="reason" id="activate_reason" rows="2" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-exclamation-circle"></i> Activate Emergency Mode
+                        </button>
+                    </form>
+                    {% endif %}
+
+                    <hr class="my-4">
+
+                    <h5 class="card-title">Generate Emergency Access Token</h5>
+                    <p>Generate a one-time emergency access token for a user who needs to bypass normal authentication.</p>
+                    <form method="POST" action="{% url 'generate_emergency_token' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username:</label>
+                            <input type="text" class="form-control" name="username" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="token_reason" class="form-label">Reason:</label>
+                            <textarea class="form-control" name="reason" id="token_reason" rows="2" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-key"></i> Generate Token
+                        </button>
+                    </form>
+
+                    {% if emergency_token %}
+                    <div class="alert alert-info mt-4">
+                        <h5>Emergency Token Generated</h5>
+                        <p>The emergency access token for {{ token_username }} is:</p>
+                        <div class="p-3 bg-light border rounded">
+                            <code class="token-display">{{ emergency_token }}</code>
+                        </div>
+                        <p class="mt-2"><strong>Important:</strong> This token will be valid for 4 hours and can only be used once. Please share it securely with the user.</p>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">All emergency access actions are logged and monitored.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .status-indicator {
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        margin-right: 10px;
+    }
+    .token-display {
+        font-size: 1.2rem;
+        word-break: break-all;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,19 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"args": [
+				"makemigrations",
+				"migrate"
+			],
+			"command": "python manage.py",
+			"group": "python",
+			"isBackground": false,
+			"label": "Run Django migrations",
+			"problemMatcher": [
+				"$python"
+			],
+			"type": "shell"
+		}
+	]
+}
