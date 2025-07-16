@@ -1,0 +1,29 @@
+/* Dashboard Styles - Admin and Student Dashboards */
+
+/* Dashboard Layout */
+.dashboard-container {
+    /* Dashboard container styles */
+}
+
+.sidebar {
+    /* Sidebar navigation styles */
+}
+
+.main-content {
+    /* Main dashboard content area */
+}
+
+/* Dashboard Cards */
+.dashboard-card {
+    /* Dashboard card component styles */
+}
+
+/* Navigation */
+.dashboard-nav {
+    /* Dashboard navigation styles */
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    /* Mobile dashboard styles */
+}

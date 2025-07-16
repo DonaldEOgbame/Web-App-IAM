@@ -1,0 +1,32 @@
+/* Notifications Styles */
+
+/* Notification Center */
+.notification-center {
+    /* Notification center styles */
+}
+
+.notification-item {
+    /* Individual notification styles */
+}
+
+/* Device Notifications */
+.device-notification {
+    /* Device-specific notification styles */
+}
+
+.device-trust-prompt {
+    /* Device trust prompt styles */
+}
+
+/* Notification Types */
+.notification-info {
+    /* Info notification styles */
+}
+
+.notification-warning {
+    /* Warning notification styles */
+}
+
+.notification-risk {
+    /* Risk notification styles */
+}
