@@ -156,6 +156,11 @@ class EmergencyAccessProtocol:
             logger.warning(f"Emergency token verification failed for {user.username}: No token exists")
             return False
         
+        # Check if token was already used
+        if user.emergency_token_used:
+            logger.warning(f"Emergency token verification failed for {user.username}: Token already used")
+            return False  # Already used
+        
         # Check if the token has expired
         if user.emergency_token_expiry < timezone.now():
             logger.warning(f"Emergency token verification failed for {user.username}: Token expired")
@@ -167,10 +172,11 @@ class EmergencyAccessProtocol:
             logger.warning(f"Emergency token verification failed for {user.username}: Invalid token")
             return False
         
-        # Clear the token after use
+        # Mark token as used and clear the token after use
+        user.emergency_token_used = True  # Add this field enforcement
         user.emergency_token_hash = None
         user.emergency_token_expiry = None
-        user.save(update_fields=['emergency_token_hash', 'emergency_token_expiry'])
+        user.save(update_fields=['emergency_token_hash', 'emergency_token_expiry', 'emergency_token_used'])
         
         # Log successful verification
         AuditLog.objects.create(

@@ -88,22 +88,41 @@ class DocumentUploadForm(forms.ModelForm):
         return super().save(commit=commit)
 
 class ProfileCompletionForm(forms.ModelForm):
+    first_name = forms.CharField(
+        max_length=30,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'})
+    )
+    last_name = forms.CharField(
+        max_length=30,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'})
+    )
+    
     class Meta:
         model = UserProfile
-        fields = ['full_name', 'department', 'position', 'phone', 'profile_picture']
+        fields = ['department', 'position', 'phone', 'profile_picture']
         widgets = {
-            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
             'position': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1 (555) 555-5555'}),
         }
 
 class ProfileUpdateForm(forms.ModelForm):
+    first_name = forms.CharField(
+        max_length=30,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'})
+    )
+    last_name = forms.CharField(
+        max_length=30,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'})
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control'})
+    )
+    
     class Meta:
         model = UserProfile
-        fields = ['full_name', 'department', 'position', 'phone', 'profile_picture', 
+        fields = ['department', 'position', 'phone', 'profile_picture', 
                   'show_risk_alerts', 'show_face_match', 'auto_logout', 'receive_email_alerts']
         widgets = {
-            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
             'position': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
         }

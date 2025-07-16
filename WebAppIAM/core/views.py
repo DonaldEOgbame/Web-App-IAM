@@ -27,7 +27,8 @@ import os
 
 from .models import (
     User, UserProfile, UserBehaviorProfile, WebAuthnCredential,
-    UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog, Notification
+    UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog, 
+    Notification, DeviceFingerprint
 )
 from .webauthn_utils import (
     generate_registration_options,
@@ -46,8 +47,12 @@ from .forms import (
 logger = logging.getLogger(__name__)
 
 # --- Encryption Utilities ---
-def get_fernet_key():
-    password = settings.SECRET_KEY.encode()
+def get_fernet_key(user=None):
+    if user:
+        # Derive keys from user password (school-friendly)
+        password = (user.password + settings.SECRET_KEY).encode()
+    else:
+        password = settings.SECRET_KEY.encode()
     salt = settings.SECRET_KEY[:16].encode()
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -59,18 +64,61 @@ def get_fernet_key():
     key = base64.urlsafe_b64encode(kdf.derive(password))
     return key
 
-def encrypt_file(data):
-    f = Fernet(get_fernet_key())
+def encrypt_file(data, user=None):
+    f = Fernet(get_fernet_key(user))
     return f.encrypt(data)
 
-def decrypt_file(encrypted_data):
-    f = Fernet(get_fernet_key())
+def decrypt_file(encrypted_data, user=None):
+    f = Fernet(get_fernet_key(user))
     return f.decrypt(encrypted_data)
 
 # --- Utility Functions ---
 def get_client_ip(request):
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     return x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+
+def get_device_info(request):
+    """Extract device information from request"""
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    
+    # Simple device detection
+    device_type = 'Desktop'
+    browser = 'Unknown'
+    os = 'Unknown'
+    
+    if 'Mobile' in user_agent or 'Android' in user_agent or 'iPhone' in user_agent:
+        device_type = 'Mobile'
+    elif 'Tablet' in user_agent or 'iPad' in user_agent:
+        device_type = 'Tablet'
+    
+    # Basic browser detection
+    if 'Chrome' in user_agent:
+        browser = 'Chrome'
+    elif 'Firefox' in user_agent:
+        browser = 'Firefox'
+    elif 'Safari' in user_agent and 'Chrome' not in user_agent:
+        browser = 'Safari'
+    elif 'Edge' in user_agent:
+        browser = 'Edge'
+    
+    # Basic OS detection
+    if 'Windows' in user_agent:
+        os = 'Windows'
+    elif 'Mac' in user_agent:
+        os = 'macOS'
+    elif 'Linux' in user_agent:
+        os = 'Linux'
+    elif 'Android' in user_agent:
+        os = 'Android'
+    elif 'iOS' in user_agent or 'iPhone' in user_agent or 'iPad' in user_agent:
+        os = 'iOS'
+    
+    return {
+        'device_type': device_type,
+        'browser': browser,
+        'os': os,
+        'user_agent': user_agent
+    }
 
 def rate_limit(request, key_prefix, limit=5, window=60):
     key = f"rate:{key_prefix}:{get_client_ip(request)}"
@@ -91,6 +139,81 @@ def notify_admin(subject, context):
             admin_emails,
             fail_silently=True
         )
+
+def create_new_device_notification(user, session, device_info):
+    """Create notification for new device login"""
+    # Create or update device fingerprint
+    import hashlib
+    device_hash = hashlib.sha256(
+        f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
+    ).hexdigest()[:32]
+    
+    device_fp, created = DeviceFingerprint.objects.get_or_create(
+        device_id=device_hash,
+        defaults={
+            'user': user,
+            'browser': device_info['browser'],
+            'operating_system': device_info['os'],
+            'device_type': device_info['device_type'],
+            'user_agent': device_info['user_agent'],
+            'last_ip': session.ip_address,
+            'last_location': session.location
+        }
+    )
+    
+    if not created:
+        device_fp.update_usage(session.ip_address, session.location)
+        # If device exists and is trusted, don't send notification
+        if device_fp.is_trusted:
+            return
+    
+    # Create user notification
+    device_description = f"{device_info['browser']} on {device_info['os']} ({device_info['device_type']})"
+    location = session.location or "Unknown location"
+    
+    Notification.objects.create(
+        user=user,
+        message=f'New device login detected: {device_description} from {location}. If this wasn\'t you, please contact security immediately.',
+        notification_type='DEVICE',
+        action_required=True,
+        metadata={
+            'device_info': device_info,
+            'device_id': device_hash,
+            'session_id': session.id,
+            'ip_address': session.ip_address,
+            'location': location
+        }
+    )
+    
+    # Also create admin notification if user preferences allow
+    if hasattr(user, 'profile') and user.profile.receive_email_alerts:
+        admins = User.objects.filter(role='ADMIN', is_active=True)
+        for admin in admins:
+            Notification.objects.create(
+                user=admin,
+                message=f'New device login for user {user.username}: {device_description} from {location}',
+                notification_type='DEVICE',
+                metadata={
+                    'target_user': user.username,
+                    'device_info': device_info,
+                    'device_id': device_hash,
+                    'session_id': session.id,
+                    'ip_address': session.ip_address
+                }
+            )
+    
+    # Log the new device detection
+    AuditLog.objects.create(
+        user=user,
+        action='DEVICE_NEW',
+        details=f'New device login detected: {device_description}',
+        ip_address=session.ip_address,
+        metadata={
+            'device_info': device_info,
+            'device_id': device_hash,
+            'session_id': session.id
+        }
+    )
 
 # --- Helper functions ---
 def is_admin(user):
@@ -222,12 +345,16 @@ def complete_profile(request):
     if request.method == 'POST':
         form = ProfileCompletionForm(request.POST)
         if form.is_valid():
-            UserProfile.objects.create(
+            profile = UserProfile.objects.create(
                 user=user,
-                full_name=form.cleaned_data['full_name'],
                 department=form.cleaned_data['department'],
                 position=form.cleaned_data['position']
             )
+            # Update user's name fields
+            user.first_name = form.cleaned_data['first_name']
+            user.last_name = form.cleaned_data['last_name']
+            user.save()
+            
             request.session['register_biometrics_user'] = user.id
             return redirect('core:register_biometrics')
     else:
@@ -293,7 +420,8 @@ def webauthn_registration_verify(request):
             credential_id=credential.credential_id,
             public_key=credential.public_key,
         )
-        user.FINGERPRINT_ENROLLED = True
+        # Fix: Sync enrollment status properly - no need for separate fields
+        # The has_biometrics property already checks for WebAuthn credentials
         user.save()
         
         AuditLog.objects.create(
@@ -306,7 +434,7 @@ def webauthn_registration_verify(request):
         # Complete registration if new user
         if 'register_biometrics_user' in request.session:
             del request.session['register_biometrics_user']
-            auth_login(request, user)
+            django_login(request, user)  # Replace auth_login
             dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'student_dashboard'
             return JsonResponse({'status': 'success', 'redirect': reverse(f'core:{dashboard_url}')})
         
@@ -360,7 +488,7 @@ def login(request):
                     )
                     
                     # Log the user in
-                    auth_login(request, user_auth)
+                    django_login(request, user_auth)  # Replace auth_login
                     
                     # Determine which dashboard to redirect to
                     if user.role == 'ADMIN':
@@ -431,7 +559,7 @@ def logout(request):
         ip_address=get_client_ip(request)
     )
     
-    auth_logout(request)
+    django_logout(request)  # Replace auth_logout
     messages.success(request, 'You have been logged out successfully.')
     return redirect('core:login')
 
@@ -515,7 +643,7 @@ def webauthn_authentication_verify(request):
         session = finalize_authentication(request, session)
         
         if session.access_granted:
-            auth_login(request, user)
+            django_login(request, user)  # Replace auth_login
             dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'student_dashboard'
             return JsonResponse({
                 'status': 'success',
@@ -533,20 +661,43 @@ def webauthn_authentication_verify(request):
 def finalize_authentication(request, session):
     user = session.user
     
+    # Get device information
+    device_info = get_device_info(request)
+    
     # Behavior analysis
     behavior_profile = user.userbehaviorprofile
     current_time = timezone.now().time()
     time_anomaly = 0
     device_anomaly = 0
     fingerprint_anomaly = 0
+    is_new_device = False
     
     if behavior_profile.typical_login_time:
         time_diff = abs((datetime.combine(timezone.now().date(), current_time) - 
                         datetime.combine(timezone.now().date(), behavior_profile.typical_login_time)).total_seconds())
         time_anomaly = min(time_diff / 3600, 1)
     
+    # Enhanced device detection
+    import hashlib
+    device_hash = hashlib.sha256(
+        f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
+    ).hexdigest()[:32]
+    
+    # Check if this is a known device
+    known_device = DeviceFingerprint.objects.filter(
+        user=user, 
+        device_id=device_hash
+    ).first()
+    
     if behavior_profile.typical_device and behavior_profile.typical_device != session.user_agent:
         device_anomaly = 1
+        is_new_device = True
+    elif not behavior_profile.typical_device or not known_device:
+        # First time login or truly new device
+        is_new_device = True
+    elif known_device and not known_device.is_trusted:
+        # Known but untrusted device
+        is_new_device = True
     
     if behavior_profile.typical_device_fingerprint and session.device_fingerprint != behavior_profile.typical_device_fingerprint:
         fingerprint_anomaly = 1
@@ -573,15 +724,20 @@ def finalize_authentication(request, session):
     # Apply risk policy
     active_policy = RiskPolicy.objects.filter(is_active=True).first()
     if active_policy:
-        if session.risk_level == 'HIGH' and active_policy.high_risk_action == 'DENY':
+        risk_level = session.risk_level
+        action = getattr(active_policy, f"{risk_level.lower()}_risk_action")
+        
+        if action == "DENY":
             session.access_granted = False
-            session.flagged_reason = "High risk session"
-        elif session.risk_level == 'HIGH' and active_policy.high_risk_action == 'CHALLENGE':
+            session.flagged_reason = f"{risk_level} risk session - access denied by policy"
+        elif action == "CHALLENGE":
             session.access_granted = True
+            # Send verification notification
             Notification.objects.create(
                 user=user,
-                message='High-risk login detected. Please verify your identity.',
-                action_required=True
+                message=f'{risk_level.lower()}-risk login detected. Please verify your identity.',
+                action_required=True,
+                notification_type='RISK'
             )
         else:
             session.access_granted = True
@@ -590,8 +746,15 @@ def finalize_authentication(request, session):
     
     session.save()
     
-    # Update behavior profile
+    # Handle new device notifications and profile updates
     if session.access_granted:
+        # Send new device notification if detected
+        if is_new_device and hasattr(user, 'profile'):
+            # Only send notification if user has email alerts enabled
+            if user.profile.receive_email_alerts:
+                create_new_device_notification(user, session, device_info)
+        
+        # Update behavior profile
         if not behavior_profile.typical_login_time:
             behavior_profile.typical_login_time = current_time
         if not behavior_profile.typical_device:
@@ -755,9 +918,9 @@ def document_upload(request):
             doc = form.save(commit=False)
             doc.uploaded_by = request.user
             
-            # Encrypt file
+            # Encrypt file with user-specific key
             file_data = request.FILES['file'].read()
-            encrypted_data = encrypt_file(file_data)
+            encrypted_data = encrypt_file(file_data, request.user)
             
             # Save encrypted file
             doc.file.save(
@@ -801,6 +964,10 @@ def document_download(request, doc_id):
         if doc.access_level == 'DEPARTMENT' and doc.department != user.userprofile.department:
             return HttpResponseForbidden("You don't have permission to access this document")
     
+    # Add strict expiry check first
+    if doc.is_expired():
+        return HttpResponseForbidden("Document expired")
+    
     # Check session risk
     current_session = UserSession.objects.filter(
         user=user, 
@@ -811,25 +978,15 @@ def document_download(request, doc_id):
         DocumentAccessLog.objects.create(
             user=user,
             document=doc,
-            was_blocked=True,
+            was_successful=False,
             reason="High-risk session",
             ip_address=get_client_ip(request)
         )
         return redirect('core:access_denied')
-    
-    if doc.is_expired():
-        DocumentAccessLog.objects.create(
-            user=user,
-            document=doc,
-            was_blocked=True,
-            reason="Document expired",
-            ip_address=get_client_ip(request)
-        )
-        return redirect('core:access_denied')
-    
+
     try:
-        # Decrypt file
-        decrypted_data = decrypt_file(doc.file.read())
+        # Decrypt file with user-specific key
+        decrypted_data = decrypt_file(doc.file.read(), doc.uploaded_by)
         
         # Create response
         response = HttpResponse(decrypted_data, content_type='application/octet-stream')
@@ -839,7 +996,7 @@ def document_download(request, doc_id):
         DocumentAccessLog.objects.create(
             user=user,
             document=doc,
-            was_blocked=False,
+            was_successful=True,
             ip_address=get_client_ip(request)
         )
         
@@ -957,7 +1114,7 @@ def purge_document(request, doc_id):
 def validate_checksum(request, doc_id):
     document = get_object_or_404(Document, id=doc_id)
     try:
-        decrypted_data = decrypt_file(document.file.read())
+        decrypted_data = decrypt_file(document.file.read(), document.uploaded_by)
         checksum = hashlib.sha256(decrypted_data).hexdigest()
         return JsonResponse({'status': 'success', 'checksum': checksum})
     except InvalidToken:
@@ -999,7 +1156,11 @@ def profile_settings(request):
         else:
             form = ProfileUpdateForm(request.POST, request.FILES)
             if form.is_valid():
-                profile.full_name = form.cleaned_data['full_name']
+                # Update user name fields
+                user.first_name = form.cleaned_data['first_name']
+                user.last_name = form.cleaned_data['last_name']
+                
+                # Update profile fields
                 profile.department = form.cleaned_data['department']
                 profile.position = form.cleaned_data['position']
                 profile.phone = form.cleaned_data.get('phone_number')
@@ -1054,7 +1215,8 @@ def profile_settings(request):
                 return redirect('core:profile_settings')
     else:
         form = ProfileUpdateForm(initial={
-            'full_name': profile.full_name,
+            'first_name': user.first_name,
+            'last_name': user.last_name,
             'department': profile.department,
             'position': profile.position,
             'email': user.email,
@@ -1072,6 +1234,79 @@ def profile_settings(request):
     
     template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/student_dashboard.html'
     return render(request, template, context)
+
+# --- Device Management ---
+@login_required
+def manage_devices(request):
+    """View and manage trusted devices"""
+    user = request.user
+    devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
+    
+    context = {
+        'devices': devices,
+        'show_device_management': True
+    }
+    
+    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/student_dashboard.html'
+    return render(request, template, context)
+
+@login_required
+@require_POST
+def trust_device(request, device_id):
+    """Mark a device as trusted"""
+    device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
+    device.mark_as_trusted()
+    
+    AuditLog.objects.create(
+        user=request.user,
+        action='DEVICE_TRUST',
+        details=f'Device marked as trusted: {device}',
+        ip_address=get_client_ip(request)
+    )
+    
+    messages.success(request, f'Device "{device}" has been marked as trusted.')
+    return redirect('core:manage_devices')
+
+@login_required
+@require_POST
+def remove_device(request, device_id):
+    """Remove/untrust a device"""
+    device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
+    device_name = str(device)
+    device.delete()
+    
+    AuditLog.objects.create(
+        user=request.user,
+        action='DEVICE_REMOVE',
+        details=f'Device removed: {device_name}',
+        ip_address=get_client_ip(request)
+    )
+    
+    messages.success(request, f'Device "{device_name}" has been removed.')
+    return redirect('core:manage_devices')
+
+@login_required
+@require_POST
+def dismiss_device_notification(request, notification_id):
+    """Dismiss a device notification and optionally trust the device"""
+    notification = get_object_or_404(Notification, id=notification_id, user=request.user, notification_type='DEVICE')
+    
+    # Check if user wants to trust the device
+    trust_device_flag = request.POST.get('trust_device') == 'true'
+    device_id = notification.metadata.get('device_id')
+    
+    if trust_device_flag and device_id:
+        try:
+            device = DeviceFingerprint.objects.get(device_id=device_id, user=request.user)
+            device.mark_as_trusted()
+            messages.success(request, 'Device has been marked as trusted.')
+        except DeviceFingerprint.DoesNotExist:
+            pass
+    
+    notification.read = True
+    notification.save()
+    
+    return JsonResponse({'status': 'success'})
 
 # --- Notification System ---
 @login_required

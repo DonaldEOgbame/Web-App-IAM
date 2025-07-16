@@ -66,4 +66,13 @@ urlpatterns = [
     # Audit Logs
     path('admin/audit_logs/', views.audit_logs, name='audit_logs'),
     path('admin/audit_logs/export/', views.export_audit_logs, name='export_audit_logs'),
+
+    # Device Management
+    path('devices/', views.manage_devices, name='manage_devices'),
+    path('devices/trust/<int:device_id>/', views.trust_device, name='trust_device'),
+    path('devices/remove/<int:device_id>/', views.remove_device, name='remove_device'),
+
+    # Notification System
+    path('notifications/', views.notifications_view, name='notifications'),
+    path('notifications/dismiss/<int:notification_id>/', views.dismiss_device_notification, name='dismiss_device_notification'),
 ]

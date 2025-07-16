@@ -11,6 +11,8 @@ class Notification(models.Model):
         ('RISK', 'Security Risk'),
         ('EXPIRY', 'Document Expiry'),
         ('APPROVAL', 'Approval Required'),
+        ('DEVICE', 'New Device Login'),  # Add this
+        ('LOCATION', 'Unusual Location'),  # Add this for future use
     ]
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
@@ -49,6 +51,7 @@ class User(AbstractUser):
     last_failed_login = models.DateTimeField(null=True, blank=True)
     emergency_token_hash = models.CharField(max_length=255, blank=True, null=True)
     emergency_token_expiry = models.DateTimeField(blank=True, null=True)
+    emergency_token_used = models.BooleanField(default=False)  # Add this field for single-use enforcement
 
     class Meta:
         permissions = [
@@ -80,6 +83,51 @@ class User(AbstractUser):
         self.force_reenroll = True
         self.face_data = None
         self.webauthn_credentials.all().delete()
+        self.save()
+
+class DeviceFingerprint(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_fingerprints')
+    device_id = models.CharField(max_length=64, unique=True)  # Hash of device characteristics
+    device_name = models.CharField(max_length=100, blank=True, null=True)  # User-friendly name
+    browser = models.CharField(max_length=50, blank=True, null=True)
+    operating_system = models.CharField(max_length=50, blank=True, null=True)
+    device_type = models.CharField(max_length=20, default='Desktop')  # Desktop, Mobile, Tablet
+    user_agent = models.TextField()
+    
+    # Security tracking
+    first_seen = models.DateTimeField(auto_now_add=True)
+    last_seen = models.DateTimeField(auto_now=True)
+    is_trusted = models.BooleanField(default=False)
+    times_used = models.PositiveIntegerField(default=1)
+    
+    # Location tracking
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_location = models.CharField(max_length=100, blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-last_seen']
+        indexes = [
+            models.Index(fields=['user', 'is_trusted']),
+            models.Index(fields=['device_id']),
+        ]
+    
+    def __str__(self):
+        name = self.device_name or f"{self.browser} on {self.operating_system}"
+        return f"{name} ({self.device_type}) - {self.user.username}"
+    
+    def mark_as_trusted(self):
+        """Mark this device as trusted by the user"""
+        self.is_trusted = True
+        self.save()
+    
+    def update_usage(self, ip_address=None, location=None):
+        """Update device usage statistics"""
+        self.times_used += 1
+        self.last_seen = timezone.now()
+        if ip_address:
+            self.last_ip = ip_address
+        if location:
+            self.last_location = location
         self.save()
 
 class UserProfile(models.Model):
@@ -228,6 +276,7 @@ class AuditLog(models.Model):
         ('LOGIN_SUCCESS', 'Successful Login'),
         ('LOGIN_FAIL', 'Failed Login'),
         ('FACE_ENROLL', 'Face Enrollment'),
+        ('FACE_ENROLLED', 'Face Enrollment'),  # Add this
         ('FINGERPRINT_ENROLL', 'Fingerprint Enrollment'),
         ('RISK_EVAL', 'Risk Evaluation'),
         ('ACCESS_GRANTED', 'Access Granted'),
@@ -238,10 +287,20 @@ class AuditLog(models.Model):
         ('DOC_DOWNLOAD', 'Document Download'),
         ('DOC_DELETE', 'Document Deletion'),
         ('DOC_RESTORE', 'Document Restore'),
+        ('DOCUMENT_CREATED', 'Document Created'),  # Add this
+        ('DOCUMENT_PURGE', 'Document Purged'),
+        ('DOCUMENT_RESTORE', 'Document Restored'),
         ('POLICY_UPDATE', 'Policy Update'),
         ('ACCOUNT_LOCK', 'Account Locked'),
         ('ACCOUNT_UNLOCK', 'Account Unlocked'),
         ('FORCE_REENROLL', 'Forced Re-enrollment'),
+        ('LOGOUT', 'User Logout'),
+        ('EMAIL_CHANGE', 'Email Changed'),
+        ('PASSWORD_RESET', 'Password Reset'),
+        ('DEVICE_NEW', 'New Device Detected'),  # Add this
+        ('DEVICE_TRUST', 'Device Trusted'),  # Add this
+        ('DEVICE_REMOVE', 'Device Removed'),  # Add this
+        ('LOCATION_NEW', 'New Location Detected'),  # Add this for future use
     ]
     
     user = models.ForeignKey(
