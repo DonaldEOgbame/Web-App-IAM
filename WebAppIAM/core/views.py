@@ -384,7 +384,7 @@ def register_biometrics(request):
                 user.has_biometrics = True
                 user.save()
                 if request.user.is_authenticated:
-                    return redirect('core:student_dashboard' if user.role == 'STUDENT' else 'core:admin_dashboard')
+                    return redirect('core:staff_dashboard' if user.role == 'STAFF' else 'core:admin_dashboard')
                 return redirect('core:login')
         
         # Handle WebAuthn registration
@@ -436,7 +436,7 @@ def webauthn_registration_verify(request):
         if 'register_biometrics_user' in request.session:
             del request.session['register_biometrics_user']
             django_login(request, user)  # Replace auth_login
-            dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'student_dashboard'
+            dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
             return JsonResponse({'status': 'success', 'redirect': reverse(f'core:{dashboard_url}')})
         
         return JsonResponse({'status': 'success'})
@@ -510,7 +510,7 @@ def login(request):
                     if user.role == 'ADMIN':
                         return redirect('core:admin_dashboard')
                     else:
-                        return redirect('core:student_dashboard')
+                        return redirect('core:staff_dashboard')
                 else:
                     # Increment failed login attempts
                     user.failed_login_attempts += 1
@@ -660,7 +660,7 @@ def webauthn_authentication_verify(request):
         
         if session.access_granted:
             django_login(request, user)  # Replace auth_login
-            dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'student_dashboard'
+            dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
             return JsonResponse({
                 'status': 'success',
                 'redirect': reverse(f'core:{dashboard_url}')
@@ -812,12 +812,12 @@ def dashboard(request):
         })
         return render(request, 'core/admin_dashboard.html', context)
     
-    return render(request, 'core/student_dashboard.html', context)
+    return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
-def student_dashboard(request):
-    """Student dashboard view"""
-    if request.user.role != 'STUDENT':
+def staff_dashboard(request):
+    """Staff dashboard view"""
+    if request.user.role != 'STAFF':
         messages.error(request, "Access denied. You don't have permission to access this page.")
         return redirect('core:login')
     
@@ -833,7 +833,7 @@ def student_dashboard(request):
         'notifications': notifications
     }
     
-    return render(request, 'core/student_dashboard.html', context)
+    return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
 def admin_dashboard(request):
@@ -923,7 +923,7 @@ def document_list(request):
     
     if user.role == 'ADMIN':
         return render(request, 'core/admin_dashboard.html', context)
-    return render(request, 'core/student_dashboard.html', context)
+    return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
 @user_passes_test(is_admin)
@@ -1166,7 +1166,7 @@ def profile_settings(request):
                 return redirect('core:profile_settings')
             except Exception as e:
                 context = {'error': str(e), 'show_profile_settings': True}
-                template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/student_dashboard.html'
+                template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
                 return render(request, template, context)
         # Handle profile update
         else:
@@ -1248,7 +1248,7 @@ def profile_settings(request):
         'show_profile_settings': True
     }
     
-    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/student_dashboard.html'
+    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
     return render(request, template, context)
 
 # --- Device Management ---
@@ -1263,7 +1263,7 @@ def manage_devices(request):
         'show_device_management': True
     }
     
-    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/student_dashboard.html'
+    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
     return render(request, template, context)
 
 @login_required
@@ -1335,7 +1335,7 @@ def notifications_view(request):
     
     if request.user.role == 'ADMIN':
         return render(request, 'core/admin_dashboard.html', context)
-    return render(request, 'core/student_dashboard.html', context)
+    return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
 @require_POST
@@ -1545,7 +1545,7 @@ def access_denied(request):
     }
     
     if request.user.is_authenticated:
-        template = 'core/admin_dashboard.html' if request.user.role == 'ADMIN' else 'core/student_dashboard.html'
+        template = 'core/admin_dashboard.html' if request.user.role == 'ADMIN' else 'core/staff_dashboard.html'
         return render(request, template, context)
     return render(request, 'core/login.html', context)
 

@@ -34,11 +34,11 @@ class Notification(models.Model):
 
 class User(AbstractUser):
     ROLE_CHOICES = [
-        ('STUDENT', 'Student'),
+        ('STAFF', 'Staff'),
         ('ADMIN', 'Administrator'),
     ]
     
-    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='STUDENT')
+    role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='STAFF')
     azure_face_id = models.CharField(max_length=100, blank=True, null=True)
     last_activity = models.DateTimeField(null=True, blank=True)
     email_verified = models.BooleanField(default=False)

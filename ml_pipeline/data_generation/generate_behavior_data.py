@@ -29,12 +29,12 @@ def generate_behavior_data(users=20000, sessions_per_user=50, output_dir="../dat
     
     for user_id in range(users):
         # Determine user archetype
-        arch_type = np.random.choice(['student', 'admin', 'contractor'], 
+        arch_type = np.random.choice(['staff', 'admin', 'contractor'], 
                                     p=[0.7, 0.2, 0.1])
         
         # Archetype parameters
         params = {
-            'student': {'loc_variance': 5, 'device_change_prob': 0.05},
+            'staff': {'loc_variance': 5, 'device_change_prob': 0.05},
             'admin': {'loc_variance': 2, 'device_change_prob': 0.01},
             'contractor': {'loc_variance': 100, 'device_change_prob': 0.3}
         }[arch_type]
