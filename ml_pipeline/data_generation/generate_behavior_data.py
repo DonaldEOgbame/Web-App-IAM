@@ -87,6 +87,26 @@ def generate_behavior_data(users=20000, sessions_per_user=50, output_dir="../dat
     output_path = os.path.join(output_dir, "synthetic_behavior_data.parquet")
     df.to_parquet(output_path)
     print(f"Generated behavior data with {len(df)} sessions at {output_path}")
+    
+    # Optionally: load and merge keystroke features for each user/session
+    keystroke_path = os.path.join(output_dir, '../keystroke_features.csv')
+    if os.path.exists(keystroke_path):
+        keystroke_df = pd.read_csv(keystroke_path)
+        # Example: merge on user/session or aggregate as needed
+        for session in all_sessions:
+            kf = keystroke_df[keystroke_df['user'] == session['user_id']]
+            if not kf.empty:
+                session['avg_hold_time'] = kf['avg_hold_time'].mean()
+                session['avg_flight_time'] = kf['avg_flight_time'].mean()
+            else:
+                session['avg_hold_time'] = 0
+                session['avg_flight_time'] = 0
+    
+    # Convert back to DataFrame if merged
+    if all_sessions:
+        df = pd.DataFrame(all_sessions)
+        df.to_parquet(output_path)
+        print(f"Merged keystroke features into behavior data at {output_path}")
 
 if __name__ == "__main__":
     generate_behavior_data()

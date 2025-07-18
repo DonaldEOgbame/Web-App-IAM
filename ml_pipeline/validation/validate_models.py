@@ -76,6 +76,14 @@ def validate_models(risk_model_path="../models/risk_model.pkl",
             "false_positive_rate": float(fp_rate)
         }
     
+    # Validate with keystroke features if available
+    keystroke_path = os.path.join(os.path.dirname(__file__), '../data/keystroke_features.csv')
+    if os.path.exists(keystroke_path):
+        keystroke_df = pd.read_csv(keystroke_path)
+        # Example: join on user/session, or aggregate as needed
+        risk_df = pd.merge(risk_df, keystroke_df, how='left', left_on='user_id', right_on='user')
+        # Optionally, add validation metrics for keystroke-based detection
+    
     # Generate report
     report_path = os.path.join(output_dir, "validation_report.json")
     with open(report_path, 'w') as f:

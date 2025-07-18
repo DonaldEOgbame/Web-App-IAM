@@ -18,6 +18,14 @@ def train_behavior_model(data_path="../data/synthetic_behavior_data.parquet",
     X = df[features]
     y = df['behavior_anomaly_score']
     
+    # Load keystroke features if available
+    keystroke_path = os.path.join(os.path.dirname(__file__), '../data/keystroke_features.csv')
+    if os.path.exists(keystroke_path):
+        keystroke_df = pd.read_csv(keystroke_path)
+        # Merge on user/session or aggregate as needed
+        df = pd.merge(df, keystroke_df, how='left', left_on='user_id', right_on='user')
+        features += ['avg_hold_time', 'avg_flight_time']
+    
     # Train-test split
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42

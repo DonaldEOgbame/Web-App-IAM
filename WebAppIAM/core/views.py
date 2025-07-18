@@ -30,6 +30,7 @@ from .models import (
     UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog, 
     Notification, DeviceFingerprint
 )
+from .models_keystroke import KeystrokeDynamics
 from .webauthn_utils import (
     generate_registration_options,
     verify_registration_response,
@@ -448,14 +449,31 @@ def login(request):
     """User login view with rate limiting and security checks"""
     if request.method == 'POST':
         form = LoginForm(request.POST)
+        # --- Keystroke Dynamics: Save if present ---
+        keystroke_data = request.POST.get('keystroke_data')
+        username = request.POST.get('username')
+        user_obj = None
+        if username:
+            try:
+                user_obj = User.objects.get(username=username)
+            except User.DoesNotExist:
+                user_obj = None
+        if keystroke_data and user_obj:
+            try:
+                KeystrokeDynamics.objects.create(
+                    user=user_obj,
+                    session_id=request.session.session_key,
+                    event_data=json.loads(keystroke_data)
+                )
+            except Exception as e:
+                logger.warning(f"Failed to save keystroke data: {e}")
+        # --- End Keystroke Dynamics ---
         if form.is_valid():
             username = form.cleaned_data['username']
             password = form.cleaned_data['password']
-            
             # Get the user object
             try:
                 user = User.objects.get(username=username)
-                
                 # Check for account lockout
                 if user.failed_login_attempts >= settings.MAX_FAILED_LOGINS:
                     if user.last_failed_login and timezone.now() < user.last_failed_login + timezone.timedelta(minutes=settings.ACCOUNT_LOCKOUT_MINUTES):
@@ -471,14 +489,12 @@ def login(request):
                         # Reset failed attempts after lockout period
                         user.failed_login_attempts = 0
                         user.save(update_fields=['failed_login_attempts'])
-                
                 # Authenticate the user
                 user_auth = authenticate(request, username=username, password=password)
                 if user_auth is not None:
                     # Reset failed login attempts on successful login
                     user.failed_login_attempts = 0
                     user.save(update_fields=['failed_login_attempts'])
-                    
                     # Create audit log entry
                     AuditLog.objects.create(
                         user=user,
