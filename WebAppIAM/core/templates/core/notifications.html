@@ -1,15 +1,29 @@
-<!-- Notifications Template -->
+{% extends 'core/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notifications - Web App IAM</title>
-    <link rel="stylesheet" href="{% static 'css/notifications.css' %}">
-</head>
-<body>
-    <!-- Notifications content will be added here -->
+
+{% block title %}Notifications{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/notifications.css' %}">{% endblock %}
+
+{% block content %}
+    <main class="container notification-center">
+        <h2>Your Notifications</h2>
+        <ul>
+            {% for n in notifications %}
+            <li class="notification-item notification-{{ n.notification_type|lower }}{% if not n.read %} unread{% endif %}">
+                <p>{{ n.message }}</p>
+                <small>{{ n.created_at|date:'Y-m-d H:i' }}</small>
+                {% if n.action_required %}
+                <form method="post" action="{% url 'core:mark_notification_read' n.id %}">
+                    {% csrf_token %}
+                    <button type="submit">Mark Read</button>
+                </form>
+                {% endif %}
+            </li>
+            {% empty %}
+            <li>No notifications found.</li>
+            {% endfor %}
+        </ul>
+    </main>
     <script src="{% static 'js/notifications.js' %}"></script>
-</body>
-</html>
+{% endblock %}
+{% block extra_js %}{% endblock %}

@@ -2,36 +2,51 @@
 
 // Profile form handling
 function initProfileForm() {
-    // Profile form initialization will be added here
+    const profileForm = document.querySelector('#profileForm');
+    if (!profileForm) return;
+    profileForm.addEventListener('submit', () => {
+        const btn = profileForm.querySelector('button[type="submit"]');
+        showLoading(btn);
+    });
 }
 
 // Device management
 function initDeviceManagement() {
-    // Device management initialization will be added here
+    document.querySelectorAll('.device-actions form').forEach(form => {
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            const btn = form.querySelector('button');
+            showLoading(btn);
+            makeAjaxRequest(form.action, {method: 'POST', body: new FormData(form)})
+                .then(() => window.location.reload())
+                .catch(err => { hideLoading(btn); handleErrors(err); });
+        });
+    });
 }
 
 // Profile picture upload
 function handleProfilePictureUpload() {
-    // Profile picture upload will be added here
+    const input = document.querySelector('#id_profile_picture');
+    const preview = document.querySelector('#picturePreview');
+    if (!input || !preview) return;
+    input.addEventListener('change', () => {
+        const file = input.files[0];
+        if (file) preview.src = URL.createObjectURL(file);
+    });
 }
 
 // Device trust management
-function handleDeviceTrust() {
-    // Device trust functionality will be added here
-}
+function handleDeviceTrust() {}
 
 // Profile preferences
-function managePreferences() {
-    // Profile preferences management will be added here
-}
+function managePreferences() {}
 
 // Form validation
-function validateProfileForm() {
-    // Profile form validation will be added here
-}
+function validateProfileForm() {}
 
 // Initialize profile management
 document.addEventListener('DOMContentLoaded', function() {
     initProfileForm();
     initDeviceManagement();
+    handleProfilePictureUpload();
 });

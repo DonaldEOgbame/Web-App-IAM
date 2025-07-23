@@ -1,15 +1,46 @@
-<!-- Device Management Template -->
+{% extends 'core/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Device Management - Web App IAM</title>
-    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
-</head>
-<body>
-    <!-- Device management content will be added here -->
-    <script src="{% static 'js/profile.js' %}"></script>
-</body>
-</html>
+
+{% block title %}Device Management{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/profile.css' %}">{% endblock %}
+
+{% block content %}
+    <main class="container">
+        <h2>Your Devices</h2>
+        <table class="table device-list">
+            <thead>
+                <tr>
+                    <th>Device</th>
+                    <th>Last Seen</th>
+                    <th>Trusted</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for d in devices %}
+                <tr class="{% if d.is_trusted %}device-trusted{% endif %}">
+                    <td>{{ d }}</td>
+                    <td>{{ d.last_seen|date:'Y-m-d H:i' }}</td>
+                    <td>{{ d.is_trusted|yesno:'Yes,No' }}</td>
+                    <td class="device-actions">
+                        {% if not d.is_trusted %}
+                        <form method="post" action="{% url 'core:trust_device' d.id %}" style="display:inline">
+                            {% csrf_token %}
+                            <button type="submit">Trust</button>
+                        </form>
+                        {% endif %}
+                        <form method="post" action="{% url 'core:remove_device' d.id %}" style="display:inline">
+                            {% csrf_token %}
+                            <button type="submit">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr><td colspan="4">No devices found.</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        <p><a href="{% url 'core:profile_settings' %}">Back to profile</a></p>
+    </main>
+{% endblock %}
+{% block extra_js %}<script src="{% static 'js/profile.js' %}"></script>{% endblock %}

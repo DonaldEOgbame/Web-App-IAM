@@ -77,3 +77,29 @@ input:focus, select:focus, textarea:focus {
 .alert.info { background: #ddeeff; }
 .text-small { font-size: 0.9rem; text-align: center; }
 .hidden { display: none; }
+
+.toast {
+    position: fixed;
+    bottom: 1rem;
+    right: 1rem;
+    background: #333;
+    color: #fff;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    opacity: 0.9;
+    z-index: 1000;
+}
+.toast-success { background: #4caf50; }
+.toast-error { background: #f44336; }
+
+@media (max-width: 600px) {
+    .auth-card {
+        padding: 1rem;
+    }
+    .auth-container {
+        padding: 1rem;
+    }
+    h2 {
+        font-size: 1.5rem;
+    }
+}

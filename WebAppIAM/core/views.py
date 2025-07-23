@@ -1328,11 +1328,16 @@ def dismiss_device_notification(request, notification_id):
 @login_required
 def notifications_view(request):
     notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+
+    if request.GET.get('ajax'):
+        unread = notifications.filter(read=False).count()
+        return JsonResponse({'unread': unread})
+
     context = {
         'notifications': notifications,
         'show_notifications': True
     }
-    
+
     if request.user.role == 'ADMIN':
         return render(request, 'core/admin_dashboard.html', context)
     return render(request, 'core/staff_dashboard.html', context)

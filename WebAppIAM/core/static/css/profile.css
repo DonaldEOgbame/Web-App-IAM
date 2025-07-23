@@ -1,36 +1,40 @@
 /* Profile Management Styles */
-
-/* Profile Form */
-.profile-form {
-    /* Profile editing form styles */
-}
-
 .profile-section {
-    /* Profile section styles */
+    margin-bottom: 2rem;
 }
-
-/* Device Management */
+.profile-section h3 {
+    margin-bottom: 0.5rem;
+}
+.profile-section form {
+    background: #e0e5ec;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 6px 6px 12px #babecc, -6px -6px 12px #fff;
+}
+.profile-section button {
+    margin-top: 0.5rem;
+}
 .device-list {
-    /* Device list styles */
+    width: 100%;
+    border-collapse: collapse;
 }
-
-.device-item {
-    /* Individual device item styles */
+.device-list th, .device-list td {
+    padding: 0.5rem;
+    text-align: left;
 }
-
 .device-trusted {
-    /* Trusted device indicator styles */
+    background: #ddffdd;
+}
+.device-actions form {
+    display: inline;
 }
 
-.device-actions {
-    /* Device action buttons styles */
-}
-
-/* Profile Picture */
-.profile-picture {
-    /* Profile picture display styles */
-}
-
-.picture-upload {
-    /* Picture upload interface styles */
+@media (max-width: 600px) {
+    .device-list td, .device-list th {
+        display: block;
+        width: 100%;
+    }
+    .device-actions form {
+        margin-right: 0.5rem;
+    }
 }
