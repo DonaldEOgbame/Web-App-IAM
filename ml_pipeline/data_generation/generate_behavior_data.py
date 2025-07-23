@@ -3,6 +3,7 @@ import pandas as pd
 from geopy.distance import geodesic
 import os
 import json
+from scipy.stats import beta
 
 class MarkovDeviceModel:
     def __init__(self, base_device):
@@ -52,7 +53,9 @@ def generate_behavior_data(users=20000, sessions_per_user=50, output_dir="../dat
             
             # Location simulation
             offset = np.random.normal(0, params['loc_variance']/111, 2)
-            location = (base_location[0] + offset[0], base_location[1] + offset[1])
+            lat = min(90, max(-90, base_location[0] + offset[0]))
+            lon = min(180, max(-180, base_location[1] + offset[1]))
+            location = (lat, lon)
             dist_km = geodesic(base_location, location).km
             location_anomaly = min(1, dist_km / 500)
             
