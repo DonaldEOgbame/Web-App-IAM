@@ -75,11 +75,13 @@ def enroll_face(user, face_image_data):
     person = face_client.person_group_person.create(person_group_id, str(user.id))
     
     # Detect faces in the image
+    face_image_data.seek(0)
     detected_faces = face_client.face.detect_with_stream(face_image_data)
     if not detected_faces:
         raise ValueError("No faces detected in the image")
-    
+
     # Add face to the person
+    face_image_data.seek(0)
     face_client.person_group_person.add_face_from_stream(
         person_group_id, person.person_id, face_image_data
     )
@@ -148,11 +150,13 @@ def verify_face(user, face_image_data, use_fallback=True, max_retries=2):
     for attempt in range(max_retries + 1):
         try:
             # Detect faces in the image
+            face_image_data.seek(0)
             detected_faces = face_client.face.detect_with_stream(face_image_data)
             if not detected_faces:
                 if attempt == max_retries:
                     raise ValueError("No faces detected in the image")
                 logger.warning(f"No faces detected in attempt {attempt+1}, retrying...")
+                face_image_data.seek(0)
                 continue
             
             # Verify against the enrolled face
