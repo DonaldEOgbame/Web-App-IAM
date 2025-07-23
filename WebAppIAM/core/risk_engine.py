@@ -78,4 +78,4 @@ def analyze_behavior_anomaly(session):
             (session.time_anomaly / 1440 * 0.3) + 
             (session.device_anomaly * 0.4) + 
             (session.location_anomaly * 0.3)
-        )
+        ))

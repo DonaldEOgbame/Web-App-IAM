@@ -1,0 +1,5 @@
+<!-- Email template for verifying user email address -->
+<p>Hello {{ user.get_full_name|default:user.username }},</p>
+<p>Please verify your email address by clicking the link below:</p>
+<p><a href="{{ verify_link }}">Verify Email</a></p>
+<p>If you did not create an account, you can ignore this email.</p>
