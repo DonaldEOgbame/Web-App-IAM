@@ -476,6 +476,7 @@ class UserBehaviorProfile(models.Model):
     typical_login_time = models.TimeField(null=True, blank=True)
     login_time_variance = models.IntegerField(default=60, help_text="Variance in minutes")
     typical_device = models.CharField(max_length=255, blank=True, null=True)
+    typical_device_fingerprint = models.CharField(max_length=255, blank=True, null=True)
     typical_location = models.CharField(max_length=255, blank=True, null=True)
     typical_ip_range = models.CharField(max_length=50, blank=True, null=True)
     keyboard_pattern = models.TextField(blank=True, null=True)
