@@ -1,0 +1,10 @@
+Django>=5.0,<6
+requests
+azure-cognitiveservices-vision-face
+msrest
+cryptography
+webauthn
+joblib
+numpy
+pandas
+Pillow
