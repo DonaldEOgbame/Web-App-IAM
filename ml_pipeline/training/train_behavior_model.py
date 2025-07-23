@@ -13,8 +13,19 @@ def train_behavior_model(data_path="../data/synthetic_behavior_data.parquet",
     
     # Load data
     df = pd.read_parquet(data_path)
-    features = ['time_anomaly', 'device_anomaly', 'location_anomaly', 
+    features = ['time_anomaly', 'device_anomaly', 'location_anomaly',
                'action_entropy', 'ip_risk', 'session_duration']
+
+    # Some historical datasets may not include the behavior_anomaly_score
+    if 'behavior_anomaly_score' not in df.columns:
+        df['behavior_anomaly_score'] = (
+            0.3 * (df['time_anomaly'] / 1440)
+            + 0.2 * df['device_anomaly']
+            + 0.2 * df['location_anomaly']
+            + 0.15 * df['action_entropy']
+            + 0.15 * df['ip_risk']
+        ).clip(0, 1)
+
     X = df[features]
     y = df['behavior_anomaly_score']
     
