@@ -1,15 +1,19 @@
-<!-- Access Denied Template -->
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Access Denied - Web App IAM</title>
-    <link rel="stylesheet" href="{% static 'css/security.css' %}">
+    <title>Access Denied - NeumorphicAuth</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
 <body>
-    <!-- Access denied message will be added here -->
-    <script src="{% static 'js/security.js' %}"></script>
+<main class="auth-container">
+    <div class="auth-card">
+        <h2>Access Restricted</h2>
+        <p>{{ reason }}</p>
+        <a href="{% url 'core:login' %}" class="btn-primary">Return to login</a>
+    </div>
+</main>
 </body>
 </html>
