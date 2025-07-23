@@ -11,6 +11,10 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -147,10 +151,12 @@ AZURE_FACE_API_ENDPOINT = 'https://your-region.api.cognitive.microsoft.com/'
 AZURE_FACE_PERSON_GROUP_ID = 'your-person-group-id'
 
 # WebAuthn Configuration
-WEBAUTHN_ENABLED = True
-WEBAUTHN_RP_ID = 'your-domain.com'  # Should match your domain
-WEBAUTHN_RP_NAME = 'Your App Name'
-WEBAUTHN_EXPECTED_ORIGIN = 'https://your-domain.com'
+# Defaults provide sensible values for local development but can be overridden
+# with environment variables for production deployments.
+WEBAUTHN_ENABLED = os.environ.get('WEBAUTHN_ENABLED', 'True') == 'True'
+WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
+WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'WebAppIAM')
+WEBAUTHN_EXPECTED_ORIGIN = os.environ.get('WEBAUTHN_EXPECTED_ORIGIN', 'http://localhost:8000')
 
 # Risk Engine Weights
 RISK_FACE_WEIGHT = 0.4
