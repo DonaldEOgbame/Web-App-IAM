@@ -1,29 +1,50 @@
-/* Dashboard Styles - Admin and Student Dashboards */
-
-/* Dashboard Layout */
+/* Dashboard layout and components */
 .dashboard-container {
-    /* Dashboard container styles */
+    min-height: 100vh;
 }
 
 .sidebar {
-    /* Sidebar navigation styles */
+    background: #e0e5ec;
+    box-shadow: 7px 7px 15px #babecc, -7px -7px 15px #fff;
+    padding-top: 1rem;
+}
+.sidebar .nav-link {
+    color: #333;
+    padding: 0.5rem 1rem;
+}
+.sidebar .nav-link.active {
+    font-weight: bold;
+    background: #d1d9e6;
 }
 
 .main-content {
-    /* Main dashboard content area */
+    padding-top: 1rem;
+    padding-bottom: 2rem;
 }
 
-/* Dashboard Cards */
 .dashboard-card {
-    /* Dashboard card component styles */
+    background: #e0e5ec;
+    border-radius: 8px;
+    box-shadow: 6px 6px 12px #babecc, -6px -6px 12px #fff;
+    padding: 1rem;
 }
 
-/* Navigation */
-.dashboard-nav {
-    /* Dashboard navigation styles */
-}
-
-/* Responsive Design */
+/* Responsive sidebar */
 @media (max-width: 768px) {
-    /* Mobile dashboard styles */
+    #sidebar.collapse {
+        position: fixed;
+        top: 0;
+        left: -250px;
+        width: 250px;
+        height: 100%;
+        transition: left 0.3s ease;
+        z-index: 1030;
+    }
+    #sidebar.collapse.open {
+        left: 0;
+    }
+    #sidebarToggle {
+        display: inline-block;
+    }
 }
+
