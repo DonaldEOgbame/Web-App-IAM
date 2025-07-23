@@ -60,7 +60,9 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [],
-        'APP_DIRS': False,
+        # Enable automatic template loading from each app's ``templates``
+        # directory so Django can locate templates like ``core/login.html``.
+        'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.debug',
