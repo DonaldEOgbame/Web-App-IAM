@@ -1,12 +1,6 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
+from django.contrib.auth.forms import PasswordChangeForm
 from .models import User, RiskPolicy, Document, UserProfile
-
-class RegistrationForm(UserCreationForm):
-    role = forms.ChoiceField(choices=[('USER', 'User'), ('ADMIN', 'Admin')], initial='USER')
-    class Meta:
-        model = User
-        fields = ('username', 'role', 'password1', 'password2')
 
 class RegistrationForm(forms.ModelForm):
     password1 = forms.CharField(
