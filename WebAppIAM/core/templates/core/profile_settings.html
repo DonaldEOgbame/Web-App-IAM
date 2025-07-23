@@ -1,15 +1,38 @@
-<!-- Profile Settings Template -->
+{% extends 'core/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Profile Settings - Web App IAM</title>
-    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
-</head>
-<body>
-    <!-- Profile settings form will be added here -->
+
+{% block title %}Profile Settings{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{% static 'css/profile.css' %}">{% endblock %}
+
+{% block content %}
+    <main class="container">
+        <h2>Profile Settings</h2>
+        <section class="profile-section">
+            <h3>Update Profile</h3>
+            <form id="profileForm" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ profile_form.as_p }}
+                <img id="picturePreview" class="hidden" alt="Preview" style="max-width:150px;display:block;margin-top:1rem;" />
+                <button type="submit">Save</button>
+            </form>
+        </section>
+        <section class="profile-section">
+            <h3>Change Password</h3>
+            <form method="post">
+                {% csrf_token %}
+                {{ password_form.as_p }}
+                <button type="submit">Change Password</button>
+            </form>
+        </section>
+        <section class="profile-section">
+            <h3>Re-enroll Face Data</h3>
+            <form id="faceForm" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ face_form.as_p }}
+                <button type="submit">Upload</button>
+            </form>
+        </section>
+    </main>
     <script src="{% static 'js/profile.js' %}"></script>
-</body>
-</html>
+{% endblock %}
+{% block extra_js %}{% endblock %}

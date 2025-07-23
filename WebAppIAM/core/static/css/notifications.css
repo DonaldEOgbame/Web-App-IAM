@@ -1,32 +1,18 @@
 /* Notifications Styles */
-
-/* Notification Center */
 .notification-center {
-    /* Notification center styles */
+    padding: 1rem;
 }
-
 .notification-item {
-    /* Individual notification styles */
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: #f4f4f4;
+}
+.notification-item.unread {
+    font-weight: bold;
 }
 
-/* Device Notifications */
-.device-notification {
-    /* Device-specific notification styles */
-}
-
-.device-trust-prompt {
-    /* Device trust prompt styles */
-}
-
-/* Notification Types */
-.notification-info {
-    /* Info notification styles */
-}
-
-.notification-warning {
-    /* Warning notification styles */
-}
-
-.notification-risk {
-    /* Risk notification styles */
-}
+.notification-info { background: #e8f4ff; }
+.notification-warning { background: #fff8e1; }
+.notification-risk { background: #ffe8e8; }
+.notification-device { background: #e8ffe8; }

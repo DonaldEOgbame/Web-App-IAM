@@ -1,34 +1,26 @@
 /* Document Management Styles */
-
-/* Document Lists */
-.document-list {
-    /* Document listing styles */
+.container {
+    padding: 1rem;
+}
+.version-filters {
+    margin-bottom: 1rem;
+}
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.table th, .table td {
+    padding: 0.5rem;
+    border-bottom: 1px solid #ccc;
 }
 
-.document-item {
-    /* Individual document item styles */
-}
-
-/* Document Upload */
-.upload-area {
-    /* File upload area styles */
-}
-
-.upload-progress {
-    /* Upload progress bar styles */
-}
-
-/* Document Viewer */
-.document-viewer {
-    /* Document viewing interface styles */
-}
-
-/* Version Management */
-.version-history {
-    /* Document version history styles */
-}
-
-/* Access Controls */
-.access-controls {
-    /* Document access control styles */
+@media (max-width: 600px) {
+    .version-filters input {
+        display: block;
+        margin-bottom: 0.5rem;
+        width: 100%;
+    }
+    .table th, .table td {
+        font-size: 0.9rem;
+    }
 }
