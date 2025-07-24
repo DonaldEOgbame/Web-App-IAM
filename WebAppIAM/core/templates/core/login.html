@@ -94,10 +94,31 @@
     // biometric verification handlers
     const faceForm = document.getElementById('faceVerifyForm');
     if(faceForm){
-        faceForm.addEventListener('submit', function(){
-            // simple validation
-            const file = document.getElementById('face_image').value;
-            if(!file){ alert('Please choose a face image'); return false; }
+        faceForm.addEventListener('submit', async function(e){
+            e.preventDefault();
+            const fileInput = document.getElementById('face_image');
+            if(!fileInput.files.length){
+                alert('Please choose a face image');
+                return;
+            }
+
+            const data = new FormData(faceForm);
+            try{
+                const resp = await fetch('', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrftoken},
+                    body: data
+                });
+                const result = await resp.json();
+                if(result.status === 'success'){
+                    alert('Face verified');
+                    window.location.reload();
+                }else{
+                    alert(result.message || 'Face verification failed');
+                }
+            }catch(e){
+                alert('Face verification failed');
+            }
         });
     }
     {% if webauthn_enabled %}

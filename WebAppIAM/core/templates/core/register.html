@@ -56,13 +56,19 @@
 (function(){
     const csrftoken = '{{ csrf_token }}';
     {% if enrollment_type == 'biometric' %}
-    document.getElementById('enrollFingerprint').addEventListener('click', async function(){
-        try {
-            const optResp = await fetch('{% url "core:webauthn_registration_options" %}', {
-                method: 'POST',
-                headers: {'X-CSRFToken': csrftoken}
-            });
-            const options = await optResp.json();
+    const initialOptions = {{ webauthn_options|default:'null'|safe }};
+
+    async function startFingerprint(opts){
+        try{
+            let options = opts;
+            if(!options){
+                const resp = await fetch('{% url "core:webauthn_registration_options" %}', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrftoken}
+                });
+                options = await resp.json();
+            }
+
             ['challenge','user.id'].forEach(k=>{ if(options[k]) options[k]=Uint8Array.from(atob(options[k]),c=>c.charCodeAt(0)); });
             if(options.excludeCredentials){
                 options.excludeCredentials = options.excludeCredentials.map(c=>{ c.id=Uint8Array.from(atob(c.id),ch=>ch.charCodeAt(0)); return c; });
@@ -89,7 +95,14 @@
             }else{
                 alert(result.message || 'Enrollment failed');
             }
-        } catch(e){ alert('Fingerprint enrollment failed'); }
+        }catch(e){
+            alert('Fingerprint enrollment failed');
+        }
+    }
+
+    document.getElementById('enrollFingerprint').addEventListener('click', function(){
+        startFingerprint(initialOptions);
+
     });
     {% endif %}
 })();
