@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enroll Biometrics</title>
+    <style>
+        body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:0; }
+        .container { max-width:500px; margin:40px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
+        h1 { text-align:center; }
+        button { margin-top:15px; padding:10px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer; }
+        button:hover { background:#1e7e34; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Enroll Biometrics</h1>
+    <form id="faceEnroll" method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <video id="enrollVideo" width="320" height="240" autoplay playsinline></video>
+        <button id="enrollFaceBtn" type="submit">Enroll Face</button>
+    </form>
+    <hr>
+    <button id="enrollFingerprint" type="button">Enroll Fingerprint</button>
+</div>
+<script>
+(function(){
+    const csrftoken = '{{ csrf_token }}';
+    const initialOptions = {{ webauthn_options|default:'null'|safe }};
+
+    const enrollForm = document.getElementById('faceEnroll');
+    const enrollVideo = document.getElementById('enrollVideo');
+    if(enrollForm && enrollVideo){
+        navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
+            enrollVideo.srcObject = stream;
+        }).catch(()=>{ alert('Unable to access camera'); });
+
+        enrollForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            const canvas = document.createElement('canvas');
+            canvas.width = enrollVideo.videoWidth || 320;
+            canvas.height = enrollVideo.videoHeight || 240;
+            canvas.getContext('2d').drawImage(enrollVideo,0,0,canvas.width,canvas.height);
+            canvas.toBlob(async function(blob){
+                const data = new FormData();
+                data.append('face_data', blob, 'face.png');
+                const resp = await fetch('', {
+                    method:'POST',
+                    headers:{'X-CSRFToken': csrftoken},
+                    body: data
+                });
+                if(resp.redirected){
+                    window.location.href = resp.url;
+                }else{
+                    alert('Face enrollment successful');
+                }
+            }, 'image/png');
+        });
+    }
+
+    async function startFingerprint(opts){
+        try{
+            let options = opts;
+            if(!options){
+                const resp = await fetch('{% url "core:webauthn_registration_options" %}', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrftoken}
+                });
+                options = await resp.json();
+            }
+            ['challenge','user.id'].forEach(k=>{ if(options[k]) options[k]=Uint8Array.from(atob(options[k]),c=>c.charCodeAt(0)); });
+            if(options.excludeCredentials){
+                options.excludeCredentials = options.excludeCredentials.map(c=>{ c.id=Uint8Array.from(atob(c.id),ch=>ch.charCodeAt(0)); return c; });
+            }
+            const cred = await navigator.credentials.create({publicKey: options});
+            const data = {
+                id: cred.id,
+                rawId: btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),
+                type: cred.type,
+                response: {
+                    clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(cred.response.clientDataJSON))),
+                    attestationObject: btoa(String.fromCharCode(...new Uint8Array(cred.response.attestationObject)))
+                }
+            };
+            const verifyResp = await fetch('{% url "core:webauthn_registration_verify" %}', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json','X-CSRFToken': csrftoken},
+                body: JSON.stringify(data)
+            });
+            const result = await verifyResp.json();
+            if(result.status === 'success'){
+                if(result.redirect){ window.location.href = result.redirect; }
+                else alert('Fingerprint enrollment successful');
+            }else{
+                alert(result.message || 'Enrollment failed');
+            }
+        }catch(e){
+            alert('Fingerprint enrollment failed');
+        }
+    }
+
+    document.getElementById('enrollFingerprint').addEventListener('click', function(){
+        startFingerprint(initialOptions);
+    });
+})();
+</script>
+</body>
+</html>

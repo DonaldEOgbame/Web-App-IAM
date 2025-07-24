@@ -282,59 +282,23 @@ def activate_user(request, user_id):
     user = get_object_or_404(User, id=user_id, is_active=False)
     user.is_active = True
     user.save()
-    
-    # Generate verification token and expiration
-    token = Fernet.generate_key().decode()
-    expiration = timezone.now() + timedelta(hours=24)  # Link expires in 24 hours
-    
-    # Save token and expiration in the database
-    user.email_verification_token = token
-    user.email_verification_expiration = expiration
-    user.save()
-    
-    # Send verification email
-    verify_url = request.build_absolute_uri(
-        reverse('core:verify_email', kwargs={'user_id': user.id, 'token': token})
+
+    subject = 'Account Approved'
+    message = (
+        'Your account has been approved by the administrator. '
+        'You can now log in to the platform.'
     )
-    
-    subject = 'Verify Your Email'
-    message = render_to_string('emails/verify_email.html', {
-        'user': user,
-        'verify_link': verify_url
-    })
-    plain_message = render_to_string('emails/verify_email.txt', {
-        'user': user,
-        'verify_link': verify_url
-    })
-    
+
     send_mail(
         subject,
-        plain_message,
+        message,
         settings.DEFAULT_FROM_EMAIL,
         [user.email],
-        html_message=message,
-        fail_silently=True
+        fail_silently=True,
     )
-    
+
     return redirect('core:admin_dashboard')
 
-def verify_email(request, user_id, token):
-    user = get_object_or_404(User, id=user_id)
-    
-    # Check token and expiration
-    if user.email_verification_token != token or user.email_verification_expiration < timezone.now():
-        return render(request, 'core/login.html', {
-            'error': 'Email verification link is invalid or has expired.'
-        })
-    
-    user.email_verified = True
-    user.email_verification_token = None
-    user.email_verification_expiration = None
-    user.save()
-    
-    # Redirect to profile completion
-    request.session['complete_profile_user'] = user.id
-    return redirect('core:complete_profile')
 
 def complete_profile(request):
     user_id = request.session.get('complete_profile_user')
@@ -356,23 +320,25 @@ def complete_profile(request):
             user.last_name = form.cleaned_data['last_name']
             user.save()
             
-            request.session['register_biometrics_user'] = user.id
-            return redirect('core:register_biometrics')
+            if 'pending_user_id' in request.session:
+                del request.session['pending_user_id']
+            if 'complete_profile_user' in request.session:
+                del request.session['complete_profile_user']
+            return render(request, 'core/pending_approval.html', {'user': user})
     else:
         form = ProfileCompletionForm()
     
-    return render(request, 'core/register.html', {
+    return render(request, 'core/complete_profile.html', {
         'form': form,
         'user': user,
-        'show_profile_completion': True
     })
 
 def register_biometrics(request):
-    # This view will now handle both initial enrollment and re-enrollment
-    user = request.user if request.user.is_authenticated else None
-    if not user and 'pending_user_id' in request.session:
+    user = None
+    if request.user.is_authenticated:
+        user = request.user
+    elif request.session.get('pending_user_id'):
         user = get_object_or_404(User, id=request.session['pending_user_id'])
-    
     if not user:
         return redirect('core:login')
     
@@ -381,17 +347,14 @@ def register_biometrics(request):
         if 'face_data' in request.FILES:
             face_data = request.FILES['face_data'].read()
             if enroll_face(user, face_data):
-                user.has_biometrics = True
                 user.save()
-                if request.user.is_authenticated:
-                    return redirect('core:staff_dashboard' if user.role == 'STAFF' else 'core:admin_dashboard')
-                return redirect('core:login')
+                request.session['complete_profile_user'] = user.id
+                return redirect('core:complete_profile')
         
         # Handle WebAuthn registration
         # (existing WebAuthn logic remains the same)
     
-    return render(request, 'core/register.html', {
-        'enrollment_type': 'biometric',
+    return render(request, 'core/enroll_biometrics.html', {
         'webauthn_options': generate_registration_options(user) if not user.face_data else None
     })
 
@@ -432,14 +395,8 @@ def webauthn_registration_verify(request):
             ip_address=get_client_ip(request)
         )
         
-        # Complete registration if new user
-        if 'register_biometrics_user' in request.session:
-            del request.session['register_biometrics_user']
-            django_login(request, user)  # Replace auth_login
-            dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
-            return JsonResponse({'status': 'success', 'redirect': reverse(f'core:{dashboard_url}')})
-        
-        return JsonResponse({'status': 'success'})
+        request.session['complete_profile_user'] = user.id
+        return JsonResponse({'status': 'success', 'redirect': reverse('core:complete_profile')})
     except Exception as e:
         logger.error(f"WebAuthn registration failed: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
@@ -489,6 +446,10 @@ def login(request):
                         # Reset failed attempts after lockout period
                         user.failed_login_attempts = 0
                         user.save(update_fields=['failed_login_attempts'])
+                if not user.is_active:
+                    messages.error(request, 'Your account is pending administrator approval.')
+                    return render(request, 'core/login.html', {'form': form})
+
                 # Authenticate the user
                 user_auth = authenticate(request, username=username, password=password)
                 if user_auth is not None:
@@ -546,6 +507,7 @@ def register(request):
         form = RegistrationForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
+            user.is_active = False
             user.set_password(form.cleaned_data['password1'])
             user.save()
             
@@ -557,9 +519,8 @@ def register(request):
                 ip_address=get_client_ip(request)
             )
             
-            # Redirect to the login page with a success message
-            messages.success(request, 'Registration successful! Please log in.')
-            return redirect('core:login')
+            request.session['pending_user_id'] = user.id
+            return redirect('core:register_biometrics')
     else:
         form = RegistrationForm()
     
