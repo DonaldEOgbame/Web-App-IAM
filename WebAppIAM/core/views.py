@@ -881,14 +881,19 @@ def admin_dashboard(request):
 @login_required
 def document_list(request):
     user = request.user
+    if not hasattr(user, 'profile'):
+        return redirect('core:complete_profile')
     documents = Document.objects.filter(deleted=False)
-    
+
     # Filter by access level
     if user.role != 'ADMIN':
-        documents = documents.filter(
-            Q(access_level='PUBLIC') |
-            Q(access_level='DEPARTMENT', department=user.profile.department)
-        )
+        if hasattr(user, 'profile'):
+            documents = documents.filter(
+                Q(access_level='PUBLIC') |
+                Q(access_level='DEPARTMENT', department=user.profile.department)
+            )
+        else:
+            documents = documents.filter(access_level='PUBLIC')
     
     # Apply search filters
     query = request.GET.get('q', '')
@@ -972,12 +977,16 @@ def document_upload(request):
 def document_download(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id, deleted=False)
     user = request.user
-    
+    if not hasattr(user, 'profile'):
+        return redirect('core:complete_profile')
+
     # Check access permissions
     if user.role != 'ADMIN':
         if doc.access_level == 'PRIVATE' and doc.uploaded_by != user:
             return HttpResponseForbidden("You don't have permission to access this document")
-        if doc.access_level == 'DEPARTMENT' and doc.department != user.profile.department:
+        if doc.access_level == 'DEPARTMENT' and (
+            not hasattr(user, 'profile') or doc.department != user.profile.department
+        ):
             return HttpResponseForbidden("You don't have permission to access this document")
     
     # Add strict expiry check first
@@ -1140,6 +1149,8 @@ def validate_checksum(request, doc_id):
 @login_required
 def profile_settings(request):
     user = request.user
+    if not hasattr(user, 'profile'):
+        return redirect('core:complete_profile')
     profile = user.profile
     
     if request.method == 'POST':

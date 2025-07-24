@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <style>
+        body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
+        .container {max-width:1000px;margin:40px auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+        nav a {margin-right:15px;text-decoration:none;color:#007bff;}
+        nav a:hover {text-decoration:underline;}
+        table {width:100%;border-collapse:collapse;margin-top:15px;}
+        th, td {border:1px solid #ddd;padding:8px;text-align:left;}
+        th {background:#f0f0f0;}
+        .btn {padding:6px 10px;background:#007bff;color:#fff;border:none;border-radius:4px;cursor:pointer;}
+        .btn:hover {background:#0056b3;}
+        .alert {padding:10px;margin-bottom:10px;border-radius:4px;}
+        .alert-warning {background:#fff3cd;color:#856404;}
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Administrator Dashboard</h1>
+    <nav>
+        <a href="{% url 'core:admin_dashboard' %}">Home</a>
+        <a href="{% url 'core:document_list' %}">Documents</a>
+        <a href="{% url 'core:document_upload' %}">Upload</a>
+        <a href="{% url 'core:audit_logs' %}">Audit Logs</a>
+        <a href="{% url 'core:profile_settings' %}">Profile</a>
+        <a href="{% url 'core:notifications' %}">Notifications{% if notifications %} ({{ notifications|length }}){% endif %}</a>
+        <a href="{% url 'core:logout' %}">Logout</a>
+    </nav>
+
+    {% if show_document_upload %}
+        <h2>Upload Document</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button class="btn" type="submit">Upload</button>
+        </form>
+    {% elif show_documents %}
+        <h2>Documents</h2>
+        <table>
+            <tr><th>Title</th><th>Category</th><th>Version</th><th>Actions</th></tr>
+            {% for doc in documents %}
+            <tr>
+                <td>{{ doc.title }}</td>
+                <td>{{ doc.category }}</td>
+                <td>{{ doc.version }}</td>
+                <td>
+                    <a class="btn" href="{% url 'core:document_download' doc.id %}">Download</a>
+                    <a class="btn" href="{% url 'core:document_versions' doc.id %}">Versions</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4">No documents found.</td></tr>
+            {% endfor %}
+        </table>
+    {% elif show_profile_settings %}
+        <h2>Profile Settings</h2>
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            {{ profile_form.as_p }}
+            <button class="btn" type="submit">Update Profile</button>
+        </form>
+    {% elif show_notifications %}
+        <h2>Notifications</h2>
+        {% for n in notifications %}
+            <div class="alert alert-warning" data-id="{{ n.id }}">{{ n.message }} - {{ n.created_at }}</div>
+        {% empty %}
+            <p>No notifications.</p>
+        {% endfor %}
+    {% else %}
+        <h2>System Stats</h2>
+        <ul>
+            <li>Total Users: {{ user_count }}</li>
+            <li>Active Sessions: {{ active_sessions }}</li>
+            <li>Security Events (24h): {{ security_events }}</li>
+        </ul>
+        <h3>Recent Logins</h3>
+        <table>
+            <tr><th>User</th><th>Time</th><th>IP</th></tr>
+            {% for l in recent_logins %}
+            <tr>
+                <td>{{ l.user.username }}</td>
+                <td>{{ l.login_time }}</td>
+                <td>{{ l.ip_address }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3">No recent logins.</td></tr>
+            {% endfor %}
+        </table>
+        {% if system_alerts %}
+            <h3>System Alerts</h3>
+            {% for alert in system_alerts %}
+                <div class="alert alert-warning">{{ alert.message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endif %}
+</div>
+<script>
+(function(){
+    const csrftoken = '{{ csrf_token }}';
+    document.querySelectorAll('.alert[data-id]').forEach(function(el){
+        el.addEventListener('click', function(){
+            fetch('{% url "core:mark_notification_read" 0 %}'.replace('0', el.dataset.id), {
+                method:'POST', headers:{'X-CSRFToken': csrftoken}
+            }).then(()=>{ el.style.display='none'; });
+        });
+    });
+})();
+</script>
+</body>
+</html>
