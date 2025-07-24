@@ -20,7 +20,7 @@ class SessionSecurityMiddleware:
             # Check session timeout
             if last_activity:
                 last_activity = datetime.datetime.fromisoformat(last_activity)
-                last_activity = last_activity.replace(tzinfo=timezone.utc)
+                last_activity = last_activity.replace(tzinfo=datetime.timezone.utc)
                 
                 # If the user has been inactive for too long, log them out
                 if (current_time - last_activity).total_seconds() > timeout_seconds:
