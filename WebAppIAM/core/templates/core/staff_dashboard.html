@@ -20,7 +20,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>Welcome, {{ user.first_name or user.username }}</h1>
+    <h1>Welcome, {% firstof user.first_name user.username %}</h1>
     <nav>
         <a href="{% url 'core:staff_dashboard' %}">Home</a>
         <a href="{% url 'core:document_list' %}">Documents</a>
