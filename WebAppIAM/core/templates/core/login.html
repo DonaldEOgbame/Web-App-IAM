@@ -1,399 +1,455 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Login</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Login</title>
 
-    <style>
-        :root{
-            --bg:#0f1115;
-            --bg-soft:#14171c;
-            --surface:#1a1d23;
-            --surface-2:#1f232a;
-            --border:#2a2f38;
-            --text:#e5e7eb;
-            --text-dim:#9ca3af;
-            --primary:#8b5cf6;
-            --primary-weak:rgba(139,92,246,.15);
-            --success:#22c55e;
-            --warning:#fbbf24;
-            --danger:#ef4444;
-            --radius:16px;
-            --shadow:0 12px 32px rgba(0,0,0,.28);
-            --transition:180ms ease;
-        }
+<style>
+  :root{
+    --bg:#0f1115; --bg-soft:#14171c; --surface:#1a1d23; --surface-2:#1f232a;
+    --border:#2a2f38; --text:#e5e7eb; --text-dim:#9ca3af;
+    --primary:#8b5cf6; --primary-weak:rgba(139,92,246,.15);
+    --success:#22c55e; --warning:#fbbf24; --danger:#ef4444;
+    --radius:16px; --shadow:0 12px 32px rgba(0,0,0,.28); --transition:180ms ease;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; min-height:100%; background:var(--bg); color:var(--text);
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif; line-height:1.5; }
+  a{ color:var(--primary); text-decoration:none; } a:hover{ text-decoration:underline; }
 
-        *{ box-sizing:border-box; }
-        html, body{
-            margin:0;
-            min-height:100%;
-            background:var(--bg);
-            color:var(--text);
-            font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
-            line-height:1.5;
-        }
+  .wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 16px; }
+  .card{
+    width:100%; max-width:460px; background:var(--surface); border:1px solid var(--border);
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:32px 28px; position:relative;
+  }
+  h1{
+    margin:0 0 24px; text-align:center; font-weight:800; font-size:1.6rem;
+    background:linear-gradient(90deg,var(--primary),#a855f7,var(--primary));
+    background-size:200% 100%;
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    animation:shimmer 2.5s infinite, fadeSlideIn 320ms ease forwards; opacity:0;
+  }
+  @keyframes shimmer{ 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
+  @keyframes fadeSlideIn{ from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
 
-        a{ color:var(--primary); text-decoration:none; }
-        a:hover{ text-decoration:underline; }
+  form{ display:grid; gap:16px; }
+  form p{ margin:0; display:flex; flex-direction:column; gap:6px; }
+  form p > label{ font-size:.95rem; color:var(--text-dim); }
 
-        .wrap{
-            min-height:100vh;
-            display:flex;
-            align-items:center;
-            justify-content:center;
-            padding:32px 16px;
-        }
+  input[type="text"], input[type="password"]{
+    width:100%; background:var(--bg-soft); border:1px solid var(--border);
+    color:var(--text); padding:10px 12px; border-radius:10px;
+    transition:border var(--transition), box-shadow var(--transition);
+  }
+  input:focus{ border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak); outline:none; }
 
-        .card{
-            width:100%;
-            max-width:480px;
-            background:var(--surface);
-            border:1px solid var(--border);
-            border-radius:var(--radius);
-            box-shadow:var(--shadow);
-            padding:32px 28px;
-            position:relative;
-        }
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:12px 16px; border:none; border-radius:10px; background:var(--primary);
+    color:#fff; font-weight:600; cursor:pointer; transition:opacity .15s ease, transform .15s ease;
+  }
+  .btn:hover{ opacity:.95; } .btn:active{ transform:translateY(1px); }
+  .btn[disabled]{ opacity:.6; cursor:not-allowed; }
+  .btn-outline{ background:transparent; color:var(--text); border:1px solid var(--border); }
+  .btn-outline:hover{ background:var(--surface-2); }
 
-        h1{
-            margin:0 0 24px;
-            text-align:center;
-            font-weight:800;
-            font-size:1.6rem;
-            background:linear-gradient(90deg,var(--primary),#a855f7,var(--primary));
-            background-size:200% 100%;
-            -webkit-background-clip:text;
-            -webkit-text-fill-color:transparent;
-            animation:shimmer 2.5s infinite, fadeSlideIn 320ms ease forwards;
-            opacity:0;
-        }
-        @keyframes shimmer{
-            0%{ background-position:0% 50%; }
-            100%{ background-position:200% 50%; }
-        }
-        @keyframes fadeSlideIn{
-            from{ opacity:0; transform:translateY(6px); }
-            to{ opacity:1; transform:translateY(0); }
-        }
+  .messages{ list-style:none; margin:0 0 16px; padding:0; }
+  .messages li{
+    margin-bottom:8px; padding:10px 12px; border-radius:10px; background:var(--surface-2);
+    color:var(--text); border-left:3px solid var(--primary);
+  }
+  .messages li.error{ border-left-color:var(--danger); }
+  .messages li.success{ border-left-color:var(--success); }
+  .messages li.warning{ border-left-color:var(--warning); }
 
-        form{
-            display:grid;
-            gap:16px;
-        }
-        form p{
-            margin:0;
-            display:flex;
-            flex-direction:column;
-            gap:6px;
-        }
-        form p > label{
-            font-size:.95rem;
-            color:var(--text-dim);
-        }
+  .status{ font-size:.9rem; color:var(--text-dim); }
+  .status.success{ color:var(--success); }
+  .status.error{ color:var(--danger); }
 
-        input[type="text"],
-        input[type="password"],
-        input[type="file"]{
-            width:100%;
-            background:var(--bg-soft);
-            border:1px solid var(--border);
-            color:var(--text);
-            padding:10px 12px;
-            border-radius:10px;
-            transition:border var(--transition), box-shadow var(--transition);
-        }
-        input:focus{
-            border-color:var(--primary);
-            box-shadow:0 0 0 3px var(--primary-weak);
-            outline:none;
-        }
+  .submitting{
+    opacity:.6; pointer-events:none; position:relative;
+  }
+  .submitting::after{
+    content:""; width:18px;height:18px; border:2px solid rgba(255,255,255,.4);
+    border-top-color:#fff; border-radius:50%;
+    animation:spin .6s linear infinite; position:absolute; right:14px; top:50%; transform:translateY(-50%);
+  }
+  @keyframes spin{ to{ transform:translateY(-50%) rotate(360deg); } }
 
-        .btn{
-            display:inline-flex;
-            align-items:center;
-            justify-content:center;
-            gap:6px;
-            padding:12px 16px;
-            border:none;
-            border-radius:10px;
-            background:var(--primary);
-            color:#fff;
-            font-weight:600;
-            cursor:pointer;
-            transition:opacity .15s ease, transform .15s ease;
-        }
-        .btn:hover{ opacity:.95; }
-        .btn:active{ transform:translateY(1px); }
-        .btn-outline{
-            background:transparent;
-            color:var(--text);
-            border:1px solid var(--border);
-        }
-        .btn-outline:hover{ background:var(--surface-2); }
+  /* --- Biometric Panel (hidden until event-trigger) --- */
+  .biometric-panel{
+    display:none; margin-top:20px; padding:20px; border:1px solid var(--border);
+    border-radius:12px; background:var(--surface-2);
+  }
+  .biometric-panel.active{ display:block; animation:fadeSlideIn 220ms ease forwards; }
 
-        .messages{
-            list-style:none;
-            margin:0 0 16px;
-            padding:0;
-        }
-        .messages li{
-            margin-bottom:8px;
-            padding:10px 12px;
-            border-radius:10px;
-            background:var(--surface-2);
-            color:var(--text);
-            border-left:3px solid var(--primary);
-        }
-        .messages li.error{ border-left-color:var(--danger); }
-        .messages li.success{ border-left-color:var(--success); }
-        .messages li.warning{ border-left-color:var(--warning); }
+  .step-head{
+    display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
+  }
+  .badge{
+    font-size:.75rem; padding:2px 8px; border-radius:9999px; background:var(--bg-soft); color:var(--text-dim);
+  }
+  .badge.required{ background:var(--danger); color:#fff; }
+  .badge.optional{ background:var(--primary); color:#fff; }
 
-        .status{
-            font-size:.9rem;
-            color:var(--text-dim);
-        }
-        .status.success{ color:var(--success); }
-        .status.error{ color:var(--danger); }
-
-        .hidden{ display:none; }
-
-        video{
-            width:100%;
-            max-height:320px;
-            background:#000;
-            border-radius:10px;
-        }
-
-        .submitting{
-            opacity:.6;
-            pointer-events:none;
-            position:relative;
-        }
-        .submitting::after{
-            content:"";
-            width:18px;height:18px;
-            border:2px solid rgba(255,255,255,.4);
-            border-top-color:#fff;
-            border-radius:50%;
-            animation:spin .6s linear infinite;
-            position:absolute;
-            right:14px; top:50%;
-            transform:translateY(-50%);
-        }
-        @keyframes spin{
-            to{ transform:translateY(-50%) rotate(360deg); }
-        }
-    </style>
+  video{
+    width:100%; max-height:320px; background:#000; border-radius:10px;
+  }
+</style>
 </head>
 <body>
 <div class="wrap">
-    <div class="card">
-        <h1>Welcome back</h1>
+  <div class="card" role="main">
+    <h1>Welcome back</h1>
 
-        {% if messages %}
-        <ul class="messages">
-            {% for m in messages %}
-                <li class="{{ m.tags }}">{{ m }}</li>
-            {% endfor %}
-        </ul>
-        {% endif %}
+    {% if messages %}
+    <ul class="messages" aria-live="polite">
+      {% for m in messages %}
+        <li class="{{ m.tags }}">{{ m }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
 
-        {% if show_biometric_verification %}
-            <p class="status">Please verify your identity.</p>
+    <!-- ============== PASSWORD FIRST (EVENT TRIGGER) ============== -->
+    <form id="loginForm" method="post" action="{% url 'core:login' %}" novalidate>
+      {% csrf_token %}
+      {{ form.as_p }}
 
-            <!-- Face verification -->
-            <form id="faceVerifyForm" method="post" enctype="multipart/form-data">
-                {% csrf_token %}
-                <video id="faceVideo" autoplay playsinline></video>
-                <button id="verifyFaceBtn" class="btn" type="submit">Verify Face</button>
-                <p id="faceStatus" class="status" aria-live="polite"></p>
-            </form>
+      <!-- Hidden field to carry keystroke dynamics -->
+      <input type="hidden" name="keystroke_data" id="keystroke_data" />
 
-            {% if webauthn_enabled %}
-                <button id="fpButton" class="btn btn-outline" type="button" style="margin-top:8px;">
-                    Use Fingerprint / Passkey
-                </button>
-                <p id="fpStatus" class="status" aria-live="polite"></p>
-            {% endif %}
+      <button id="loginBtn" class="btn" type="submit">Login</button>
+      <p id="loginStatus" class="status" aria-live="polite"></p>
+    </form>
 
-        {% else %}
-            <form id="loginForm" method="post">
-                {% csrf_token %}
-                {{ form.as_p }}
-                <button id="loginBtn" class="btn" type="submit">Login</button>
-            </form>
-        {% endif %}
-    </div>
+    <!-- ============== BIOMETRICS (SHOWN AFTER PASSWORD OK) ============== -->
+    <section id="biometricPanel" class="biometric-panel" aria-hidden="true">
+      <div class="step-head">
+        <h2 style="margin:0;font-size:1.05rem;">Biometric verification required</h2>
+        <span class="badge required">Required</span>
+      </div>
+      <p class="status">Choose any biometric you’ve enrolled (Face or Fingerprint/Passkey) to continue.</p>
+
+      <!-- FACE -->
+      <div id="faceBlock" style="margin-top:16px; display:none;">
+        <div class="step-head">
+          <h3 style="margin:0;font-size:1rem;">Verify with Face</h3>
+          <span class="badge optional">Optional</span>
+        </div>
+
+        <form id="faceVerifyForm" method="post" enctype="multipart/form-data">
+          <video id="faceVideo" autoplay playsinline></video>
+          <div style="margin-top:8px;">
+            <button id="verifyFaceBtn" class="btn" type="submit">Verify Face</button>
+          </div>
+          <p id="faceStatus" class="status" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <!-- WebAuthn -->
+      <div id="webauthnBlock" style="margin-top:20px; display:none;">
+        <div class="step-head">
+          <h3 style="margin:0;font-size:1rem;">Verify with Fingerprint / Passkey</h3>
+          <span class="badge optional">Optional</span>
+        </div>
+
+        <button id="fpButton" class="btn btn-outline" type="button">Use Fingerprint / Passkey</button>
+        <p id="fpStatus" class="status" aria-live="polite"></p>
+      </div>
+    </section>
+  </div>
 </div>
 
 <script>
 (function(){
-    const csrftoken = '{{ csrf_token }}';
+  // ---------- CONFIG (endpoints your backend exposes) ----------
+  const ENDPOINTS = {
+    login: "{% url 'core:login' %}",  // should return JSON on AJAX: {status: 'password_ok_biometric_required'|'ok'|'error', face:bool, webauthn:bool, next:'/dashboard'}
+    face_verify: "{% url 'core:face_verify' %}",
+    webauthn_options: "{% url 'core:webauthn_authentication_options' %}",
+    webauthn_verify: "{% url 'core:webauthn_authentication_verify' %}"
+  };
 
-    {% if not show_biometric_verification %}
-    // ---- Keystroke dynamics capture ----
-    let events = [];
-    function record(e){ events.push({type:e.type, key:e.key, time:Date.now()}); }
+  const requireBiometrics = true; // Biometrics NOT optional overall
+  // Choice is optional: server should tell us which modalities user has/enrolled for this session/user
+  // We’ll reveal only those blocks (faceBlock/webauthnBlock)
 
+  // ---------- CSRF ----------
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
+    if (match) return match[2];
+    return null;
+  }
+  const csrftoken = getCookie('csrftoken') || (document.querySelector('input[name=csrfmiddlewaretoken]')?.value ?? '');
+
+  // ---------- Simple helpers ----------
+  function setStatus(el, msg, type){
+    if(!el) return;
+    el.textContent = msg;
+    el.className = 'status ' + (type || '');
+  }
+  function toggle(el, show){
+    if(!el) return;
+    el.style.display = show ? '' : 'none';
+  }
+  function activatePanel(panel){
+    if(!panel) return;
+    panel.classList.add('active');
+    panel.setAttribute('aria-hidden', 'false');
+    panel.scrollIntoView({ behavior: 'smooth' });
+  }
+  function toBase64Url(buf) {
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,'');
+  }
+  function b64UrlToBuf(b64){
+    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4;
+    if(pad) b64 += '='.repeat(4 - pad);
+    return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  }
+
+  // ---------- Keystroke dynamics ----------
+  (function initKeystrokeDynamics(){
+    const events = [];
     const userEl = document.getElementById('id_username');
     const passEl = document.getElementById('id_password');
-    const loginForm = document.getElementById('loginForm');
-    const loginBtn = document.getElementById('loginBtn');
+    const ksHidden = document.getElementById('keystroke_data');
+
+    function record(e){ events.push({type:e.type, key:e.key, time:Date.now()}); }
 
     if(userEl && passEl){
-        ['keydown','keyup'].forEach(evt=>{
-            userEl.addEventListener(evt, record);
-            passEl.addEventListener(evt, record);
+      ['keydown','keyup'].forEach(evt=>{
+        userEl.addEventListener(evt, record);
+        passEl.addEventListener(evt, record);
+      });
+    }
+
+    document.getElementById('loginForm')?.addEventListener('submit', ()=>{
+      if(ksHidden) ksHidden.value = JSON.stringify(events);
+    });
+  })();
+
+  // ---------- Password-first flow ----------
+  const loginForm = document.getElementById('loginForm');
+  const loginBtn  = document.getElementById('loginBtn');
+  const loginStatus = document.getElementById('loginStatus');
+
+  const biometricPanel = document.getElementById('biometricPanel');
+  const faceBlock = document.getElementById('faceBlock');
+  const webauthnBlock = document.getElementById('webauthnBlock');
+
+  const faceVideo = document.getElementById('faceVideo');
+  const faceForm = document.getElementById('faceVerifyForm');
+  const verifyFaceBtn = document.getElementById('verifyFaceBtn');
+  const faceStatus = document.getElementById('faceStatus');
+
+  const fpButton = document.getElementById('fpButton');
+  const fpStatus = document.getElementById('fpStatus');
+
+  // Camera stream handle for cleanup if needed
+  let faceStream = null;
+
+  async function ajaxLogin(e){
+    e.preventDefault();
+    if(!loginForm) return;
+
+    setStatus(loginStatus, 'Authenticating...', '');
+    loginBtn?.classList.add('submitting');
+
+    const formData = new FormData(loginForm);
+
+    try{
+      const resp = await fetch(ENDPOINTS.login, {
+        method: 'POST',
+        headers: {'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
+        body: formData
+      });
+
+      const result = await resp.json();
+
+      if(result.status === 'ok'){
+        // Password only path (shouldn't happen if biometrics always required, but keep it safe)
+        window.location.href = result.next || '/';
+        return;
+      }
+
+      if(result.status === 'password_ok_biometric_required' && requireBiometrics){
+        setStatus(loginStatus, 'Password ok. Please complete biometric verification.', 'success');
+        // Show biometrics dynamically, based on what server says this user supports
+        if(result.face) initFaceBlock(true);
+        if(result.webauthn) initWebAuthnBlock(true);
+        activatePanel(biometricPanel);
+        // Hide the password form to declutter
+        loginForm.style.display = 'none';
+        return;
+      }
+
+      // Errors
+      setStatus(loginStatus, result.message || 'Login failed', 'error');
+
+    }catch(err){
+      console.error(err);
+      setStatus(loginStatus, 'Network / server error. Please try again.', 'error');
+    }finally{
+      loginBtn?.classList.remove('submitting');
+    }
+  }
+
+  loginForm?.addEventListener('submit', ajaxLogin);
+
+  // ---------- FACE VERIFICATION ----------
+  function initFaceBlock(show){
+    toggle(faceBlock, show);
+    if(!show) return;
+
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      setStatus(faceStatus, 'Camera not supported in this browser.', 'error');
+      return;
+    }
+
+    navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user",
+        width: { min: 640, ideal: 1280 },
+        height: { min: 480, ideal: 720 }
+      }
+    }).then(stream => {
+      faceStream = stream;
+      if(faceVideo) faceVideo.srcObject = stream;
+    }).catch(err => {
+      setStatus(faceStatus, 'Unable to access camera: ' + (err?.message || err), 'error');
+    });
+
+    faceForm?.addEventListener('submit', async function(e){
+      e.preventDefault();
+      verifyFaceBtn?.classList.add('submitting');
+      setStatus(faceStatus, 'Verifying face...', '');
+
+      try{
+        const canvas = document.createElement('canvas');
+        canvas.width = faceVideo.videoWidth || 640;
+        canvas.height = faceVideo.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(faceVideo,0,0,canvas.width,canvas.height);
+
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+        const data = new FormData();
+        data.append('face_image', blob, 'face.png');
+
+        const resp = await fetch(ENDPOINTS.face_verify, {
+          method:'POST',
+          headers:{'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
+          body:data
         });
-    }
+        const result = await resp.json();
 
-    if(loginForm){
-        loginForm.addEventListener('submit', function(){
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'keystroke_data';
-            input.value = JSON.stringify(events);
-            this.appendChild(input);
-            if(loginBtn) loginBtn.classList.add('submitting');
+        if(result.status === 'success'){
+          setStatus(faceStatus, 'Face verified!', 'success');
+          // Done — redirect
+          window.location.href = result.redirect || '/';
+        }else{
+          setStatus(faceStatus, result.message || 'Face verification failed', 'error');
+        }
+
+      }catch(e){
+        console.error(e);
+        setStatus(faceStatus, 'Face verification failed', 'error');
+      }finally{
+        verifyFaceBtn?.classList.remove('submitting');
+      }
+    }, { once:true });
+  }
+
+  // ---------- WEBAUTHN VERIFICATION ----------
+  function initWebAuthnBlock(show){
+    toggle(webauthnBlock, show);
+    if(!show) return;
+
+    fpButton?.addEventListener('click', async function(){
+      if(window.isSecureContext === false){
+        setStatus(fpStatus, 'WebAuthn requires HTTPS.', 'error');
+        return;
+      }
+      if(!('credentials' in navigator) || !('get' in navigator.credentials)){
+        setStatus(fpStatus, 'WebAuthn not supported in this browser.', 'error');
+        return;
+      }
+
+      try{
+        fpButton.classList.add('submitting');
+        setStatus(fpStatus, 'Preparing authenticator...', '');
+
+        // 1) Get assertion options
+        const optResp = await fetch(ENDPOINTS.webauthn_options, {
+          method:'POST',
+          headers:{'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'}
         });
-    }
-    {% else %}
-    // ---- Biometric verification ----
-    const faceForm = document.getElementById('faceVerifyForm');
-    const videoEl = document.getElementById('faceVideo');
-    const faceStatus = document.getElementById('faceStatus');
-    const verifyFaceBtn = document.getElementById('verifyFaceBtn');
+        const options = await optResp.json();
 
-    function setFaceStatus(msg, type){
-        if(!faceStatus) return;
-        faceStatus.textContent = msg;
-        faceStatus.className = 'status ' + (type || '');
-    }
+        options.challenge = b64UrlToBuf(options.challenge);
+        if(options.allowCredentials){
+          options.allowCredentials = options.allowCredentials.map(c=>{
+            return {...c, id: b64UrlToBuf(c.id)};
+          });
+        }
 
-    if(faceForm && videoEl){
-        navigator.mediaDevices.getUserMedia({video:true})
-            .then(stream => { videoEl.srcObject = stream; })
-            .catch(()=> { setFaceStatus('Unable to access camera', 'error'); });
+        // 2) Get credential
+        const assertion = await navigator.credentials.get({publicKey: options});
+        if(!assertion){
+          setStatus(fpStatus, 'No credential returned', 'error');
+          return;
+        }
 
-        faceForm.addEventListener('submit', async function(e){
-            e.preventDefault();
-            if(verifyFaceBtn) verifyFaceBtn.classList.add('submitting');
-            setFaceStatus('Verifying...', '');
+        const data = {
+          id: assertion.id,
+          rawId: toBase64Url(assertion.rawId),
+          type: assertion.type,
+          response: {
+            clientDataJSON: toBase64Url(assertion.response.clientDataJSON),
+            authenticatorData: toBase64Url(assertion.response.authenticatorData),
+            signature: toBase64Url(assertion.response.signature),
+            userHandle: assertion.response.userHandle ? toBase64Url(assertion.response.userHandle) : null
+          }
+        };
 
-            const canvas = document.createElement('canvas');
-            canvas.width = videoEl.videoWidth || 320;
-            canvas.height = videoEl.videoHeight || 240;
-            canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        setStatus(fpStatus, 'Verifying...', '');
 
-            canvas.toBlob(async function(blob){
-                const data = new FormData();
-                data.append('face_image', blob, 'face.png');
-                try{
-                    const resp = await fetch('', {
-                        method: 'POST',
-                        headers: {'X-CSRFToken': csrftoken},
-                        body: data
-                    });
-                    const result = await resp.json();
-                    if(result.status === 'success'){
-                        setFaceStatus('Face verified!', 'success');
-                        window.location.href = result.redirect || window.location.href;
-                    }else{
-                        setFaceStatus(result.message || 'Face verification failed', 'error');
-                    }
-                }catch(e){
-                    setFaceStatus('Face verification failed', 'error');
-                }finally{
-                    if(verifyFaceBtn) verifyFaceBtn.classList.remove('submitting');
-                }
-            }, 'image/png');
+        // 3) Verify on server
+        const verifyResp = await fetch(ENDPOINTS.webauthn_verify, {
+          method:'POST',
+          headers:{'Content-Type':'application/json','X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
+          body: JSON.stringify(data)
         });
-    }
+        const result = await verifyResp.json();
 
-    {% if webauthn_enabled %}
-    const fpBtn = document.getElementById('fpButton');
-    const fpStatus = document.getElementById('fpStatus');
+        if(result.status === 'success'){
+          setStatus(fpStatus, 'Authenticated!', 'success');
+          window.location.href = result.redirect || '/';
+        }else{
+          setStatus(fpStatus, result.message || 'Authentication failed', 'error');
+        }
 
-    function setFpStatus(msg, type){
-        if(!fpStatus) return;
-        fpStatus.textContent = msg;
-        fpStatus.className = 'status ' + (type || '');
-    }
+      }catch(e){
+        console.error(e);
+        if(e && e.name === 'NotAllowedError'){
+          setStatus(fpStatus, 'Operation cancelled or timed out. Please try again.', 'error');
+        }else{
+          setStatus(fpStatus, 'Fingerprint / Passkey verification failed', 'error');
+        }
+      }finally{
+        fpButton.classList.remove('submitting');
+      }
+    }, { once:true });
+  }
 
-    function b64ToBuf(b64){
-        b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-        const pad = b64.length % 4;
-        if(pad) b64 += '='.repeat(4 - pad);
-        return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-    }
-    function bufToB64(buf){
-        const bin = String.fromCharCode(...new Uint8Array(buf));
-        return btoa(bin);
-    }
+  // Cleanup on unload
+  window.addEventListener('beforeunload', () => {
+    if(faceStream) faceStream.getTracks().forEach(t => t.stop());
+  });
 
-    if(fpBtn){
-        fpBtn.addEventListener('click', async function(){
-            try{
-                fpBtn.classList.add('submitting');
-                setFpStatus('Preparing authenticator...', '');
-
-                const optResp = await fetch('{% url "core:webauthn_authentication_options" %}', {
-                    method: 'POST',
-                    headers: {'X-CSRFToken': csrftoken}
-                });
-                const options = await optResp.json();
-
-                options.challenge = b64ToBuf(options.challenge);
-                if(options.allowCredentials){
-                    options.allowCredentials = options.allowCredentials.map(c=>{
-                        c.id = b64ToBuf(c.id);
-                        return c;
-                    });
-                }
-
-                const cred = await navigator.credentials.get({publicKey: options});
-                if(!cred){
-                    setFpStatus('No credential returned', 'error');
-                    return;
-                }
-
-                const data = {
-                    id: cred.id,
-                    rawId: bufToB64(cred.rawId),
-                    type: cred.type,
-                    response: {
-                        clientDataJSON: bufToB64(cred.response.clientDataJSON),
-                        authenticatorData: bufToB64(cred.response.authenticatorData),
-                        signature: bufToB64(cred.response.signature),
-                        userHandle: cred.response.userHandle ? bufToB64(cred.response.userHandle) : null
-                    }
-                };
-
-                setFpStatus('Verifying...', '');
-
-                const verifyResp = await fetch('{% url "core:webauthn_authentication_verify" %}', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrftoken},
-                    body: JSON.stringify(data)
-                });
-                const result = await verifyResp.json();
-                if(result.status === 'success'){
-                    setFpStatus('Authenticated!', 'success');
-                    window.location.href = result.redirect || window.location.href;
-                }else{
-                    setFpStatus(result.message || 'Authentication failed', 'error');
-                }
-            }catch(e){
-                console.error(e);
-                setFpStatus('Fingerprint verification failed', 'error');
-            }finally{
-                fpBtn.classList.remove('submitting');
-            }
-        });
-    }
-    {% endif %}
-    {% endif %}
 })();
 </script>
 </body>
