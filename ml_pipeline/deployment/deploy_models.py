@@ -53,9 +53,11 @@ class ModelDeployer:
     def validate_model(self, model_path, model_type):
         """Run validation checks on a model"""
         # Load model and get validation report
+        data_path = os.path.join(self.base_dir, "../data/synthetic_risk_data.parquet")
         report = validate_models(
             risk_model_path=model_path if "risk" in model_type else None,
-            behavior_model_path=model_path if "behavior" in model_type else None
+            behavior_model_path=model_path if "behavior" in model_type else None,
+            risk_data_path=data_path
         )
         
         # Save validation report
@@ -82,10 +84,10 @@ class ModelDeployer:
             )
             
         elif "behavior_model" in model_type:
-            metrics = report["behavior_model_metrics"]
+            metrics = report.get("behavior_model_metrics", {})
             return (
-                metrics["MAE"] <= criteria["max_mae"] and
-                metrics["attack_detection"] >= criteria["min_attack_detection"]
+                metrics.get("MAE", float("inf")) <= criteria["max_mae"] and
+                metrics.get("attack_detection", 0) >= criteria["min_attack_detection"]
             )
             
         return False
