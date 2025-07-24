@@ -76,4 +76,5 @@ urlpatterns = [
     # Notification System
     path('notifications/', views.notifications_view, name='notifications'),
     path('notifications/dismiss/<int:notification_id>/', views.dismiss_device_notification, name='dismiss_device_notification'),
+    path('notifications/mark_read/<int:notification_id>/', views.mark_notification_read, name='mark_notification_read'),
 ]
