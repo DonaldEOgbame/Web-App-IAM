@@ -785,7 +785,7 @@ def finalize_authentication(request, session):
 @login_required
 def dashboard(request):
     # Profile completion gate
-    if not hasattr(request.user, 'userprofile'):
+    if not hasattr(request.user, 'profile'):
         return redirect('core:complete_profile')
     
     # Biometric enrollment gate
@@ -887,7 +887,7 @@ def document_list(request):
     if user.role != 'ADMIN':
         documents = documents.filter(
             Q(access_level='PUBLIC') |
-            Q(access_level='DEPARTMENT', department=user.userprofile.department)
+            Q(access_level='DEPARTMENT', department=user.profile.department)
         )
     
     # Apply search filters
@@ -977,7 +977,7 @@ def document_download(request, doc_id):
     if user.role != 'ADMIN':
         if doc.access_level == 'PRIVATE' and doc.uploaded_by != user:
             return HttpResponseForbidden("You don't have permission to access this document")
-        if doc.access_level == 'DEPARTMENT' and doc.department != user.userprofile.department:
+        if doc.access_level == 'DEPARTMENT' and doc.department != user.profile.department:
             return HttpResponseForbidden("You don't have permission to access this document")
     
     # Add strict expiry check first
@@ -1140,7 +1140,7 @@ def validate_checksum(request, doc_id):
 @login_required
 def profile_settings(request):
     user = request.user
-    profile = user.userprofile
+    profile = user.profile
     
     if request.method == 'POST':
         # Handle password change
