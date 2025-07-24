@@ -1,147 +1,636 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Staff Dashboard</title>
+
     <style>
-        body {font-family: Arial, sans-serif;background:#f5f5f5;margin:0;padding:0;}
-        .container {max-width:900px;margin:40px auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
-        nav a {margin-right:15px;text-decoration:none;color:#007bff;}
-        nav a:hover {text-decoration:underline;}
-        table {width:100%;border-collapse:collapse;margin-top:15px;}
-        th, td {border:1px solid #ddd;padding:8px;text-align:left;}
-        th {background:#f0f0f0;}
-        .btn {padding:6px 10px;background:#007bff;color:#fff;border:none;border-radius:4px;cursor:pointer;}
-        .btn:hover {background:#0056b3;}
-        .alert {padding:10px;margin-bottom:10px;border-radius:4px;}
-        .alert-info {background:#d1ecf1;color:#0c5460;}
-        .alert-warning {background:#fff3cd;color:#856404;}
+        :root {
+            --bg: #0f1115;
+            --bg-soft: #14171c;
+            --surface: #1a1d23;
+            --surface-2: #1f232a;
+            --border: #2a2f38;
+            --text: #e5e7eb;
+            --text-dim: #9ca3af;
+            --primary: #8b5cf6;
+            --primary-weak: rgba(139, 92, 246, 0.15);
+            --success: #22c55e;
+            --warning: #fbbf24;
+            --danger: #ef4444;
+            --radius: 14px;
+            --shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+            --transition: 180ms ease;
+            --sidebar-width: 250px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
+            line-height: 1.5;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        .layout {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            padding: 24px 16px 16px;
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px 20px;
+            font-weight: 600;
+            font-size: 1.05rem;
+        }
+        .brand-icon{
+            width: 28px;
+            height: 28px;
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .nav {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-top: 12px;
+        }
+        .nav a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-radius: 8px;
+            color: var(--text-dim);
+            transition: background var(--transition), color var(--transition), transform var(--transition);
+        }
+        .nav a .left {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav a:hover { background: var(--surface-2); color: var(--text); transform: translateX(2px); }
+        .nav a.active { background: var(--surface-2); color: var(--text); }
+        .nav svg {
+            width: 18px;
+            height: 18px;
+            stroke-width: 2;
+            stroke: currentColor;
+            fill: none;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 22px;
+            padding: 0 6px;
+            border-radius: 9999px;
+            background: var(--primary);
+            color: #fff;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .topbar {
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        .menu-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            color: var(--text);
+            font-size: 1.4rem;
+            cursor: pointer;
+        }
+
+        .hello{
+            font-weight: 700;
+            font-size: 1.2rem;
+            background: linear-gradient(90deg, var(--primary), #a855f7, var(--primary));
+            background-size: 200% 100%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: shimmer 2.5s infinite, fadeSlideIn 320ms ease forwards;
+            opacity: 0;
+        }
+        @keyframes shimmer{
+            0%{ background-position: 0% 50%; }
+            100%{ background-position: 200% 50%; }
+        }
+
+        .content {
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        h1, h2, h3 {
+            margin: 0 0 16px;
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* Cards / Panels */
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .metric {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .metric .label {
+            font-size: 0.875rem;
+            color: var(--text-dim);
+        }
+        .metric .value {
+            font-size: 1.6rem;
+            font-weight: 700;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            margin-top: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+        }
+        thead th {
+            background: var(--surface-2);
+            color: var(--text-dim);
+            font-size: 0.85rem;
+            font-weight: 500;
+            border-bottom: 1px solid var(--border);
+        }
+        tbody tr + tr td { border-top: 1px solid var(--border); }
+        tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+        /* Forms */
+        form {
+            display: grid;
+            gap: 16px;
+            max-width: 780px;
+        }
+        input[type="text"], input[type="email"], input[type="password"],
+        input[type="file"], select, textarea {
+            width: 100%;
+            background: var(--bg-soft);
+            border: 1px solid var(--border);
+            color: var(--text);
+            padding: 10px 12px;
+            border-radius: 8px;
+            transition: border var(--transition), box-shadow var(--transition);
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-weak);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border: none;
+            border-radius: 8px;
+            background: var(--primary);
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity var(--transition), transform var(--transition);
+        }
+        .btn:hover { opacity: 0.95; }
+        .btn:active { transform: translateY(1px); }
+        .btn-outline {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-outline:hover { background: var(--surface-2); }
+        .btn-danger { background: var(--danger); }
+
+        /* Alerts */
+        .alert {
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            border: 1px solid transparent;
+        }
+        .alert-info {
+            background: rgba(59, 130, 246, 0.08);
+            border-color: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+        .alert-warning {
+            background: rgba(251, 191, 36, 0.08);
+            border-color: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+        }
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+
+        /* Django messages list */
+        ul.messages {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 16px;
+        }
+        ul.messages li {
+            margin-bottom: 8px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            background: var(--surface-2);
+            color: var(--text);
+        }
+        ul.messages li.success { border-left: 3px solid var(--success); }
+        ul.messages li.error { border-left: 3px solid var(--danger); }
+        ul.messages li.warning { border-left: 3px solid var(--warning); }
+        ul.messages li.info { border-left: 3px solid var(--primary); }
+
+        /* Section switching */
+        .section {
+            display: none;
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        .section.active {
+            display: block;
+            animation: fadeSlideIn 240ms var(--transition) forwards;
+        }
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .mt-24 { margin-top: 24px; }
+
+        /* Mobile */
+        @media (max-width: 960px) {
+            .layout {
+                grid-template-columns: 1fr;
+            }
+            .sidebar {
+                position: fixed;
+                left: 0; top: 0;
+                height: 100vh;
+                transform: translateX(-100%);
+                transition: transform var(--transition);
+                z-index: 1000;
+                width: var(--sidebar-width);
+            }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: inline-flex; }
+            .content { padding: 16px; }
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>Welcome, {% firstof user.first_name user.username %}</h1>
-    <nav>
-        <a href="{% url 'core:staff_dashboard' %}">Home</a>
-        <a href="{% url 'core:document_list' %}">Documents</a>
-        <a href="{% url 'core:manage_devices' %}">Devices</a>
-        <a href="{% url 'core:profile_settings' %}">Profile</a>
-        <a href="{% url 'core:notifications' %}">Notifications{% if notifications %} ({{ notifications|length }}){% endif %}</a>
-        <a href="{% url 'core:logout' %}">Logout</a>
-    </nav>
+<div class="layout">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="sidebar">
+        <div class="brand">
+            <!-- briefcase icon -->
+            <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" fill="currentColor"></rect>
+                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke="currentColor" stroke-width="2"></path>
+            </svg>
+            <span>Staff</span>
+        </div>
 
-    {% if show_documents %}
-        <h2>Documents</h2>
-        <table>
-            <tr><th>Title</th><th>Category</th><th>Version</th><th>Actions</th></tr>
-            {% for doc in documents %}
-            <tr>
-                <td>{{ doc.title }}</td>
-                <td>{{ doc.category }}</td>
-                <td>{{ doc.version }}</td>
-                <td>
-                    {% if doc.can_download %}
-                    <a class="btn" href="{% url 'core:document_download' doc.id %}">Download</a>
-                    {% endif %}
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="4">No documents found.</td></tr>
-            {% endfor %}
-        </table>
-    {% elif show_device_management %}
-        <h2>Trusted Devices</h2>
-        <table>
-            <tr><th>Device</th><th>Last Seen</th><th>Actions</th></tr>
-            {% for d in devices %}
-            <tr>
-                <td>{{ d.browser }} on {{ d.operating_system }}</td>
-                <td>{{ d.last_seen }}</td>
-                <td>
-                    {% if not d.is_trusted %}
-                    <form method="post" action="{% url 'core:trust_device' d.id %}" style="display:inline;">
-                        {% csrf_token %}
-                        <button class="btn" type="submit">Trust</button>
-                    </form>
-                    {% endif %}
-                    <form method="post" action="{% url 'core:remove_device' d.id %}" style="display:inline;">
-                        {% csrf_token %}
-                        <button class="btn" type="submit">Remove</button>
-                    </form>
-                </td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="3">No devices found.</td></tr>
-            {% endfor %}
-        </table>
-    {% elif show_profile_settings %}
-        <h2>Profile Settings</h2>
-        {% if messages %}
-        <ul class="messages">
-            {% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}
-        </ul>
-        {% endif %}
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            {{ profile_form.as_p }}
-            <button class="btn" type="submit">Update Profile</button>
-        </form>
-        <hr>
-        <h3>Change Password</h3>
-        <form method="post">
-            {% csrf_token %}
-            {{ password_form.as_p }}
-            <button class="btn" type="submit">Change Password</button>
-        </form>
-        <hr>
-        <h3>Re-enroll Face</h3>
-        <form method="post" enctype="multipart/form-data">
-            {% csrf_token %}
-            {{ face_form.as_p }}
-            <button class="btn" type="submit">Upload Face</button>
-        </form>
-    {% elif show_notifications %}
-        <h2>Notifications</h2>
-        {% for n in notifications %}
-            <div class="alert alert-{{ n.notification_type|lower }}" data-id="{{ n.id }}">
-                {{ n.message }} - {{ n.created_at }}
-                {% if n.action_required %}
-                <form method="post" action="{% url 'core:dismiss_device_notification' n.id %}">
-                    {% csrf_token %}
-                    <button class="btn" type="submit">Dismiss</button>
-                </form>
+        <nav class="nav" id="sidebarNav">
+            <a href="{% url 'core:staff_dashboard' %}" data-section="dashboard" class="active">
+                <span class="left">
+                    <!-- home icon -->
+                    <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7"></path><path d="M9 22V12h6v10"></path></svg>
+                    Home
+                </span>
+            </a>
+
+            <a href="{% url 'core:document_list' %}" data-section="documents">
+                <span class="left">
+                    <!-- file-text icon -->
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><line x1="10" y1="9" x2="8" y2="9"></line></svg>
+                    Documents
+                </span>
+            </a>
+
+            <a href="{% url 'core:manage_devices' %}" data-section="devices">
+                <span class="left">
+                    <!-- smartphone icon -->
+                    <svg viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12" y2="18"></line></svg>
+                    Devices
+                </span>
+            </a>
+
+            <a href="{% url 'core:profile_settings' %}" data-section="profile">
+                <span class="left">
+                    <!-- user icon -->
+                    <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    Profile
+                </span>
+            </a>
+
+            <a href="{% url 'core:notifications' %}" data-section="notifications">
+                <span class="left">
+                    <!-- bell icon -->
+                    <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    Notifications
+                </span>
+                {% if notifications %}
+                    <span class="badge">{{ notifications|length }}</span>
                 {% endif %}
-            </div>
-        {% empty %}
-            <p>No notifications.</p>
-        {% endfor %}
-    {% else %}
-        <h2>Recent Sessions</h2>
-        <table>
-            <tr><th>IP</th><th>Login Time</th><th>Risk</th></tr>
-            {% for s in sessions %}
-            <tr>
-                <td>{{ s.ip_address }}</td>
-                <td>{{ s.login_time }}</td>
-                <td>{{ s.risk_level }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="3">No sessions.</td></tr>
-            {% endfor %}
-        </table>
-    {% endif %}
+            </a>
+
+            <a href="{% url 'core:logout' %}">
+                <span class="left">
+                    <!-- log-out icon -->
+                    <svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                    Logout
+                </span>
+            </a>
+        </nav>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+        <header class="topbar">
+            <button class="menu-toggle" id="menuToggle">☰</button>
+            <h1 class="hello">
+                Hello, {% firstof request.user.first_name request.user.username %} 👋
+            </h1>
+        </header>
+
+        <main class="content">
+            <!-- DASHBOARD / HOME -->
+            <section class="section active" data-view="dashboard">
+                <div class="cards-grid">
+                    <div class="card metric">
+                        <span class="label">Active Sessions</span>
+                        <span class="value">{{ sessions|length }}</span>
+                    </div>
+                    {% if notifications %}
+                    <div class="card metric">
+                        <span class="label">Unread Notifications</span>
+                        <span class="value">{{ notifications|length }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="card mt-24">
+                    <h2>Recent Sessions</h2>
+                    <table>
+                        <thead>
+                        <tr><th>IP</th><th>Login Time</th><th>Risk</th></tr>
+                        </thead>
+                        <tbody>
+                        {% for s in sessions %}
+                        <tr>
+                            <td>{{ s.ip_address }}</td>
+                            <td>{{ s.login_time }}</td>
+                            <td>{{ s.risk_level }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3">No sessions.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- DOCUMENTS -->
+            <section class="section" data-view="documents">
+                <div class="card">
+                    <h2>Documents</h2>
+                    <table>
+                        <thead>
+                        <tr><th>Title</th><th>Category</th><th>Version</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                        {% for doc in documents %}
+                        <tr>
+                            <td>{{ doc.title }}</td>
+                            <td>{{ doc.category }}</td>
+                            <td>{{ doc.version }}</td>
+                            <td>
+                                {% if doc.can_download %}
+                                <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4">No documents found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- DEVICES -->
+            <section class="section" data-view="devices">
+                <div class="card">
+                    <h2>Trusted Devices</h2>
+                    <table>
+                        <thead>
+                        <tr><th>Device</th><th>Last Seen</th><th>Actions</th></tr>
+                        </thead>
+                        <tbody>
+                        {% for d in devices %}
+                        <tr>
+                            <td>{{ d.browser }} on {{ d.operating_system }}</td>
+                            <td>{{ d.last_seen }}</td>
+                            <td style="white-space: nowrap;">
+                                {% if not d.is_trusted %}
+                                <form method="post" action="{% url 'core:trust_device' d.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button class="btn btn-outline" type="submit">Trust</button>
+                                </form>
+                                {% endif %}
+                                <form method="post" action="{% url 'core:remove_device' d.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button class="btn btn-danger" type="submit">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3">No devices found.</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- PROFILE -->
+            <section class="section" data-view="profile">
+                <div class="card">
+                    <h2>Profile Settings</h2>
+
+                    {% if messages %}
+                    <ul class="messages">
+                        {% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {{ profile_form.as_p }}
+                        <button class="btn" type="submit">Update Profile</button>
+                    </form>
+
+                    <hr style="border-color: var(--border); margin: 24px 0;">
+
+                    <h3>Change Password</h3>
+                    <form method="post">
+                        {% csrf_token %}
+                        {{ password_form.as_p }}
+                        <button class="btn" type="submit">Change Password</button>
+                    </form>
+
+                    <hr style="border-color: var(--border); margin: 24px 0;">
+
+                    <h3>Re-enroll Face</h3>
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {{ face_form.as_p }}
+                        <button class="btn" type="submit">Upload Face</button>
+                    </form>
+                </div>
+            </section>
+
+            <!-- NOTIFICATIONS -->
+            <section class="section" data-view="notifications">
+                <div class="card">
+                    <h2>Notifications</h2>
+                    {% for n in notifications %}
+                        <div class="alert alert-{{ n.notification_type|lower }}" data-id="{{ n.id }}">
+                            {{ n.message }} - {{ n.created_at }}
+                            {% if n.action_required %}
+                            <form method="post" action="{% url 'core:dismiss_device_notification' n.id %}" style="margin-top: 8px;">
+                                {% csrf_token %}
+                                <button class="btn btn-outline" type="submit">Dismiss</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <p>No notifications.</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </main>
+    </div>
 </div>
+
 <script>
 (function(){
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.getElementById('sidebar');
+    if (menuToggle) {
+        menuToggle.addEventListener('click', function () {
+            sidebar.classList.toggle('open');
+        });
+    }
+
     const csrftoken = '{{ csrf_token }}';
     document.querySelectorAll('.alert[data-id]').forEach(function(el){
         el.addEventListener('click', function(){
             fetch('{% url "core:mark_notification_read" 0 %}'.replace('0', el.dataset.id), {
-                method:'POST', headers:{'X-CSRFToken': csrftoken}
+                method:'POST',
+                headers:{'X-CSRFToken': csrftoken}
             }).then(()=>{ el.style.display='none'; });
         });
     });
+
+    // Tab behavior (SPA-like)
+    const links = document.querySelectorAll('[data-section]');
+    const sections = document.querySelectorAll('[data-view]');
+
+    function activate(section) {
+        sections.forEach(s => {
+            if (s.dataset.view === section) {
+                s.classList.add('active');
+            } else {
+                s.classList.remove('active');
+            }
+        });
+        links.forEach(a => {
+            a.classList.toggle('active', a.dataset.section === section);
+        });
+        if (section) {
+            history.replaceState(null, '', '#' + section);
+            try { localStorage.setItem('staff-active-section', section); } catch(e){}
+        }
+        if (sidebar.classList.contains('open')) sidebar.classList.remove('open');
+    }
+
+    links.forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            const section = a.dataset.section;
+            activate(section);
+        });
+    });
+
+    let initial = 'dashboard';
+    try {
+        initial = localStorage.getItem('staff-active-section') || initial;
+    } catch(e){}
+    if (location.hash) initial = location.hash.slice(1);
+    activate(initial);
 })();
 </script>
 </body>

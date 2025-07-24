@@ -1,37 +1,179 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Access Denied</title>
+
     <style>
-        body {font-family: Arial, sans-serif;background:#f0f2f5;margin:0;}
-        .container {max-width:600px;margin:80px auto;padding:20px;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);text-align:center;}
-        h1 {color:#c0392b;margin-bottom:10px;}
-        .reason {margin:20px 0;font-size:1.1em;color:#555;}
-        .login-link {display:inline-block;padding:10px 20px;background:#3498db;color:#fff;text-decoration:none;border-radius:5px;}
+        :root{
+            --bg:#0f1115;
+            --surface:#1a1d23;
+            --surface-2:#1f232a;
+            --text:#e5e7eb;
+            --text-dim:#9ca3af;
+            --primary:#8b5cf6;
+            --danger:#ef4444;
+            --border:#2a2f38;
+            --radius:16px;
+            --shadow:0 12px 32px rgba(0,0,0,.28);
+        }
+
+        *{box-sizing:border-box}
+        html,body{
+            margin:0;
+            height:100%;
+            background:var(--bg);
+            color:var(--text);
+            font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
+        }
+
+        .wrap{
+            min-height:100%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:32px 16px;
+        }
+
+        .card{
+            width:100%;
+            max-width:600px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:var(--radius);
+            box-shadow:var(--shadow);
+            padding:32px 28px 28px;
+            text-align:center;
+            position:relative;
+            overflow:hidden;
+        }
+
+        .icon{
+            width:70px;
+            height:70px;
+            margin:0 auto 18px;
+            color:var(--danger);
+            animation:pulse 2.2s infinite;
+        }
+        @keyframes pulse{
+            0%{transform:scale(1); opacity:1}
+            50%{transform:scale(1.06); opacity:.9}
+            100%{transform:scale(1); opacity:1}
+        }
+
+        h1{
+            margin:0 0 12px;
+            font-size:1.8rem;
+            line-height:1.2;
+            background:linear-gradient(90deg,var(--danger),#f87171,var(--danger));
+            background-size:200% 100%;
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            animation:shine 3s linear infinite;
+        }
+        @keyframes shine{
+            0%{background-position:0% 50%}
+            100%{background-position:200% 50%}
+        }
+
+        .reason{
+            margin:14px 0 24px;
+            color:var(--text-dim);
+            font-size:1rem;
+        }
+
+        .countdown{
+            margin-top:6px;
+            color:var(--text-dim);
+            font-size:.95rem;
+        }
+
+        .progress{
+            width:100%;
+            height:6px;
+            background:var(--surface-2);
+            border-radius:9999px;
+            overflow:hidden;
+            margin:16px 0 22px;
+        }
+        .progress__bar{
+            height:100%;
+            width:100%;
+            background:var(--primary);
+            transform-origin:left center;
+            transition:transform .2s linear;
+        }
+
+        .btn{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            padding:10px 18px;
+            border-radius:10px;
+            background:var(--primary);
+            color:#fff;
+            text-decoration:none;
+            font-weight:600;
+            border:none;
+            cursor:pointer;
+            transition:opacity .15s ease, transform .15s ease;
+        }
+        .btn:hover{opacity:.95}
+        .btn:active{transform:translateY(1px)}
     </style>
+
     <script>
         document.addEventListener('DOMContentLoaded', function () {
-            var seconds = 10;
-            var timer = document.getElementById('timer');
-            var interval = setInterval(function () {
+            const total = 10;
+            let seconds = total;
+
+            const timerEl = document.getElementById('timer');
+            const bar = document.getElementById('progressBar');
+
+            const tick = () => {
                 seconds--;
-                if (timer) timer.textContent = seconds;
+                if (timerEl) timerEl.textContent = seconds;
+                if (bar) {
+                    const pct = Math.max(seconds / total, 0);
+                    bar.style.transform = `scaleX(${pct})`;
+                }
                 if (seconds <= 0) {
-                    clearInterval(interval);
+                    clearInterval(iv);
                     window.location.href = "{% url 'core:login' %}";
                 }
-            }, 1000);
+            };
+
+            // init
+            if (timerEl) timerEl.textContent = seconds;
+            if (bar) bar.style.transform = 'scaleX(1)';
+            const iv = setInterval(tick, 1000);
         });
     </script>
 </head>
 <body>
-<div class="container">
-    <h1>Access Denied</h1>
-    <p class="reason">{{ reason }}</p>
-    <p>You will be redirected to the login page in <span id="timer">10</span> seconds.</p>
-    <a class="login-link" href="{% url 'core:login' %}">Return to Login</a>
+<div class="wrap">
+    <main class="card" role="alert" aria-live="polite">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="currentColor"></path>
+            <line x1="9" y1="9" x2="15" y2="15" stroke="#0f1115" stroke-width="2" />
+            <line x1="15" y1="9" x2="9" y2="15" stroke="#0f1115" stroke-width="2" />
+        </svg>
+
+        <h1>Access Denied</h1>
+        <p class="reason">{{ reason }}</p>
+
+        <div class="progress" aria-hidden="true">
+            <div id="progressBar" class="progress__bar"></div>
+        </div>
+
+        <p class="countdown">
+            You will be redirected to the login page in
+            <strong><span id="timer">10</span>s</strong>.
+        </p>
+
+        <a class="btn" href="{% url 'core:login' %}">Return to Login</a>
+    </main>
 </div>
 </body>
 </html>

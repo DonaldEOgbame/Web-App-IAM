@@ -1,65 +1,367 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Enroll Biometrics</title>
+
     <style>
-        body { font-family: Arial, sans-serif; background:#f5f5f5; margin:0; padding:0; }
-        .container { max-width:500px; margin:40px auto; background:#fff; padding:20px; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1); }
-        h1 { text-align:center; }
-        button { margin-top:15px; padding:10px; background:#28a745; color:#fff; border:none; border-radius:4px; cursor:pointer; }
-        button:hover { background:#1e7e34; }
+        :root{
+            --bg:#0f1115;
+            --bg-soft:#14171c;
+            --surface:#1a1d23;
+            --surface-2:#1f232a;
+            --border:#2a2f38;
+            --text:#e5e7eb;
+            --text-dim:#9ca3af;
+            --primary:#8b5cf6;
+            --primary-weak:rgba(139,92,246,.15);
+            --success:#22c55e;
+            --warning:#fbbf24;
+            --danger:#ef4444;
+            --radius:16px;
+            --shadow:0 12px 32px rgba(0,0,0,.28);
+            --transition:180ms ease;
+        }
+
+        *{ box-sizing:border-box; }
+        html, body{
+            margin:0;
+            min-height:100%;
+            background:var(--bg);
+            color:var(--text);
+            font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
+            line-height:1.5;
+        }
+
+        .wrap{
+            min-height:100vh;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            padding:32px 16px;
+        }
+
+        .card{
+            width:100%;
+            max-width:760px;
+            background:var(--surface);
+            border:1px solid var(--border);
+            border-radius:var(--radius);
+            box-shadow:var(--shadow);
+            padding:32px 28px;
+            position:relative;
+        }
+
+        .hello{
+            margin:0 0 24px;
+            text-align:center;
+            font-weight:800;
+            font-size:1.6rem;
+            background:linear-gradient(90deg,var(--primary),#a855f7,var(--primary));
+            background-size:200% 100%;
+            -webkit-background-clip:text;
+            -webkit-text-fill-color:transparent;
+            animation:shimmer 2.5s infinite, fadeSlideIn 320ms ease forwards;
+            opacity:0;
+        }
+        @keyframes shimmer{
+            0%{ background-position:0% 50%; }
+            100%{ background-position:200% 50%; }
+        }
+        @keyframes fadeSlideIn{
+            from{ opacity:0; transform:translateY(6px); }
+            to{ opacity:1; transform:translateY(0); }
+        }
+
+        .tabs{
+            display:flex;
+            gap:8px;
+            background:var(--surface-2);
+            border:1px solid var(--border);
+            border-radius:12px;
+            padding:4px;
+            margin-bottom:20px;
+        }
+        .tab-btn{
+            flex:1;
+            background:transparent;
+            color:var(--text-dim);
+            border:none;
+            border-radius:8px;
+            padding:10px 12px;
+            cursor:pointer;
+            transition:background var(--transition), color var(--transition);
+        }
+        .tab-btn.active{
+            background:var(--primary);
+            color:#fff;
+        }
+
+        .section{
+            display:none;
+            opacity:0;
+            transform:translateY(8px);
+        }
+        .section.active{
+            display:block;
+            animation:fadeSlideIn 240ms var(--transition) forwards;
+        }
+
+        .video-box{
+            background:var(--bg-soft);
+            border:1px dashed var(--border);
+            border-radius:12px;
+            padding:12px;
+            display:flex;
+            justify-content:center;
+            align-items:center;
+            overflow:hidden;
+        }
+        video{
+            width:100%;
+            max-height:360px;
+            border-radius:8px;
+            background:#000;
+        }
+        canvas{ display:none; }
+
+        form{
+            display:grid;
+            gap:16px;
+        }
+
+        .btn{
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            gap:6px;
+            padding:12px 16px;
+            border:none;
+            border-radius:10px;
+            background:var(--primary);
+            color:#fff;
+            font-weight:600;
+            cursor:pointer;
+            transition:opacity .15s ease, transform .15s ease;
+        }
+        .btn:hover{ opacity:.95; }
+        .btn:active{ transform:translateY(1px); }
+        .btn-outline{
+            background:transparent;
+            color:var(--text);
+            border:1px solid var(--border);
+        }
+        .btn-outline:hover{
+            background:var(--surface-2);
+        }
+
+        .submitting{
+            opacity:.6;
+            pointer-events:none;
+            position:relative;
+        }
+        .submitting::after{
+            content:"";
+            width:18px;height:18px;
+            border:2px solid rgba(255,255,255,.4);
+            border-top-color:#fff;
+            border-radius:50%;
+            animation:spin .6s linear infinite;
+            position:absolute;
+            right:14px; top:50%;
+            transform:translateY(-50%);
+        }
+        @keyframes spin{
+            to{ transform:translateY(-50%) rotate(360deg); }
+        }
+
+        .status{
+            margin-top:8px;
+            font-size:.9rem;
+            color:var(--text-dim);
+        }
+        .status.success{ color:var(--success); }
+        .status.error{ color:var(--danger); }
+
+        /* small helper for fingerprint icon */
+        .fp-icon, .cam-icon{
+            width:20px;height:20px;stroke:currentColor;stroke-width:2;fill:none;
+        }
     </style>
 </head>
 <body>
-<div class="container">
-    <h1>Enroll Biometrics</h1>
-    <form id="faceEnroll" method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <video id="enrollVideo" width="320" height="240" autoplay playsinline></video>
-        <button id="enrollFaceBtn" type="submit">Enroll Face</button>
-    </form>
-    <hr>
-    <button id="enrollFingerprint" type="button">Enroll Fingerprint</button>
+<div class="wrap">
+    <div class="card">
+        <h1 class="hello">Enroll your biometrics, {% firstof request.user.first_name request.user.username %} 🔒</h1>
+
+        <div class="tabs" role="tablist">
+            <button id="tab-face" class="tab-btn active" data-target="face-sec" role="tab" aria-selected="true">
+                <svg class="cam-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="12" cy="12" r="3"></circle></svg>
+                Face
+            </button>
+            <button id="tab-fp" class="tab-btn" data-target="fp-sec" role="tab" aria-selected="false">
+                <svg class="fp-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11a4 4 0 0 0-4 4v1"></path><path d="M12 11a4 4 0 0 1 4 4v1"></path><path d="M12 11V9"></path><path d="M8 5a8 8 0 0 1 8 0"></path><path d="M5 8a11 11 0 0 1 14 0"></path><path d="M3 12a15 15 0 0 1 18 0"></path><path d="M6 16a11 11 0 0 1 12 0"></path></svg>
+                Fingerprint / Passkey
+            </button>
+        </div>
+
+        <!-- FACE ENROLLMENT -->
+        <section id="face-sec" class="section active" role="tabpanel" aria-labelledby="tab-face">
+            <form id="faceEnroll" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="video-box">
+                    <video id="enrollVideo" autoplay playsinline muted></video>
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                    <button id="enrollFaceBtn" class="btn" type="submit">
+                        <svg class="cam-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"></rect><circle cx="12" cy="12" r="3"></circle></svg>
+                        Capture &amp; Enroll Face
+                    </button>
+                    <button id="takePreview" class="btn btn-outline" type="button">Preview Snapshot</button>
+                </div>
+                <canvas id="snapshotCanvas"></canvas>
+                <p id="faceStatus" class="status" aria-live="polite"></p>
+            </form>
+        </section>
+
+        <!-- FINGERPRINT / PASSKEY (WebAuthn) -->
+        <section id="fp-sec" class="section" role="tabpanel" aria-labelledby="tab-fp">
+            <p class="status">Register a **platform authenticator** (e.g., fingerprint or Windows Hello/Touch ID) with WebAuthn.</p>
+            <button id="enrollFingerprint" class="btn" type="button">
+                <svg class="fp-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 11a4 4 0 0 0-4 4v1"></path><path d="M12 11a4 4 0 0 1 4 4v1"></path><path d="M12 11V9"></path><path d="M8 5a8 8 0 0 1 8 0"></path><path d="M5 8a11 11 0 0 1 14 0"></path><path d="M3 12a15 15 0 0 1 18 0"></path><path d="M6 16a11 11 0 0 1 12 0"></path></svg>
+                Enroll Fingerprint / Passkey
+            </button>
+            <p id="fpStatus" class="status" aria-live="polite"></p>
+        </section>
+    </div>
 </div>
+
 <script>
 (function(){
+    // ----- Tabs -----
+    const tabs = document.querySelectorAll('.tab-btn');
+    const sections = document.querySelectorAll('.section');
+    tabs.forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+            tabs.forEach(b=>{
+                b.classList.toggle('active', b === btn);
+                b.setAttribute('aria-selected', b === btn ? 'true':'false');
+            });
+            sections.forEach(sec=>{
+                sec.classList.toggle('active', sec.id === btn.dataset.target);
+            });
+        });
+    });
+
     const csrftoken = '{{ csrf_token }}';
     const initialOptions = {{ webauthn_options|default:'null'|safe }};
 
+    // ----- Face Enroll -----
     const enrollForm = document.getElementById('faceEnroll');
     const enrollVideo = document.getElementById('enrollVideo');
-    if(enrollForm && enrollVideo){
-        navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
-            enrollVideo.srcObject = stream;
-        }).catch(()=>{ alert('Unable to access camera'); });
+    const enrollBtn = document.getElementById('enrollFaceBtn');
+    const takePreviewBtn = document.getElementById('takePreview');
+    const snapshotCanvas = document.getElementById('snapshotCanvas');
+    const faceStatus = document.getElementById('faceStatus');
 
-        enrollForm.addEventListener('submit', function(e){
-            e.preventDefault();
-            const canvas = document.createElement('canvas');
-            canvas.width = enrollVideo.videoWidth || 320;
-            canvas.height = enrollVideo.videoHeight || 240;
-            canvas.getContext('2d').drawImage(enrollVideo,0,0,canvas.width,canvas.height);
-            canvas.toBlob(async function(blob){
-                const data = new FormData();
-                data.append('face_data', blob, 'face.png');
-                const resp = await fetch('', {
-                    method:'POST',
-                    headers:{'X-CSRFToken': csrftoken},
-                    body: data
-                });
-                if(resp.redirected){
-                    window.location.href = resp.url;
-                }else{
-                    alert('Face enrollment successful');
-                }
-            }, 'image/png');
+    if(enrollVideo){
+        navigator.mediaDevices.getUserMedia({video:true})
+            .then(stream => {
+                enrollVideo.srcObject = stream;
+            })
+            .catch(() => { faceStatus.textContent = 'Unable to access camera'; faceStatus.classList.add('error'); });
+    }
+
+    function setFaceStatus(msg, type){
+        if(!faceStatus) return;
+        faceStatus.textContent = msg;
+        faceStatus.className = 'status ' + (type || '');
+    }
+
+    if(takePreviewBtn && snapshotCanvas){
+        takePreviewBtn.addEventListener('click', () => {
+            if(!enrollVideo.videoWidth){
+                setFaceStatus('Video not ready yet, please wait...', 'error');
+                return;
+            }
+            snapshotCanvas.width = enrollVideo.videoWidth;
+            snapshotCanvas.height = enrollVideo.videoHeight;
+            const ctx = snapshotCanvas.getContext('2d');
+            ctx.drawImage(enrollVideo,0,0,snapshotCanvas.width,snapshotCanvas.height);
+            snapshotCanvas.style.display = 'block';
+            setFaceStatus('Snapshot captured. You can now enroll.', 'success');
         });
+    }
+
+    if(enrollForm){
+        enrollForm.addEventListener('submit', async function(e){
+            e.preventDefault();
+            setFaceStatus('Capturing and uploading...', '');
+            enrollBtn.classList.add('submitting');
+
+            try{
+                const canvas = document.createElement('canvas');
+                canvas.width = enrollVideo.videoWidth || 320;
+                canvas.height = enrollVideo.videoHeight || 240;
+                canvas.getContext('2d').drawImage(enrollVideo,0,0,canvas.width,canvas.height);
+
+                canvas.toBlob(async function(blob){
+                    const data = new FormData();
+                    data.append('face_data', blob, 'face.png');
+
+                    const resp = await fetch('', {
+                        method:'POST',
+                        headers:{'X-CSRFToken': csrftoken},
+                        body: data
+                    });
+
+                    if(resp.redirected){
+                        window.location.href = resp.url;
+                        return;
+                    }
+                    if(resp.ok){
+                        setFaceStatus('Face enrollment successful', 'success');
+                    }else{
+                        const text = await resp.text();
+                        setFaceStatus('Enrollment failed: ' + text, 'error');
+                    }
+                }, 'image/png');
+            }catch(err){
+                setFaceStatus('Enrollment failed: ' + (err?.message || err), 'error');
+            }finally{
+                enrollBtn.classList.remove('submitting');
+            }
+        });
+    }
+
+    // ----- Fingerprint / Passkey (WebAuthn) -----
+    const fpBtn = document.getElementById('enrollFingerprint');
+    const fpStatus = document.getElementById('fpStatus');
+
+    function setFpStatus(msg, type){
+        if(!fpStatus) return;
+        fpStatus.textContent = msg;
+        fpStatus.className = 'status ' + (type || '');
+    }
+
+    function b64ToBuf(b64){
+        // handle base64url
+        b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
+        const pad = b64.length % 4;
+        if(pad) b64 += '='.repeat(4 - pad);
+        return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    }
+    function bufToB64(buf){
+        const bin = String.fromCharCode(...new Uint8Array(buf));
+        return btoa(bin);
     }
 
     async function startFingerprint(opts){
         try{
+            setFpStatus('Requesting authenticator...', '');
+            fpBtn.classList.add('submitting');
+
             let options = opts;
             if(!options){
                 const resp = await fetch('{% url "core:webauthn_registration_options" %}', {
@@ -68,40 +370,60 @@
                 });
                 options = await resp.json();
             }
-            ['challenge','user.id'].forEach(k=>{ if(options[k]) options[k]=Uint8Array.from(atob(options[k]),c=>c.charCodeAt(0)); });
+
+            // Convert from base64url to ArrayBuffers
+            options.challenge = b64ToBuf(options.challenge);
+            options.user.id = b64ToBuf(options.user.id);
             if(options.excludeCredentials){
-                options.excludeCredentials = options.excludeCredentials.map(c=>{ c.id=Uint8Array.from(atob(c.id),ch=>ch.charCodeAt(0)); return c; });
+                options.excludeCredentials = options.excludeCredentials.map(c => {
+                    return { ...c, id: b64ToBuf(c.id) };
+                });
             }
+
             const cred = await navigator.credentials.create({publicKey: options});
+            if(!cred){
+                setFpStatus('No credential created.', 'error');
+                return;
+            }
+
             const data = {
                 id: cred.id,
-                rawId: btoa(String.fromCharCode(...new Uint8Array(cred.rawId))),
+                rawId: bufToB64(cred.rawId),
                 type: cred.type,
                 response: {
-                    clientDataJSON: btoa(String.fromCharCode(...new Uint8Array(cred.response.clientDataJSON))),
-                    attestationObject: btoa(String.fromCharCode(...new Uint8Array(cred.response.attestationObject)))
+                    clientDataJSON: bufToB64(cred.response.clientDataJSON),
+                    attestationObject: bufToB64(cred.response.attestationObject)
                 }
             };
+
+            setFpStatus('Verifying with server...', '');
+
             const verifyResp = await fetch('{% url "core:webauthn_registration_verify" %}', {
                 method: 'POST',
                 headers: {'Content-Type':'application/json','X-CSRFToken': csrftoken},
                 body: JSON.stringify(data)
             });
+
             const result = await verifyResp.json();
             if(result.status === 'success'){
+                setFpStatus('Fingerprint / Passkey enrollment successful!', 'success');
                 if(result.redirect){ window.location.href = result.redirect; }
-                else alert('Fingerprint enrollment successful');
             }else{
-                alert(result.message || 'Enrollment failed');
+                setFpStatus(result.message || 'Enrollment failed', 'error');
             }
         }catch(e){
-            alert('Fingerprint enrollment failed');
+            console.error(e);
+            setFpStatus('Fingerprint enrollment failed: ' + (e?.message || e), 'error');
+        }finally{
+            fpBtn.classList.remove('submitting');
         }
     }
 
-    document.getElementById('enrollFingerprint').addEventListener('click', function(){
-        startFingerprint(initialOptions);
-    });
+    if(fpBtn){
+        fpBtn.addEventListener('click', function(){
+            startFingerprint(initialOptions);
+        });
+    }
 })();
 </script>
 </body>
