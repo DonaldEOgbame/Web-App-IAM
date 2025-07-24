@@ -20,7 +20,7 @@
             --warning: #fbbf24;
             --danger: #ef4444;
             --radius: 14px;
-            --shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+            --shadow: 0 6px 18px rgba(0,0,0,0.3);
             --transition: 180ms ease;
             --sidebar-width: 250px;
         }
@@ -424,12 +424,14 @@
                         <span class="label">Active Sessions</span>
                         <span class="value">{{ sessions|length }}</span>
                     </div>
-                    {% if notifications %}
                     <div class="card metric">
                         <span class="label">Unread Notifications</span>
                         <span class="value">{{ notifications|length }}</span>
                     </div>
-                    {% endif %}
+                    <div class="card metric">
+                        <span class="label">Documents</span>
+                        <span class="value">{{ documents|length }}</span>
+                    </div>
                 </div>
 
                 <div class="card mt-24">
@@ -539,15 +541,6 @@
                         {% csrf_token %}
                         {{ password_form.as_p }}
                         <button class="btn" type="submit">Change Password</button>
-                    </form>
-
-                    <hr style="border-color: var(--border); margin: 24px 0;">
-
-                    <h3>Re-enroll Face</h3>
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        {{ face_form.as_p }}
-                        <button class="btn" type="submit">Upload Face</button>
                     </form>
                 </div>
             </section>
