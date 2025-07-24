@@ -1,6 +1,0 @@
-Hello {{ user.get_full_name|default:user.username }},
-
-Please verify your email address by clicking the link below:
-{{ verify_link }}
-
-If you did not create an account, you can ignore this email.

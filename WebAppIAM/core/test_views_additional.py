@@ -15,7 +15,6 @@ call_command('migrate', run_syncdb=True, verbosity=0)
 
 from .views import (
     finalize_authentication,
-    verify_email,
     complete_profile,
     register_biometrics,
     login,
@@ -113,25 +112,15 @@ class RegistrationFlowTests(TestCase):
         self.user = User.objects.create_user(username="bar", password="bar", email="b@c.com")
 
     @patch("core.views.redirect", return_value=HttpResponse("ok"))
-    def test_verify_email_and_complete_profile(self, mock_redirect):
-        self.user.email_verification_token = "tok"
-        self.user.email_verification_expiration = timezone.now() + timezone.timedelta(hours=1)
-        self.user.save()
-        request = self.factory.get("/")
-        request.session = {}
-        resp = verify_email(request, self.user.id, "tok")
-        self.assertEqual(resp.status_code, 200)
-        self.assertIn("complete_profile_user", request.session)
-
+    def test_complete_profile_flow(self, mock_redirect):
         request = self.factory.post("/", {
             "first_name": "A",
             "last_name": "B",
             "department": "HR",
             "position": "Staff"
         })
-        request.session = {"complete_profile_user": self.user.id}
-        with patch("core.views.UserProfile.objects.create", return_value=SimpleNamespace()), \
-             patch("core.views.redirect", return_value=HttpResponse("done")):
+        request.session = {"complete_profile_user": self.user.id, "pending_user_id": self.user.id}
+        with patch("core.views.UserProfile.objects.create", return_value=SimpleNamespace()):
             resp = complete_profile(request)
         self.assertEqual(resp.status_code, 200)
 
