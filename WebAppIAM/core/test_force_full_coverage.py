@@ -8,8 +8,6 @@ class ForceFullCoverageTests(TestCase):
         modules = [
             'core.admin',
             'core.csrf',
-            'core.emergency',
-            'core.emergency_views',
             'core.face_api',
             'core.forms',
             'core.health',

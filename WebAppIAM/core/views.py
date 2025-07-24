@@ -1030,34 +1030,6 @@ def document_download(request, doc_id):
         logger.error(f"Document download failed: {str(e)}")
         return HttpResponseBadRequest("Failed to download document")
 
-@login_required
-@user_passes_test(is_admin)
-@require_POST
-def restore_document_version(request, doc_id):
-    doc = get_object_or_404(Document, id=doc_id, deleted=True)
-    
-    # Find current active version
-    current = Document.objects.filter(
-        title=doc.title,
-        category=doc.category,
-        department=doc.department,
-        deleted=False
-    ).first()
-    
-    if current:
-        current.deleted = True
-        current.save()
-    
-    doc.deleted = False
-    doc.save()
-    
-    AuditLog.objects.create(
-        user=request.user,
-        action='DOCUMENT_RESTORE',
-        details=f'Restored version {doc.version} of "{doc.title}"',
-        ip_address=get_client_ip(request)
-    )
-    return redirect('core:document_access_logs')
 
 @login_required
 @user_passes_test(is_admin)
@@ -1068,56 +1040,6 @@ def document_access_logs(request):
         'show_document_logs': True
     })
 
-# --- Document Vault Enhancements ---
-@login_required
-def document_versions(request, doc_id):
-    document = get_object_or_404(Document, id=doc_id)
-    query = request.GET.get('q', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
-    version = request.GET.get('version', '')
-    
-    versions = Document.objects.filter(
-        title=document.title,
-        category=document.category,
-        department=document.department
-    ).order_by('-version')
-    
-    # Apply filters
-    if query:
-        versions = versions.filter(Q(title__icontains=query) | 
-                                  Q(description__icontains=query))
-    
-    if date_from:
-        try:
-            date_from = timezone.datetime.strptime(date_from, '%Y-%m-%d')
-            versions = versions.filter(upload_date__gte=date_from)
-        except ValueError:
-            pass
-    
-    if date_to:
-        try:
-            date_to = timezone.datetime.strptime(date_to, '%Y-%m-%d')
-            versions = versions.filter(upload_date__lte=date_to)
-        except ValueError:
-            pass
-    
-    if version:
-        try:
-            versions = versions.filter(version=int(version))
-        except ValueError:
-            pass
-
-    context = {
-        'document': document,
-        'versions': versions,
-        'query': query,
-        'date_from': date_from,
-        'date_to': date_to,
-        'version': version,
-        'show_versions': True
-    }
-    return render(request, 'core/document_versions.html', context)
 
 @login_required
 @user_passes_test(is_admin)
@@ -1608,55 +1530,3 @@ def verify_email_update(request, token):
     if request.user.is_authenticated:
         return redirect('core:profile_settings')
     return redirect('core:login')
-
-# --- System Status ---
-@login_required
-@user_passes_test(is_admin)
-def system_status(request):
-    """
-    System status dashboard for administrators
-    Shows health of all system components and allows toggling features
-    """
-    from .health import check_services
-    
-    system_status = check_services()
-    system_status["response_time_ms"] = 0  # Will be calculated in the template
-    
-    context = {
-        'system_status': system_status,
-        'settings': settings,
-        'show_system_status': True
-    }
-    
-    return render(request, 'core/system_status.html', context)
-
-@login_required
-@user_passes_test(is_admin)
-@require_POST
-def toggle_feature(request):
-    """Toggle a feature flag"""
-    feature = request.POST.get('feature')
-    redirect_url = request.POST.get('redirect_url', 'core:system_status')
-    
-    valid_features = ['FACE_API_ENABLED', 'RISK_ENGINE_BYPASS']
-    
-    if feature in valid_features:
-        # Toggle the feature
-        current_value = getattr(settings, feature, False)
-        setattr(settings, feature, not current_value)
-        
-        # Log the change
-        new_value = getattr(settings, feature, False)
-        AuditLog.objects.create(
-            user=request.user,
-            action=f"TOGGLE_FEATURE_{feature}",
-            details=f"Changed {feature} from {current_value} to {new_value}",
-            ip_address=get_client_ip(request)
-        )
-        
-        # Set message
-        messages.success(request, f"Feature '{feature}' has been {'enabled' if new_value else 'disabled'}")
-    else:
-        messages.error(request, f"Invalid feature: {feature}")
-    
-    return redirect(redirect_url)

@@ -25,6 +25,7 @@
         <a href="{% url 'core:document_list' %}">Documents</a>
         <a href="{% url 'core:document_upload' %}">Upload</a>
         <a href="{% url 'core:audit_logs' %}">Audit Logs</a>
+        <a href="{% url 'core:manage_devices' %}">Devices</a>
         <a href="{% url 'core:profile_settings' %}">Profile</a>
         <a href="{% url 'core:notifications' %}">Notifications{% if notifications %} ({{ notifications|length }}){% endif %}</a>
         <a href="{% url 'core:logout' %}">Logout</a>
@@ -48,11 +49,35 @@
                 <td>{{ doc.version }}</td>
                 <td>
                     <a class="btn" href="{% url 'core:document_download' doc.id %}">Download</a>
-                    <a class="btn" href="{% url 'core:document_versions' doc.id %}">Versions</a>
                 </td>
             </tr>
             {% empty %}
             <tr><td colspan="4">No documents found.</td></tr>
+            {% endfor %}
+        </table>
+    {% elif show_device_management %}
+        <h2>Trusted Devices</h2>
+        <table>
+            <tr><th>Device</th><th>Last Seen</th><th>Actions</th></tr>
+            {% for d in devices %}
+            <tr>
+                <td>{{ d.browser }} on {{ d.operating_system }}</td>
+                <td>{{ d.last_seen }}</td>
+                <td>
+                    {% if not d.is_trusted %}
+                    <form method="post" action="{% url 'core:trust_device' d.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button class="btn" type="submit">Trust</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="{% url 'core:remove_device' d.id %}" style="display:inline;">
+                        {% csrf_token %}
+                        <button class="btn" type="submit">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3">No devices found.</td></tr>
             {% endfor %}
         </table>
     {% elif show_profile_settings %}

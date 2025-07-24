@@ -2,7 +2,6 @@ from django.urls import path
 from django.contrib.auth import views as auth_views
 from . import views
 from .health import health_check
-from . import emergency_views
 
 app_name = 'core'
 
@@ -21,13 +20,6 @@ urlpatterns = [
     path('webauthn/auth/options/', views.webauthn_authentication_options, name='webauthn_authentication_options'),
     path('webauthn/auth/verify/', views.webauthn_authentication_verify, name='webauthn_authentication_verify'),
 
-    # Emergency Access URLs
-    path('emergency/login/', emergency_views.emergency_login_page, name='emergency_login_page'),
-    path('emergency/access/', emergency_views.emergency_login, name='emergency_login'),
-    path('admin/emergency/', emergency_views.emergency_access_dashboard, name='emergency_access_dashboard'),
-    path('admin/emergency/activate/', emergency_views.activate_emergency, name='activate_emergency'),
-    path('admin/emergency/deactivate/', emergency_views.deactivate_emergency, name='deactivate_emergency'),
-    path('admin/emergency/generate-token/', emergency_views.generate_emergency_token, name='generate_emergency_token'),
 
     # Password Reset URLs
     path('password_reset/', views.password_reset_request, name='password_reset'),
@@ -47,9 +39,6 @@ urlpatterns = [
     path('admin/users/unlock/<int:user_id>/', views.unlock_user, name='unlock_user'),
     path('admin/users/force-reenroll/<int:user_id>/', views.force_reenroll, name='force_reenroll'),
 
-    # System Administration
-    path('admin/system/status/', views.system_status, name='system_status'),
-    path('admin/system/toggle-feature/', views.toggle_feature, name='toggle_feature'),
 
     # Profile Management
     path('complete_profile/', views.complete_profile, name='complete_profile'),
@@ -59,8 +48,6 @@ urlpatterns = [
     path('documents/', views.document_list, name='document_list'),
     path('documents/upload/', views.document_upload, name='document_upload'),
     path('documents/download/<int:doc_id>/', views.document_download, name='document_download'),
-    path('documents/versions/<int:doc_id>/', views.document_versions, name='document_versions'),
-    path('documents/restore/<int:doc_id>/', views.restore_document_version, name='restore_document_version'),
     path('documents/purge/<int:doc_id>/', views.purge_document, name='purge_document'),
     path('documents/validate_checksum/<int:doc_id>/', views.validate_checksum, name='validate_checksum'),
 
