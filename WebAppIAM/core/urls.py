@@ -25,8 +25,7 @@ urlpatterns = [
     path('password_reset/', views.password_reset_request, name='password_reset'),
     path('password_reset/confirm/<int:user_id>/<str:token>/', views.password_reset_confirm, name='password_reset_confirm'),
 
-    # Email verification
-    path('verify_email/<int:user_id>/<str:token>/', views.verify_email, name='verify_email'),
+    # Email update verification
     path('verify_email_update/<str:token>/', views.verify_email_update, name='verify_email_update'),
 
     # Dashboard URLs
