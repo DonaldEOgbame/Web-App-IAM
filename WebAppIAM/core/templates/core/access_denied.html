@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Access Denied</title>
+    <style>
+        body {font-family: Arial, sans-serif;background:#f0f2f5;margin:0;}
+        .container {max-width:600px;margin:80px auto;padding:20px;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);text-align:center;}
+        h1 {color:#c0392b;margin-bottom:10px;}
+        .reason {margin:20px 0;font-size:1.1em;color:#555;}
+        .login-link {display:inline-block;padding:10px 20px;background:#3498db;color:#fff;text-decoration:none;border-radius:5px;}
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var seconds = 10;
+            var timer = document.getElementById('timer');
+            var interval = setInterval(function () {
+                seconds--;
+                if (timer) timer.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(interval);
+                    window.location.href = "{% url 'core:login' %}";
+                }
+            }, 1000);
+        });
+    </script>
+</head>
+<body>
+<div class="container">
+    <h1>Access Denied</h1>
+    <p class="reason">{{ reason }}</p>
+    <p>You will be redirected to the login page in <span id="timer">10</span> seconds.</p>
+    <a class="login-link" href="{% url 'core:login' %}">Return to Login</a>
+</div>
+</body>
+</html>
