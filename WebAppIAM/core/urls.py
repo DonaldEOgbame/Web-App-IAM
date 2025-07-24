@@ -52,6 +52,7 @@ urlpatterns = [
     path('admin/system/toggle-feature/', views.toggle_feature, name='toggle_feature'),
 
     # Profile Management
+    path('complete_profile/', views.complete_profile, name='complete_profile'),
     path('profile/settings/', views.profile_settings, name='profile_settings'),
 
     # Document Management
