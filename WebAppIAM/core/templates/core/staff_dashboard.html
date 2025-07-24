@@ -20,7 +20,7 @@
 </head>
 <body>
 <div class="container">
-    <h1>Welcome, {{ user.first_name|default:user.username }}</h1>
+    <h1>Welcome, {{ user.first_name or user.username }}</h1>
     <nav>
         <a href="{% url 'core:staff_dashboard' %}">Home</a>
         <a href="{% url 'core:document_list' %}">Documents</a>
@@ -137,7 +137,7 @@
     const csrftoken = '{{ csrf_token }}';
     document.querySelectorAll('.alert[data-id]').forEach(function(el){
         el.addEventListener('click', function(){
-            fetch('{% url "core:dismiss_device_notification" 0 %}'.replace('0', el.dataset.id), {
+            fetch('{% url "core:mark_notification_read" 0 %}'.replace('0', el.dataset.id), {
                 method:'POST', headers:{'X-CSRFToken': csrftoken}
             }).then(()=>{ el.style.display='none'; });
         });
