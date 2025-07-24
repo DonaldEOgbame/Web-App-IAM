@@ -97,6 +97,10 @@
   video{
     width:100%; max-height:320px; background:#000; border-radius:10px;
   }
+  .link{
+    text-align:center;
+    margin-top:10px;
+  }
 </style>
 </head>
 <body>
@@ -123,6 +127,7 @@
       <button id="loginBtn" class="btn" type="submit">Login</button>
       <p id="loginStatus" class="status" aria-live="polite"></p>
     </form>
+    <div class="link"><a href="{% url 'core:password_reset' %}">Forgot password?</a></div>
 
     <!-- ============== BIOMETRICS (SHOWN AFTER PASSWORD OK) ============== -->
     <section id="biometricPanel" class="biometric-panel" aria-hidden="true">
