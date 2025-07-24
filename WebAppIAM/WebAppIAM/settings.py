@@ -137,17 +137,22 @@ AUTH_USER_MODEL = 'core.User'
 
 # Email settings (update for production)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.yourprovider.com'
+EMAIL_HOST = 'smtp-mail.outlook.com'
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'your-email@yourdomain.com'
-EMAIL_HOST_PASSWORD = 'your-email-password'
 EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = 'WebAppIAM <no-reply@yourdomain.com>'
-ADMINS = [('Admin', 'admin@yourdomain.com')]
+EMAIL_HOST_USER = 'webappIAM@outlook.com'
+EMAIL_HOST_PASSWORD = 'testcase@123456'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'webappIAM@outlook.com')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'testcase@123456')
 
 # Azure Face API
-AZURE_FACE_API_KEY = 'your-azure-face-api-key'
-AZURE_FACE_API_ENDPOINT = 'https://your-region.api.cognitive.microsoft.com/'
+AZURE_FACE_API_KEY = os.environ.get('AZURE_FACE_API_KEY',
+                                    'FFveXtbSQaaGJWRS5Mxj93MF02EQromA5BC77OjHCdbHMxgawg0OJQQJ99BGACYeBjFXJ3w3AAAKACOGqsqC')
+AZURE_FACE_API_KEY_SECONDARY = os.environ.get('AZURE_FACE_API_KEY_SECONDARY',
+                                              '5DcKp6aLK3sAp4wsBPcqEgFrfP3dxecrYiNB5Gzrr12vBlWwunfMJQQJ99BGACYeBjFXJ3w3AAAKACOGjSzE')
+AZURE_FACE_API_LOCATION = os.environ.get('AZURE_FACE_API_LOCATION', 'eastus')
+AZURE_FACE_API_ENDPOINT = os.environ.get('AZURE_FACE_API_ENDPOINT',
+                                         'https://facin-api-test.cognitiveservices.azure.com/')
 AZURE_FACE_PERSON_GROUP_ID = 'your-person-group-id'
 
 # WebAuthn Configuration
