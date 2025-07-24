@@ -58,9 +58,8 @@
         <p>Please verify your identity.</p>
         <form id="faceVerifyForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            <label for="face_image">Face image</label>
-            <input type="file" id="face_image" name="face_image" accept="image/*">
-            <button type="submit">Verify Face</button>
+            <video id="faceVideo" width="320" height="240" autoplay playsinline></video>
+            <button id="verifyFaceBtn" type="submit">Verify Face</button>
         </form>
         {% if webauthn_enabled %}
             <button id="fpButton" type="button">Use Fingerprint</button>
@@ -93,32 +92,38 @@
     {% else %}
     // biometric verification handlers
     const faceForm = document.getElementById('faceVerifyForm');
-    if(faceForm){
+    const videoEl = document.getElementById('faceVideo');
+    if(faceForm && videoEl){
+        navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
+            videoEl.srcObject = stream;
+        }).catch(()=>{ alert('Unable to access camera'); });
+
         faceForm.addEventListener('submit', async function(e){
             e.preventDefault();
-            const fileInput = document.getElementById('face_image');
-            if(!fileInput.files.length){
-                alert('Please choose a face image');
-                return;
-            }
-
-            const data = new FormData(faceForm);
-            try{
-                const resp = await fetch('', {
-                    method: 'POST',
-                    headers: {'X-CSRFToken': csrftoken},
-                    body: data
-                });
-                const result = await resp.json();
-                if(result.status === 'success'){
-                    alert('Face verified');
-                    window.location.reload();
-                }else{
-                    alert(result.message || 'Face verification failed');
+            const canvas = document.createElement('canvas');
+            canvas.width = videoEl.videoWidth || 320;
+            canvas.height = videoEl.videoHeight || 240;
+            canvas.getContext('2d').drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+            canvas.toBlob(async function(blob){
+                const data = new FormData();
+                data.append('face_image', blob, 'face.png');
+                try{
+                    const resp = await fetch('', {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': csrftoken},
+                        body: data
+                    });
+                    const result = await resp.json();
+                    if(result.status === 'success'){
+                        alert('Face verified');
+                        window.location.reload();
+                    }else{
+                        alert(result.message || 'Face verification failed');
+                    }
+                }catch(e){
+                    alert('Face verification failed');
                 }
-            }catch(e){
-                alert('Face verification failed');
-            }
+            }, 'image/png');
         });
     }
     {% if webauthn_enabled %}

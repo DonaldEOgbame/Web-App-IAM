@@ -38,9 +38,8 @@
         <h2>Enroll Biometrics</h2>
         <form id="faceEnroll" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            <label for="face_data">Face image</label>
-            <input type="file" id="face_data" name="face_data" accept="image/*">
-            <button type="submit">Enroll Face</button>
+            <video id="enrollVideo" width="320" height="240" autoplay playsinline></video>
+            <button id="enrollFaceBtn" type="submit">Enroll Face</button>
         </form>
         <hr>
         <button id="enrollFingerprint" type="button">Enroll Fingerprint</button>
@@ -57,6 +56,36 @@
     const csrftoken = '{{ csrf_token }}';
     {% if enrollment_type == 'biometric' %}
     const initialOptions = {{ webauthn_options|default:'null'|safe }};
+
+    const enrollForm = document.getElementById('faceEnroll');
+    const enrollVideo = document.getElementById('enrollVideo');
+    if(enrollForm && enrollVideo){
+        navigator.mediaDevices.getUserMedia({video:true}).then(stream=>{
+            enrollVideo.srcObject = stream;
+        }).catch(()=>{ alert('Unable to access camera'); });
+
+        enrollForm.addEventListener('submit', function(e){
+            e.preventDefault();
+            const canvas = document.createElement('canvas');
+            canvas.width = enrollVideo.videoWidth || 320;
+            canvas.height = enrollVideo.videoHeight || 240;
+            canvas.getContext('2d').drawImage(enrollVideo,0,0,canvas.width,canvas.height);
+            canvas.toBlob(async function(blob){
+                const data = new FormData();
+                data.append('face_data', blob, 'face.png');
+                const resp = await fetch('', {
+                    method:'POST',
+                    headers:{'X-CSRFToken': csrftoken},
+                    body: data
+                });
+                if(resp.redirected){
+                    window.location.href = resp.url;
+                }else{
+                    alert('Face enrollment successful');
+                }
+            }, 'image/png');
+        });
+    }
 
     async function startFingerprint(opts){
         try{
