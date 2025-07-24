@@ -2,7 +2,7 @@ from django.contrib.auth.signals import user_logged_in, user_logged_out, user_lo
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from .models import AuditLog, User, Document, UserSession
+from .models import AuditLog, User, Document, UserSession, UserProfile
 from django.conf import settings
 import socket
 
@@ -79,3 +79,13 @@ def document_deleted_callback(sender, instance, **kwargs):
         details=f'Document deleted: {instance.title} (v{instance.version})',
         ip_address='System'
     )
+
+# --- Signal to auto-create UserProfile for new users ---
+
+@receiver(post_save, sender=User)
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        try:
+            UserProfile.objects.get(user=instance)
+        except UserProfile.DoesNotExist:
+            UserProfile.objects.create(user=instance)
