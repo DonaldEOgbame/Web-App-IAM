@@ -8,8 +8,10 @@ import joblib
 import shap
 import os
 
-def train_risk_model(data_path="../data/synthetic_risk_data.parquet", 
-                     output_dir="../models"):
+def train_risk_model(data_path=None, output_dir=None):
+    base_dir = os.path.join(os.path.dirname(__file__), "..")
+    data_path = data_path or os.path.join(base_dir, "data", "synthetic_risk_data.parquet")
+    output_dir = output_dir or os.path.join(base_dir, "models")
     os.makedirs(output_dir, exist_ok=True)
     
     # Load data
