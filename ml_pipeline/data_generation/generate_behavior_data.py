@@ -104,10 +104,16 @@ def generate_behavior_data(users=20000, sessions_per_user=50, output_dir="../dat
             else:
                 session['avg_hold_time'] = 0
                 session['avg_flight_time'] = 0
-    
-    # Convert back to DataFrame if merged
-    if all_sessions:
+
+        # Convert back to DataFrame with merged features and recompute score
         df = pd.DataFrame(all_sessions)
+        df['behavior_anomaly_score'] = (
+            0.3 * (df['time_anomaly'] / 1440)
+            + 0.2 * df['device_anomaly']
+            + 0.2 * df['location_anomaly']
+            + 0.15 * df['action_entropy']
+            + 0.15 * df['ip_risk']
+        ).clip(0, 1)
         df.to_parquet(output_path)
         print(f"Merged keystroke features into behavior data at {output_path}")
 
