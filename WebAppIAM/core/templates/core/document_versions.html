@@ -48,7 +48,8 @@
         </table>
         <p><a href="{% url 'core:document_list' %}">Back to documents</a></p>
     </main>
+{% endblock %}
+{% block extra_js %}
     <script src="{% static 'js/documents.js' %}"></script>
 {% endblock %}
-{% block extra_js %}{% endblock %}
 
