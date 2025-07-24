@@ -354,8 +354,7 @@ def register_biometrics(request):
         # Handle WebAuthn registration
         # (existing WebAuthn logic remains the same)
     
-    return render(request, 'core/register.html', {
-        'enrollment_type': 'biometric',
+    return render(request, 'core/enroll_biometrics.html', {
         'webauthn_options': generate_registration_options(user) if not user.face_data else None
     })
 
