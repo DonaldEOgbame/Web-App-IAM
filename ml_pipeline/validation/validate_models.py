@@ -5,10 +5,23 @@ from sklearn.metrics import precision_recall_curve, auc
 import os
 import json
 
-def validate_models(risk_model_path="../models/risk_model.pkl",
-                    behavior_model_path="../models/behavior_model.pkl",
-                    risk_data_path="../data/synthetic_risk_data.parquet",
-                    output_dir="../validation_reports"):
+def validate_models(
+    risk_model_path=None,
+    behavior_model_path=None,
+    risk_data_path=None,
+    behavior_data_path=None,
+    output_dir=None,
+):
+    """Validate trained models using the latest generated datasets."""
+
+    base_dir = os.path.join(os.path.dirname(__file__), "..")
+
+    risk_model_path = risk_model_path or os.path.join(base_dir, "models", "risk_model.pkl")
+    behavior_model_path = behavior_model_path or os.path.join(base_dir, "models", "behavior_model.pkl")
+    risk_data_path = risk_data_path or os.path.join(base_dir, "data", "synthetic_risk_data.parquet")
+    behavior_data_path = behavior_data_path or os.path.join(base_dir, "data", "synthetic_behavior_data.parquet")
+    output_dir = output_dir or os.path.join(base_dir, "validation_reports")
+
     os.makedirs(output_dir, exist_ok=True)
     
     # Load models and data
@@ -77,6 +90,35 @@ def validate_models(risk_model_path="../models/risk_model.pkl",
                 "detection_rate": float(detection_rate),
                 "false_positive_rate": float(fp_rate)
             }
+
+    if behavior_model is not None:
+        behavior_df = pd.read_parquet(behavior_data_path)
+
+        behavior_features = [
+            'time_anomaly',
+            'device_anomaly',
+            'location_anomaly',
+            'action_entropy',
+            'ip_risk',
+            'session_duration',
+        ]
+
+        if {'avg_hold_time', 'avg_flight_time'} <= set(behavior_df.columns):
+            behavior_features += ['avg_hold_time', 'avg_flight_time']
+
+        X_behavior = behavior_df[behavior_features]
+        y_behavior = behavior_df['behavior_anomaly_score']
+
+        behavior_preds = behavior_model.predict(X_behavior)
+
+        behavior_mae = np.mean(np.abs(behavior_preds - y_behavior))
+        results['behavior_model_metrics']['MAE'] = float(behavior_mae)
+
+        if 'is_anomaly' in behavior_df.columns:
+            threshold = 0.5
+            actual_anomaly = behavior_df['is_anomaly'] == 1
+            detection = np.mean(behavior_preds[actual_anomaly] > threshold)
+            results['behavior_model_metrics']['attack_detection'] = float(detection)
     
     # Validate with keystroke features if available
     keystroke_path = os.path.join(os.path.dirname(__file__), '../data/keystroke_features.csv')

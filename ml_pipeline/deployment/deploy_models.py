@@ -53,11 +53,13 @@ class ModelDeployer:
     def validate_model(self, model_path, model_type):
         """Run validation checks on a model"""
         # Load model and get validation report
-        data_path = os.path.join(self.base_dir, "../data/synthetic_risk_data.parquet")
+        risk_data = os.path.join(self.base_dir, "../data/synthetic_risk_data.parquet")
+        behavior_data = os.path.join(self.base_dir, "../data/synthetic_behavior_data.parquet")
         report = validate_models(
             risk_model_path=model_path if "risk" in model_type else None,
             behavior_model_path=model_path if "behavior" in model_type else None,
-            risk_data_path=data_path
+            risk_data_path=risk_data,
+            behavior_data_path=behavior_data,
         )
         
         # Save validation report
