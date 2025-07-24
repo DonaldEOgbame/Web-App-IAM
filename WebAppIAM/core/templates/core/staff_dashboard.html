@@ -43,7 +43,6 @@
                     {% if doc.can_download %}
                     <a class="btn" href="{% url 'core:document_download' doc.id %}">Download</a>
                     {% endif %}
-                    <a class="btn" href="{% url 'core:document_versions' doc.id %}">Versions</a>
                 </td>
             </tr>
             {% empty %}

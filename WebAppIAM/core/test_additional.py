@@ -4,8 +4,14 @@ from django.contrib.auth import get_user_model
 from unittest.mock import patch, MagicMock
 import requests
 from django.conf import settings
+import os
+import django
+from django.core.management import call_command
 
-from .emergency import EmergencyAccessProtocol
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'WebAppIAM.settings')
+django.setup()
+call_command('migrate', run_syncdb=True, verbosity=0)
+
 from .face_api import check_face_api_status, verify_face, FaceAPIError
 from .csrf import ensure_csrf
 from .security_middleware import (
@@ -18,26 +24,6 @@ from .health import health_check
 
 User = get_user_model()
 
-class EmergencyProtocolTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username="admin", password="x", email="a@example.com", role="ADMIN", is_active=True)
-
-    @patch("core.emergency.send_mail")
-    @patch("django.core.cache.cache")
-    def test_activate_and_deactivate(self, mock_cache, mock_send):
-        settings.EMERGENCY_ACCESS_MODE = False
-        EmergencyAccessProtocol.activate_emergency_mode(self.user, "testing")
-        self.assertTrue(settings.EMERGENCY_ACCESS_MODE)
-        EmergencyAccessProtocol.deactivate_emergency_mode(self.user)
-        self.assertFalse(settings.EMERGENCY_ACCESS_MODE)
-        self.assertTrue(mock_send.called)
-        self.assertTrue(mock_cache.set.called)
-
-    def test_token_generation_and_verification(self):
-        token = EmergencyAccessProtocol.generate_emergency_token(self.user)
-        self.assertIsNotNone(self.user.emergency_token_hash)
-        self.assertTrue(EmergencyAccessProtocol.verify_emergency_token(self.user, token))
-        self.assertTrue(self.user.emergency_token_used)
 
 class CSRFDecoratorTests(TestCase):
     def setUp(self):

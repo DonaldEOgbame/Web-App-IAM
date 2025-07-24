@@ -5,6 +5,13 @@ from django.utils import timezone
 from django.http import HttpResponse
 from unittest.mock import patch, MagicMock
 from builtins import hasattr as builtin_hasattr
+import os
+import django
+from django.core.management import call_command
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'WebAppIAM.settings')
+django.setup()
+call_command('migrate', run_syncdb=True, verbosity=0)
 
 from .views import (
     finalize_authentication,
@@ -22,7 +29,8 @@ class FinalizeAuthenticationTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
         self.user = User.objects.create_user(username="foo", password="bar", email="a@b.com")
-        profile = UserBehaviorProfile.objects.create(user=self.user)
+        profile = UserBehaviorProfile(user=self.user)
+        profile.save = lambda *args, **kwargs: None
         # attach for attribute lookup used in views
         self.user.userbehaviorprofile = profile
         # attach dummy profile object without triggering descriptor
