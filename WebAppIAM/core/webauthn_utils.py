@@ -30,7 +30,9 @@ def generate_registration_options(user):
     return wa_generate_registration_options(
         rp_id=settings.WEBAUTHN_RP_ID,
         rp_name=settings.WEBAUTHN_RP_NAME,
-        user_id=str(user.id),
+        # The WebAuthn library expects the user identifier as bytes.
+        # Convert the database ID to a UTF-8 encoded byte string.
+        user_id=str(user.id).encode(),
         user_name=user.username,
         user_display_name=user.get_full_name() or user.username,
         authenticator_selection=AuthenticatorSelectionCriteria(
