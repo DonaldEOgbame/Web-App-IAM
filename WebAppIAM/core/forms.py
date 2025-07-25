@@ -127,6 +127,12 @@ class PasswordResetForm(forms.Form):
         widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Enter your email'})
     )
 
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if not User.objects.filter(email=email).exists():
+            raise forms.ValidationError("User with this email does not exist.")
+        return email
+
 class PasswordResetConfirmForm(forms.Form):
     password1 = forms.CharField(
         label="New password",
