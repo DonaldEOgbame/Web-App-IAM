@@ -36,6 +36,7 @@ from .webauthn_utils import (
     verify_registration_response,
     generate_authentication_options,
     verify_authentication_response,
+    options_to_json,
 )
 from .face_api import verify_face, enroll_face
 from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
@@ -364,7 +365,10 @@ def register_biometrics(request):
         # (existing WebAuthn logic remains the same)
     
     return render(request, 'core/enroll_biometrics.html', {
-        'webauthn_options': generate_registration_options(user) if not user.face_data else None
+        'webauthn_options': (
+            json.loads(options_to_json(generate_registration_options(user)))
+            if not user.face_data else None
+        )
     })
 
 @login_required
@@ -375,7 +379,7 @@ def webauthn_registration_options(request):
     user = request.user
     options = generate_registration_options(user)
     request.session['webauthn_registration_challenge'] = options.challenge
-    return JsonResponse(options.to_dict())
+    return JsonResponse(json.loads(options_to_json(options)))
 
 @login_required
 def webauthn_registration_verify(request):
@@ -610,7 +614,7 @@ def webauthn_authentication_options(request):
     user = User.objects.get(id=user_id)
     options = generate_authentication_options(user)
     request.session['webauthn_authentication_challenge'] = options.challenge
-    return JsonResponse(options.to_dict())
+    return JsonResponse(json.loads(options_to_json(options)))
 
 @csrf_exempt
 @require_http_methods(['POST'])
