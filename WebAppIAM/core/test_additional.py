@@ -90,7 +90,7 @@ class FaceAPITests(TestCase):
                 verify_face(self.user, MagicMock(), use_fallback=False)
 
     def test_verify_face_no_enrollment(self):
-        with self.settings(FACE_API_ENABLED=True):
+        with self.settings(FACE_API_ENABLED=True, AZURE_FACE_PERSON_GROUP_ID="testgroup"):
             with patch("core.face_api.check_face_api_status", return_value=True):
                 result = verify_face(self.user, MagicMock(), use_fallback=True)
                 self.assertEqual(result["confidence"], 0.3)

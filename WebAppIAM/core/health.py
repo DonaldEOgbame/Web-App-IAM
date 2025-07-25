@@ -51,7 +51,8 @@ def health_check(request):
     http_status = 200 if status["status"] == "operational" else 503
     
     # Log health issues if any
+    logger.info("Health check result: %s", json.dumps(status))
     if status["status"] != "operational":
-        logger.warning(f"Health check failed: {json.dumps(status)}")
+        logger.warning("Health check degraded")
     
     return JsonResponse(status, status=http_status)
