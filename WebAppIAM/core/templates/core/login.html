@@ -172,7 +172,7 @@
   // ---------- CONFIG (endpoints your backend exposes) ----------
   const ENDPOINTS = {
     login: "{% url 'core:login' %}",  // should return JSON on AJAX: {status: 'password_ok_biometric_required'|'ok'|'error', face:bool, webauthn:bool, next:'/dashboard'}
-    face_verify: "{% url 'core:face_verify' %}",
+    face_verify: "{% url 'core:verify_biometrics' %}",
     webauthn_options: "{% url 'core:webauthn_authentication_options' %}",
     webauthn_verify: "{% url 'core:webauthn_authentication_verify' %}"
   };
