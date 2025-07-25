@@ -1387,40 +1387,36 @@ def password_reset_request(request):
         form = PasswordResetForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data['email']
-            try:
-                user = User.objects.get(email=email)
-                
-                # Generate token and expiration
-                token = Fernet.generate_key().decode()
-                expiration = timezone.now() + timedelta(hours=24)
-                
-                user.email_verification_token = token
-                user.email_verification_expiration = expiration
-                user.save()
-                
-                # Send password reset email
-                reset_url = request.build_absolute_uri(
-                    reverse('core:password_reset_confirm', kwargs={'user_id': user.id, 'token': token})
-                )
-                
-                subject = 'Password Reset Request'
-                message = render_to_string('emails/password_reset.html', {
-                    'user': user,
-                    'reset_link': reset_url
-                })
-                
-                send_mail(
-                    subject,
-                    message,
-                    settings.DEFAULT_FROM_EMAIL,
-                    [user.email],
-                    fail_silently=False
-                )
-                
-                return render(request, 'core/password_reset_done.html')
-            except User.DoesNotExist:
-                # Still return success to prevent email enumeration
-                return render(request, 'core/password_reset_done.html')
+            user = User.objects.get(email=email)
+
+            # Generate token and expiration
+            token = Fernet.generate_key().decode()
+            expiration = timezone.now() + timedelta(hours=24)
+
+            user.email_verification_token = token
+            user.email_verification_expiration = expiration
+            user.save()
+
+            # Send password reset email
+            reset_url = request.build_absolute_uri(
+                reverse('core:password_reset_confirm', kwargs={'user_id': user.id, 'token': token})
+            )
+
+            subject = 'Password Reset Request'
+            message = render_to_string('emails/password_reset.html', {
+                'user': user,
+                'reset_link': reset_url
+            })
+
+            send_mail(
+                subject,
+                message,
+                settings.DEFAULT_FROM_EMAIL,
+                [user.email],
+                fail_silently=False
+            )
+
+            return render(request, 'core/password_reset_done.html')
     else:
         form = PasswordResetForm()
     
