@@ -920,17 +920,17 @@ def document_upload(request):
         if form.is_valid():
             doc = form.save(commit=False)
             doc.uploaded_by = request.user
-            
+
             # Encrypt file with user-specific key
             file_data = request.FILES['file'].read()
             encrypted_data = encrypt_file(file_data, request.user)
-            
-            # Save encrypted file
-            doc.file.save(
-                f'doc_{int(timezone.now().timestamp())}.enc',
-                encrypted_data
-            )
+
+            # Persist encrypted file data and metadata
+            doc.encrypted_file = encrypted_data
             doc.original_filename = request.FILES['file'].name
+            doc.file_type = request.FILES['file'].content_type
+            doc.file_size = request.FILES['file'].size
+            doc.encryption_key = get_fernet_key(request.user)
             
             # Handle versioning
             existing = Document.objects.filter(
@@ -993,7 +993,7 @@ def document_download(request, doc_id):
 
     try:
         # Decrypt file with user-specific key
-        decrypted_data = decrypt_file(doc.file.read(), doc.uploaded_by)
+        decrypted_data = decrypt_file(doc.encrypted_file, doc.uploaded_by)
         
         # Create response
         response = HttpResponse(decrypted_data, content_type='application/octet-stream')
@@ -1380,22 +1380,6 @@ def unlock_user(request, user_id):
     )
     return redirect('core:admin_dashboard')
 
-@login_required
-@user_passes_test(is_admin)
-@require_POST
-def force_reenroll(request, user_id):
-    user = get_object_or_404(User, id=user_id)
-    user.FACE_ENROLLED = False
-    user.FINGERPRINT_ENROLLED = False
-    user.save()
-    AuditLog.objects.create(
-        user=request.user,
-        affected_user=user,
-        action='FORCE_REENROLL',
-        details=f'Biometric re-enrollment forced for {user.username}',
-        ip_address=get_client_ip(request)
-    )
-    return redirect('core:admin_dashboard')
 
 # --- Password Reset ---
 def password_reset_request(request):
