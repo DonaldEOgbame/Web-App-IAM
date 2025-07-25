@@ -1,0 +1,26 @@
+{
+  "n_train": 800000,
+  "n_test": 200000,
+  "features": [
+    "face_match",
+    "fingerprint_verified",
+    "behavior_anomaly"
+  ],
+  "cv": {
+    "best_params": {
+      "model__min_samples_leaf": 10,
+      "model__max_leaf_nodes": 127,
+      "model__max_depth": 3,
+      "model__learning_rate": 0.08483428982440717,
+      "model__l2_regularization": 1e-05
+    },
+    "best_cv_ap": 0.8301166754004661
+  },
+  "test": {
+    "average_precision": 0.8254102732473583,
+    "roc_auc": 0.986460548203116,
+    "f1_at_0p5": 0.7171411265899454,
+    "low_threshold": 0.08130994575282872,
+    "high_threshold": 0.8087274398616916
+  }
+}

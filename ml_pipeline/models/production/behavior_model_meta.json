@@ -1,0 +1,16 @@
+{
+  "version": "20250725_154256",
+  "task": "regression",
+  "expected_features": [
+    "time_anomaly",
+    "device_anomaly",
+    "location_anomaly",
+    "action_entropy",
+    "ip_risk",
+    "session_duration"
+  ],
+  "thresholds": {},
+  "random_state": 42,
+  "train_rows": 800000,
+  "test_rows": 200000
+}

@@ -143,7 +143,7 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'webappIAM@outlook.com'
 EMAIL_HOST_PASSWORD = 'testcase@123456'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'webappIAM@outlook.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'testcase@123456')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'thenewpasswordisgreat!@##')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 # Azure Face API
@@ -154,7 +154,7 @@ AZURE_FACE_API_KEY_SECONDARY = os.environ.get('AZURE_FACE_API_KEY_SECONDARY',
 AZURE_FACE_API_LOCATION = os.environ.get('AZURE_FACE_API_LOCATION', 'eastus')
 AZURE_FACE_API_ENDPOINT = os.environ.get('AZURE_FACE_API_ENDPOINT',
                                          'https://facin-api-test.cognitiveservices.azure.com/')
-AZURE_FACE_PERSON_GROUP_ID = 'your-person-group-id'
+AZURE_FACE_PERSON_GROUP_ID = 'webappiam-default'
 
 # WebAuthn Configuration
 # Defaults provide sensible values for local development but can be overridden

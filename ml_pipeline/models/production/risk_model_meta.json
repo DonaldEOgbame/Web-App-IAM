@@ -1,0 +1,16 @@
+{
+  "version": "20250725_154543",
+  "task": "binary_classification",
+  "expected_features": [
+    "face_match",
+    "fingerprint_verified",
+    "behavior_anomaly"
+  ],
+  "thresholds": {
+    "low": 0.08130994575282872,
+    "high": 0.8087274398616916
+  },
+  "random_state": 42,
+  "train_rows": 800000,
+  "test_rows": 200000
+}

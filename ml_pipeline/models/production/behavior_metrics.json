@@ -1,0 +1,27 @@
+{
+  "n_train": 800000,
+  "n_test": 200000,
+  "features": [
+    "time_anomaly",
+    "device_anomaly",
+    "location_anomaly",
+    "action_entropy",
+    "ip_risk",
+    "session_duration"
+  ],
+  "cv": {
+    "best_params": {
+      "model__min_samples_leaf": 50,
+      "model__max_leaf_nodes": 63,
+      "model__max_depth": null,
+      "model__learning_rate": 0.08483428982440717,
+      "model__l2_regularization": 1e-06
+    },
+    "best_cv_mae": 0.03998783755462176
+  },
+  "test": {
+    "test_MAE": 0.040027548920468156,
+    "test_RMSE": 0.050166113984429855,
+    "test_R2": 0.8861667718335757
+  }
+}
