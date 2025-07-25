@@ -1,10 +1,14 @@
 import json
 import base64
+# Import WebAuthn library functions under distinct names to avoid
+# colliding with the wrapper helpers defined in this module. Without
+# aliasing, calls inside the wrappers would recursively invoke the
+# wrappers themselves leading to unexpected errors.
 from webauthn import (
-    generate_registration_options,
-    verify_registration_response,
-    generate_authentication_options,
-    verify_authentication_response,
+    generate_registration_options as wa_generate_registration_options,
+    verify_registration_response as wa_verify_registration_response,
+    generate_authentication_options as wa_generate_authentication_options,
+    verify_authentication_response as wa_verify_authentication_response,
     options_to_json,
 )
 from webauthn.helpers import (
@@ -23,7 +27,7 @@ from django.conf import settings
 
 def generate_registration_options(user):
     """Generate WebAuthn registration options for a user"""
-    return generate_registration_options(
+    return wa_generate_registration_options(
         rp_id=settings.WEBAUTHN_RP_ID,
         rp_name=settings.WEBAUTHN_RP_NAME,
         user_id=str(user.id),
@@ -37,8 +41,8 @@ def generate_registration_options(user):
 def verify_registration_response(user, data, expected_challenge):
     """Verify WebAuthn registration response"""
     credential = parse_registration_credential_json(json.dumps(data))
-    
-    verification = verify_registration_response(
+
+    verification = wa_verify_registration_response(
         credential=RegistrationCredential(
             id=credential.id,
             raw_id=base64url_to_bytes(credential.raw_id),
@@ -60,7 +64,7 @@ def generate_authentication_options(user):
     for cred in user.webauthn_credentials.all():
         credentials.append(base64url_to_bytes(cred.credential_id))
     
-    return generate_authentication_options(
+    return wa_generate_authentication_options(
         rp_id=settings.WEBAUTHN_RP_ID,
         allow_credentials=[
             {"type": "public-key", "id": cred.credential_id, "transports": ["internal"]}
@@ -76,7 +80,7 @@ def verify_authentication_response(user, data, expected_challenge):
     # Get the stored credential
     stored_credential = user.webauthn_credentials.get(credential_id=credential.id)
     
-    verification = verify_authentication_response(
+    verification = wa_verify_authentication_response(
         credential=AuthenticationCredential(
             id=credential.id,
             raw_id=base64url_to_bytes(credential.raw_id),
