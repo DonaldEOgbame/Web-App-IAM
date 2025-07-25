@@ -587,9 +587,14 @@ def verify_biometrics(request):
                 session.face_match_score = result['confidence']
                 session.save()
                 return JsonResponse({'status': 'success', 'score': result['confidence']})
-            except Exception as e:
-                logger.error(f"Face verification failed: {str(e)}")
+            except FaceAPIError as e:
+                logger.warning(f"Face verification failed: {e}")
+                messages.error(request, str(e))
                 return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            except Exception as e:
+                logger.exception("Unexpected face verification error")
+                messages.error(request, 'Face verification temporarily unavailable.')
+                return JsonResponse({'status': 'error', 'message': 'Face verification failed'}, status=400)
         
         return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
     

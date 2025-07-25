@@ -23,14 +23,9 @@ _behavior_meta = {}
 _loaded = False
 _lock = threading.Lock()
 
-# Backwards compatibility references used in tests
-risk_model = None
-behavior_model = None
-
 
 def _load_models():
     global _loaded, _risk_model, _risk_meta, _behavior_model, _behavior_meta
-    global risk_model, behavior_model
     if _loaded:
         return
     with _lock:
@@ -55,17 +50,6 @@ def _load_models():
             logger.error("Behavior model loading failed: %s", e)
 
         _loaded = True
-        # Keep public references in sync
-        risk_model = _risk_model
-        behavior_model = _behavior_model
-
-
-def load_models():
-    """Public wrapper for tests"""
-    _load_models()
-    if risk_model is None or behavior_model is None:
-        raise RuntimeError("Models unavailable")
-    return risk_model, behavior_model
 
 
 def _assert_schema(n_cols: int, meta: dict):
@@ -84,19 +68,19 @@ def calculate_risk_score(face_match: float,
     Returns probability-like risk score in [0, 1].
     Falls back to rule-based if model unavailable.
     """
-    load_models()
+    _load_models()
     feats = np.array([[face_match, float(fingerprint_verified), behavior_anomaly]], dtype=float)
 
-    if risk_model is None:
+    if _risk_model is None:
         logger.warning("Risk model unavailable, falling back to rule-based score.")
         return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
 
     try:
         _assert_schema(feats.shape[1], _risk_meta)
-        if hasattr(risk_model, "predict_proba"):
-            return float(risk_model.predict_proba(feats)[0, 1])
+        if hasattr(_risk_model, "predict_proba"):
+            return float(_risk_model.predict_proba(feats)[0, 1])
         # Regressor fallback
-        return float(np.clip(risk_model.predict(feats)[0], 0.0, 1.0))
+        return float(np.clip(_risk_model.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
         logger.exception("Risk model inference failed, fallback to rule: %s", e)
         return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
@@ -107,7 +91,7 @@ def analyze_behavior_anomaly(session) -> float:
     Returns behavior anomaly score in [0, 1].
     Falls back to rule-based if model unavailable.
     """
-    load_models()
+    _load_models()
     feats = np.array([[
         getattr(session, 'time_anomaly', 0.0),
         getattr(session, 'device_anomaly', 0.0),
@@ -117,16 +101,16 @@ def analyze_behavior_anomaly(session) -> float:
         getattr(session, 'session_duration', 300.0),
     ]], dtype=float)
 
-    if behavior_model is None:
+    if _behavior_model is None:
         logger.warning("Behavior model unavailable, using rule fallback.")
         return _rule_behavior(session)
 
     try:
         _assert_schema(feats.shape[1], _behavior_meta)
-        if hasattr(behavior_model, "predict_proba"):
-            return float(behavior_model.predict_proba(feats)[0, 1])
+        if hasattr(_behavior_model, "predict_proba"):
+            return float(_behavior_model.predict_proba(feats)[0, 1])
         # Regressor fallback
-        return float(np.clip(behavior_model.predict(feats)[0], 0.0, 1.0))
+        return float(np.clip(_behavior_model.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
         logger.exception("Behavior model inference failed, fallback to rule: %s", e)
         return _rule_behavior(session)
