@@ -22,4 +22,8 @@ python manage.py runserver localhost:8000
 ## Production
 
 Set `WEBAUTHN_RP_ID` and `WEBAUTHN_EXPECTED_ORIGIN` to your public domain and
-ensure the site is served over HTTPS.
+ensure the site is served over HTTPS. `WEBAUTHN_RP_ID` **must** contain only the
+host name (no scheme or port). It also needs to match or be a suffix of the
+host serving the page. When developing locally you should use `localhost` and
+not `127.0.0.1`, otherwise WebAuthn will fail with an "invalid domain"
+message.
