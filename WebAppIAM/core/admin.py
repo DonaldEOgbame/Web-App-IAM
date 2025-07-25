@@ -6,7 +6,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 class UserAdmin(BaseUserAdmin):
     list_display = ('username', 'role', 'has_biometrics', 'is_active', 'is_staff')
     list_filter = ('role', 'is_active', 'is_staff')
-    actions = ['lock_user', 'unlock_user', 'force_reenroll']
+    actions = ['lock_user', 'unlock_user']
 
     def has_biometrics(self, obj):
         return obj.has_biometrics
@@ -21,10 +21,6 @@ class UserAdmin(BaseUserAdmin):
         queryset.update(is_active=True)
     unlock_user.short_description = 'Unlock selected users'
 
-    def force_reenroll(self, request, queryset):
-        for user in queryset:
-            user.require_reenrollment()
-    force_reenroll.short_description = 'Force biometric re-enrollment'
 
 @admin.register(UserBehaviorProfile)
 class UserBehaviorProfileAdmin(admin.ModelAdmin):

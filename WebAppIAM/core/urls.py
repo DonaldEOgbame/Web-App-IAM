@@ -36,7 +36,6 @@ urlpatterns = [
     path('admin/users/activate/<int:user_id>/', views.activate_user, name='activate_user'),
     path('admin/users/lock/<int:user_id>/', views.lock_user, name='lock_user'),
     path('admin/users/unlock/<int:user_id>/', views.unlock_user, name='unlock_user'),
-    path('admin/users/force-reenroll/<int:user_id>/', views.force_reenroll, name='force_reenroll'),
 
 
     # Profile Management
