@@ -122,6 +122,15 @@ def get_device_info(request):
         'user_agent': user_agent
     }
 
+# Helper to retrieve the user during biometric registration.
+def get_registration_user(request):
+    if request.user.is_authenticated:
+        return request.user
+    pending_id = request.session.get('pending_user_id')
+    if pending_id:
+        return get_object_or_404(User, id=pending_id)
+    return None
+
 def rate_limit(request, key_prefix, limit=5, window=60):
     key = f"rate:{key_prefix}:{get_client_ip(request)}"
     count = cache.get(key, 0)
@@ -375,22 +384,24 @@ def register_biometrics(request):
         )
     })
 
-@login_required
 def webauthn_registration_options(request):
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
-    
-    user = request.user
+
+    user = get_registration_user(request)
+    if not user:
+        return JsonResponse({'error': 'Authentication required'}, status=403)
     options = generate_registration_options(user)
     request.session['webauthn_registration_challenge'] = options.challenge
     return JsonResponse(json.loads(options_to_json(options)))
 
-@login_required
 def webauthn_registration_verify(request):
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
-    
-    user = request.user
+
+    user = get_registration_user(request)
+    if not user:
+        return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
     data = json.loads(request.body)
     challenge = request.session.get('webauthn_registration_challenge')
     
