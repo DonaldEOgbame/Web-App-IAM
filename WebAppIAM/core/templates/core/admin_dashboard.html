@@ -565,7 +565,7 @@
             <section class="section" data-view="upload">
                 <div class="card">
                     <h2>Upload Document</h2>
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" action="{% url 'core:update_profile' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         {{ form.as_p }}
                         <button class="btn" type="submit">Upload</button>
@@ -688,7 +688,11 @@
         });
     }
 
-    const csrftoken = '{{ csrf_token }}';
+    function getCookie(name) {
+        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+        return match ? match[2] : null;
+    }
+    const csrftoken = getCookie('csrftoken');
 
     // Mark a single notification read on click
     document.querySelectorAll('.alert[data-id]').forEach(function (el) {

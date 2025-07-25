@@ -42,6 +42,8 @@ urlpatterns = [
     # Profile Management
     path('complete_profile/', views.complete_profile, name='complete_profile'),
     path('profile/settings/', views.profile_settings, name='profile_settings'),
+    path('profile/update/', views.update_profile, name='update_profile'),
+    path('profile/change_password/', views.change_password, name='change_password'),
 
     # Document Management
     path('documents/', views.document_list, name='document_list'),
@@ -63,4 +65,5 @@ urlpatterns = [
     path('notifications/', views.notifications_view, name='notifications'),
     path('notifications/dismiss/<int:notification_id>/', views.dismiss_device_notification, name='dismiss_device_notification'),
     path('notifications/mark_read/<int:notification_id>/', views.mark_notification_read, name='mark_notification_read'),
+    path('notifications/mark_all/', views.mark_all_notifications_read, name='mark_all_notifications_read'),
 ]

@@ -528,7 +528,7 @@
                     </ul>
                     {% endif %}
 
-                    <form method="post" enctype="multipart/form-data">
+                    <form method="post" action="{% url 'core:update_profile' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         {{ profile_form.as_p }}
                         <button class="btn" type="submit">Update Profile</button>
@@ -537,7 +537,7 @@
                     <hr style="border-color: var(--border); margin: 24px 0;">
 
                     <h3>Change Password</h3>
-                    <form method="post">
+                    <form method="post" action="{% url 'core:change_password' %}">
                         {% csrf_token %}
                         {{ password_form.as_p }}
                         <button class="btn" type="submit">Change Password</button>

@@ -283,6 +283,14 @@ def activate_user(request, user_id):
     user.is_active = True
     user.save()
 
+    AuditLog.objects.create(
+        user=request.user,
+        affected_user=user,
+        action='USER_ACTIVATE',
+        details=f'Activated user {user.username}',
+        ip_address=get_client_ip(request)
+    )
+
     subject = 'Account Approved'
     message = (
         'Your account has been approved by the administrator. '
@@ -309,6 +317,7 @@ def complete_profile(request):
     
     if request.method == 'POST':
         form = ProfileCompletionForm(request.POST)
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         if form.is_valid():
             profile = UserProfile.objects.create(
                 user=user,
@@ -405,6 +414,7 @@ def webauthn_registration_verify(request):
 def login(request):
     """User login view with rate limiting and security checks"""
     if request.method == 'POST':
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
         form = LoginForm(request.POST)
         # --- Keystroke Dynamics: Save if present ---
         keystroke_data = request.POST.get('keystroke_data')
@@ -464,14 +474,21 @@ def login(request):
                         ip_address=get_client_ip(request)
                     )
                     
-                    # Log the user in
-                    django_login(request, user_auth)  # Replace auth_login
-                    
-                    # Determine which dashboard to redirect to
-                    if user.role == 'ADMIN':
-                        return redirect('core:admin_dashboard')
-                    else:
-                        return redirect('core:staff_dashboard')
+                    django_login(request, user_auth)
+                    next_url = reverse('core:admin_dashboard') if user.role == 'ADMIN' else reverse('core:staff_dashboard')
+
+                    if is_ajax:
+                        if user.has_biometrics:
+                            return JsonResponse({
+                                'status': 'password_ok_biometric_required',
+                                'face': bool(user.face_data),
+                                'webauthn': user.webauthn_credentials.exists(),
+                                'next': next_url
+                            })
+                        else:
+                            return JsonResponse({'status': 'ok', 'next': next_url})
+
+                    return redirect(next_url)
                 else:
                     # Increment failed login attempts
                     user.failed_login_attempts += 1
@@ -486,6 +503,8 @@ def login(request):
                         ip_address=get_client_ip(request)
                     )
                     
+                    if is_ajax:
+                        return JsonResponse({'status': 'error', 'message': 'Invalid username or password.'}, status=400)
                     messages.error(request, 'Invalid username or password.')
             except User.DoesNotExist:
                 # Create audit log entry for non-existent user
@@ -495,10 +514,12 @@ def login(request):
                     details=f'Login attempt with non-existent username: {username}',
                     ip_address=get_client_ip(request)
                 )
+                if is_ajax:
+                    return JsonResponse({'status': 'error', 'message': 'Invalid username or password.'}, status=400)
                 messages.error(request, 'Invalid username or password.')
     else:
         form = LoginForm()
-    
+
     return render(request, 'core/login.html', {'form': form})
 
 def register(request):
@@ -1031,107 +1052,20 @@ def validate_checksum(request, doc_id):
 # --- Profile Management ---
 @login_required
 def profile_settings(request):
+    """Display profile settings page"""
     user = request.user
     if not hasattr(user, 'profile'):
         return redirect('core:complete_profile')
     profile = user.profile
-    
-    if request.method == 'POST':
-        # Handle password change
-        if 'old_password' in request.POST:
-            form = CustomPasswordChangeForm(user, request.POST)
-            if form.is_valid():
-                form.save()
-                AuditLog.objects.create(
-                    user=user,
-                    action='PASSWORD_CHANGE',
-                    details='Password changed',
-                    ip_address=get_client_ip(request)
-                )
-                return redirect('core:profile_settings')
-        # Handle face re-enrollment
-        elif 'face_image' in request.FILES:
-            face_image = request.FILES['face_image']
-            try:
-                face_id = enroll_face(user, face_image)
-                user.azure_face_id = face_id
-                user.face_data = face_image.read()
-                user.save()
-                return redirect('core:profile_settings')
-            except Exception as e:
-                context = {'error': str(e), 'show_profile_settings': True}
-                template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
-                return render(request, template, context)
-        # Handle profile update
-        else:
-            form = ProfileUpdateForm(request.POST, request.FILES)
-            if form.is_valid():
-                # Update user name fields
-                user.first_name = form.cleaned_data['first_name']
-                user.last_name = form.cleaned_data['last_name']
-                
-                # Update profile fields
-                profile.department = form.cleaned_data['department']
-                profile.position = form.cleaned_data['position']
-                profile.phone = form.cleaned_data.get('phone_number')
-                
-                # Handle email update with verification
-                if form.cleaned_data['email'] != user.email:
-                    # Generate verification token and expiration
-                    token = Fernet.generate_key().decode()
-                    expiration = timezone.now() + timedelta(hours=24)
-                    
-                    # Store new email in session and token in DB
-                    request.session['pending_email_update'] = form.cleaned_data['email']
-                    user.email_verification_token = token
-                    user.email_verification_expiration = expiration
-                    user.save()
-                    
-                    # Send verification email
-                    verify_url = request.build_absolute_uri(
-                        reverse('core:verify_email_update', kwargs={'token': token})
-                    )
-                    
-                    subject = 'Verify Email Change'
-                    message = render_to_string('emails/verify_email_update.html', {
-                        'user': user,
-                        'verify_link': verify_url,
-                        'new_email': form.cleaned_data['email']
-                    })
-                    
-                    send_mail(
-                        subject,
-                        message,
-                        settings.DEFAULT_FROM_EMAIL,
-                        [form.cleaned_data['email']],
-                        fail_silently=False
-                    )
-                    
-                    messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
-                
-                # Handle profile picture
-                if 'profile_picture' in request.FILES:
-                    profile.profile_picture = request.FILES['profile_picture']
-                
-                profile.save()
-                
-                AuditLog.objects.create(
-                    user=user,
-                    action='PROFILE_UPDATE',
-                    details='Profile information updated',
-                    ip_address=get_client_ip(request)
-                )
-                
-                return redirect('core:profile_settings')
-    else:
-        form = ProfileUpdateForm(initial={
-            'first_name': user.first_name,
-            'last_name': user.last_name,
-            'department': profile.department,
-            'position': profile.position,
-            'email': user.email,
-            'phone_number': profile.phone
-        })
+
+    form = ProfileUpdateForm(initial={
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'department': profile.department,
+        'position': profile.position,
+        'email': user.email,
+        'phone_number': profile.phone
+    })
     
     context = {
         'profile': profile,
@@ -1144,6 +1078,80 @@ def profile_settings(request):
     
     template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
     return render(request, template, context)
+
+@login_required
+@require_POST
+def update_profile(request):
+    """Handle profile update form"""
+    user = request.user
+    if not hasattr(user, 'profile'):
+        return redirect('core:complete_profile')
+    profile = user.profile
+
+    form = ProfileUpdateForm(request.POST, request.FILES)
+    if form.is_valid():
+        user.first_name = form.cleaned_data['first_name']
+        user.last_name = form.cleaned_data['last_name']
+        profile.department = form.cleaned_data['department']
+        profile.position = form.cleaned_data['position']
+        profile.phone = form.cleaned_data.get('phone_number')
+
+        if form.cleaned_data['email'] != user.email:
+            token = Fernet.generate_key().decode()
+            expiration = timezone.now() + timedelta(hours=24)
+            request.session['pending_email_update'] = form.cleaned_data['email']
+            user.email_verification_token = token
+            user.email_verification_expiration = expiration
+            user.save()
+
+            verify_url = request.build_absolute_uri(
+                reverse('core:verify_email_update', kwargs={'token': token})
+            )
+
+            subject = 'Verify Email Change'
+            message = render_to_string('emails/verify_email_update.html', {
+                'user': user,
+                'verify_link': verify_url,
+                'new_email': form.cleaned_data['email']
+            })
+
+            send_mail(subject, message, settings.DEFAULT_FROM_EMAIL,
+                      [form.cleaned_data['email']], fail_silently=False)
+
+            messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
+
+        if 'profile_picture' in request.FILES:
+            profile.profile_picture = request.FILES['profile_picture']
+
+        profile.save()
+
+        AuditLog.objects.create(
+            user=user,
+            action='PROFILE_UPDATE',
+            details='Profile information updated',
+            ip_address=get_client_ip(request)
+        )
+
+    return redirect('core:profile_settings')
+
+@login_required
+@require_POST
+def change_password(request):
+    """Handle password change form"""
+    user = request.user
+    form = CustomPasswordChangeForm(user, request.POST)
+    if form.is_valid():
+        form.save()
+        AuditLog.objects.create(
+            user=user,
+            action='PASSWORD_CHANGE',
+            details='Password changed',
+            ip_address=get_client_ip(request)
+        )
+        messages.success(request, 'Password updated successfully.')
+    else:
+        messages.error(request, 'Password change failed.')
+    return redirect('core:profile_settings')
 
 # --- Device Management ---
 @login_required
@@ -1244,6 +1252,12 @@ def mark_notification_read(request, notification_id):
     notification.save()
     return JsonResponse({'status': 'success'})
 
+@login_required
+@require_POST
+def mark_all_notifications_read(request):
+    Notification.objects.filter(user=request.user, read=False).update(read=True)
+    return JsonResponse({'status': 'success'})
+
 # --- Policy Management ---
 @login_required
 @user_passes_test(is_admin)
@@ -1336,27 +1350,51 @@ def export_audit_logs(request):
 # --- Admin Actions ---
 @login_required
 @user_passes_test(is_admin)
+@require_POST
 def lock_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.is_active = False
     user.save()
+    AuditLog.objects.create(
+        user=request.user,
+        affected_user=user,
+        action='ACCOUNT_LOCK',
+        details=f'Account locked for {user.username}',
+        ip_address=get_client_ip(request)
+    )
     return redirect('core:admin_dashboard')
 
 @login_required
 @user_passes_test(is_admin)
+@require_POST
 def unlock_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.is_active = True
     user.save()
+    AuditLog.objects.create(
+        user=request.user,
+        affected_user=user,
+        action='ACCOUNT_UNLOCK',
+        details=f'Account unlocked for {user.username}',
+        ip_address=get_client_ip(request)
+    )
     return redirect('core:admin_dashboard')
 
 @login_required
 @user_passes_test(is_admin)
+@require_POST
 def force_reenroll(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.FACE_ENROLLED = False
     user.FINGERPRINT_ENROLLED = False
     user.save()
+    AuditLog.objects.create(
+        user=request.user,
+        affected_user=user,
+        action='FORCE_REENROLL',
+        details=f'Biometric re-enrollment forced for {user.username}',
+        ip_address=get_client_ip(request)
+    )
     return redirect('core:admin_dashboard')
 
 # --- Password Reset ---

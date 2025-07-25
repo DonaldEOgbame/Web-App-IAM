@@ -385,9 +385,7 @@
 
 <!-- Safer way to pass JSON from Django to JS -->
 {% if webauthn_options %}
-<script id="webauthn-options" type="application/json">
-    {{ webauthn_options|json_script:"webauthn-options" }}
-</script>
+{{ webauthn_options|json_script:"webauthn-options" }}
 {% endif %}
 
 <script>
