@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# ---- Windows / OpenMP stability fixes (must be before sklearn imports) ----
+# ------------ Windows / OpenMP stability fixes (must be before sklearn imports)
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
+from typing import Protocol, Any, Type, cast
 import argparse
 import json
 from pathlib import Path
@@ -26,18 +27,27 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state
 from joblib import dump
 
-try:
-    from joblib.externals.loky.process_executor import TerminatedWorkerError
+# ---- Robust + Pylance-friendly import of TerminatedWorkerError ----
+try:  # type: ignore[attr-defined]
+    from joblib.externals.loky.process_executor import TerminatedWorkerError as _TerminatedWorkerError  # type: ignore[attr-defined]
+    TerminatedWorkerError: Type[BaseException] = _TerminatedWorkerError  # type: ignore[assignment]
 except Exception:  # pragma: no cover
     class TerminatedWorkerError(Exception):
         pass
 
 
+# ----------------------- typing helpers -----------------------
+class FitPredictor(Protocol):
+    def fit(self, X: Any, y: Any) -> Any: ...
+    def predict(self, X: Any) -> Any: ...
+
+
+# ----------------------- utils -----------------------
 def rmse(y_true, y_pred):
     return np.sqrt(mean_squared_error(y_true, y_pred))
 
 
-def metrics_dict(y_true, y_pred, prefix=""):
+def metrics_dict(y_true, y_pred, prefix: str = ""):
     return {
         f"{prefix}MAE": mean_absolute_error(y_true, y_pred),
         f"{prefix}RMSE": rmse(y_true, y_pred),
@@ -52,21 +62,21 @@ def build_preprocessor(X: pd.DataFrame):
     num_pipe = Pipeline([("imp", SimpleImputer(strategy="median"))])
     cat_pipe = Pipeline([
         ("imp", SimpleImputer(strategy="most_frequent")),
-        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
     ])
 
     pre = ColumnTransformer([
         ("num", num_pipe, num_cols),
-        ("cat", cat_pipe, cat_cols)
+        ("cat", cat_pipe, cat_cols),
     ])
     return pre
 
 
-def cv_scores(estimator, X, Y, cv):
+def cv_scores(estimator: FitPredictor, X: pd.DataFrame, y: pd.Series, cv):
     maes, rmses, r2s = [], [], []
     for tr_idx, va_idx in cv.split(X):
         Xtr, Xva = X.iloc[tr_idx], X.iloc[va_idx]
-        ytr, yva = Y.iloc[tr_idx], Y.iloc[va_idx]
+        ytr, yva = y.iloc[tr_idx], y.iloc[va_idx]
         estimator.fit(Xtr, ytr)
         pred = estimator.predict(Xva)
         maes.append(mean_absolute_error(yva, pred))
@@ -82,7 +92,7 @@ def cv_scores(estimator, X, Y, cv):
     }
 
 
-def run_random_search_with_retry(search, X, y):
+def run_random_search_with_retry(search: RandomizedSearchCV, X, y):
     try:
         return search.fit(X, y)
     except TerminatedWorkerError:
@@ -91,6 +101,7 @@ def run_random_search_with_retry(search, X, y):
         return search.fit(X, y)
 
 
+# ----------------------- main -----------------------
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True, help="Path to synthetic_risk_data.{parquet,csv}")
@@ -113,7 +124,7 @@ def main():
 
     assert args.target in df.columns, f"{args.target} not in data"
 
-    # Preserve temporal order → test is tail
+    # Preserve temporal order → tail is test
     n_test = int(len(df) * args.test_size)
     train_df = df.iloc[:-n_test]
     test_df = df.iloc[-n_test:]
@@ -133,7 +144,7 @@ def main():
         ("lr", LinearRegression())
     ])
 
-    # CV (time series like)
+    # CV
     if len(X_train) >= args.n_splits:
         cv = TimeSeriesSplit(n_splits=args.n_splits)
     else:
@@ -141,7 +152,7 @@ def main():
 
     baseline_cv = cv_scores(baseline, X_train, y_train, cv)
 
-    # Main model
+    # Main model + search
     gbr = GradientBoostingRegressor(random_state=args.random_state)
     pipe = Pipeline([
         ("pre", pre),
@@ -162,14 +173,14 @@ def main():
         n_iter=60,
         cv=cv,
         scoring="neg_mean_absolute_error",
-        n_jobs=1,          # safest on Windows
+        n_jobs=1,          # serial to avoid Windows crashes
         pre_dispatch=1,
         verbose=2,
         random_state=args.random_state
     )
 
     search = run_random_search_with_retry(search, X_train, y_train)
-    best = search.best_estimator_
+    best = cast(Pipeline, search.best_estimator_)
 
     tuned_cv = {
         "best_params": search.best_params_,

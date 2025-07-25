@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# ---- Windows / OpenMP stability fixes (must be before sklearn imports) ----
+# ------------ Windows / OpenMP stability fixes (must be before sklearn imports)
 import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 
+from typing import Protocol, Any, Type, cast
 import argparse
 import json
 from pathlib import Path
@@ -25,31 +26,33 @@ from sklearn.impute import SimpleImputer
 from sklearn.inspection import permutation_importance
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import (
-    GroupKFold,
-    KFold,
-    RandomizedSearchCV,
-)
+from sklearn.model_selection import GroupKFold, KFold, RandomizedSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.utils import check_random_state
 from joblib import dump
 
-try:
-    # Available in joblib>=0.12 (bundled with sklearn)
-    from joblib.externals.loky.process_executor import TerminatedWorkerError
+# ---- Robust + Pylance-friendly import of TerminatedWorkerError ----
+try:  # type: ignore[attr-defined]
+    from joblib.externals.loky.process_executor import TerminatedWorkerError as _TerminatedWorkerError  # type: ignore[attr-defined]
+    TerminatedWorkerError: Type[BaseException] = _TerminatedWorkerError  # type: ignore[assignment]
 except Exception:  # pragma: no cover
     class TerminatedWorkerError(Exception):
         pass
 
 
-# ----------------------- utils -----------------------
+# ----------------------- typing helpers -----------------------
+class FitPredictor(Protocol):
+    def fit(self, X: Any, y: Any) -> Any: ...
+    def predict(self, X: Any) -> Any: ...
 
+
+# ----------------------- utils -----------------------
 def rmse(y_true, y_pred):
     return np.sqrt(mean_squared_error(y_true, y_pred))
 
 
-def metrics_dict(y_true, y_pred, prefix=""):
+def metrics_dict(y_true, y_pred, prefix: str = ""):
     return {
         f"{prefix}MAE": mean_absolute_error(y_true, y_pred),
         f"{prefix}RMSE": rmse(y_true, y_pred),
@@ -64,18 +67,17 @@ def build_preprocessor(X: pd.DataFrame):
     num_pipe = Pipeline([("imp", SimpleImputer(strategy="median"))])
     cat_pipe = Pipeline([
         ("imp", SimpleImputer(strategy="most_frequent")),
-        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+        ("ohe", OneHotEncoder(handle_unknown="ignore", sparse_output=False)),
     ])
 
     pre = ColumnTransformer([
         ("num", num_pipe, num_cols),
-        ("cat", cat_pipe, cat_cols)
+        ("cat", cat_pipe, cat_cols),
     ])
-
     return pre, num_cols, cat_cols
 
 
-def cv_scores(estimator, X, y, cv, groups=None):
+def cv_scores(estimator: FitPredictor, X: pd.DataFrame, y: pd.Series, cv, groups=None):
     maes, rmses, r2s = [], [], []
     split_iter = cv.split(X, y, groups) if groups is not None else cv.split(X, y)
 
@@ -87,6 +89,7 @@ def cv_scores(estimator, X, y, cv, groups=None):
         maes.append(mean_absolute_error(yva, pred))
         rmses.append(rmse(yva, pred))
         r2s.append(r2_score(yva, pred))
+
     return {
         "cv_mae_mean": float(np.mean(maes)),
         "cv_mae_std": float(np.std(maes)),
@@ -97,7 +100,7 @@ def cv_scores(estimator, X, y, cv, groups=None):
     }
 
 
-def leakage_corr_top(X, y, k=10):
+def leakage_corr_top(X: pd.DataFrame, y: pd.Series, k: int = 10):
     corrs = {}
     for c in X.columns:
         if pd.api.types.is_numeric_dtype(X[c]):
@@ -108,8 +111,7 @@ def leakage_corr_top(X, y, k=10):
     return dict(sorted(corrs.items(), key=lambda kv: kv[1], reverse=True)[:k])
 
 
-def run_random_search_with_retry(search, X, y):
-    """Run RandomizedSearchCV and retry serially if a worker dies."""
+def run_random_search_with_retry(search: RandomizedSearchCV, X, y):
     try:
         return search.fit(X, y)
     except TerminatedWorkerError:
@@ -119,7 +121,6 @@ def run_random_search_with_retry(search, X, y):
 
 
 # ----------------------- main -----------------------
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data", required=True, help="Path to synthetic_behavior_data.{parquet,csv}")
@@ -148,16 +149,14 @@ def main():
     y = df[args.target]
     X = df.drop(columns=[args.target])
 
-    # Optional: drop “formula” features (from your generator)
-    formula_feats = [
-        "time_anomaly", "device_anomaly", "location_anomaly",
-        "action_entropy", "ip_risk"
-    ]
+    # Optional: drop “formula” features (leakage)
+    formula_feats = ["time_anomaly", "device_anomaly", "location_anomaly",
+                     "action_entropy", "ip_risk"]
     if args.drop_formula_features:
         drop_cols = [c for c in formula_feats if c in X.columns]
         X = X.drop(columns=drop_cols)
 
-    # Split train/test with **user-level** separation if possible
+    # Group-aware train/test split if user_id present
     if args.user_col in X.columns:
         users = X[args.user_col].unique()
         rng.shuffle(users)
@@ -172,7 +171,6 @@ def main():
         groups_train = X_train[args.user_col].to_numpy()
         use_groups = True
     else:
-        # Fallback: random row-level split (not ideal)
         idx = np.arange(len(X))
         rng.shuffle(idx)
         n_test = int(len(X) * args.test_size)
@@ -203,12 +201,13 @@ def main():
         baseline_cv = cv_scores(baseline, X_train, y_train, cv)
         cv_for_search = cv
 
-    # Main model
-    hgbr = HistGradientBoostingRegressor(random_state=args.random_state)
+    # Main model + search
+    hgbr = HistGradientBoostingRegressor(random_state=args.random_state, early_stopping=True)
     pipe = Pipeline([
         ("pre", pre),
         ("model", hgbr)
     ])
+
     param_dist = {
         "model__learning_rate": np.logspace(-2.5, -0.7, 12),
         "model__max_depth": [None, 3, 5, 7, 9],
@@ -224,13 +223,13 @@ def main():
         cv=cv_for_search,
         scoring="neg_mean_absolute_error",
         random_state=args.random_state,
-        n_jobs=1,          # <- critical to avoid Windows crash
-        pre_dispatch=1,    # <- critical to avoid Windows crash
+        n_jobs=1,          # serial to avoid Windows crashes
+        pre_dispatch=1,
         verbose=2
     )
 
     search = run_random_search_with_retry(search, X_train, y_train)
-    best = search.best_estimator_
+    best = cast(Pipeline, search.best_estimator_)
 
     tuned_cv = {
         "best_params": search.best_params_,
@@ -247,27 +246,31 @@ def main():
     y_pred_bl = baseline.predict(X_test)
     test_metrics_bl = metrics_dict(y_test, y_pred_bl, prefix="baseline_test_")
 
-    # Permutation importance
+    # Permutation importance (safe version: work on transformed matrix)
     try:
+        pre_step = best.named_steps["pre"]      # type: ignore[attr-defined]
+        model_step = best.named_steps["model"]  # type: ignore[attr-defined]
+
+        X_test_tx = pre_step.transform(X_test)
+
+        try:
+            feat_names = pre_step.get_feature_names_out()  # sklearn >= 1.0
+        except Exception:
+            # Fallback for older sklearn
+            num_cols_tx = pre_step.transformers_[0][2]
+            cat_cols_tx = pre_step.transformers_[1][2]
+            ohe = pre_step.named_transformers_["cat"].named_steps["ohe"]
+            feat_names = np.concatenate([num_cols_tx, ohe.get_feature_names_out(cat_cols_tx)])
+
         perm = permutation_importance(
-            best, X_test, y_test, n_repeats=10, random_state=args.random_state, n_jobs=1
+            model_step, X_test_tx, y_test,
+            n_repeats=10, random_state=args.random_state, n_jobs=1
         )
 
-        def get_feature_names(preproc, num_cols, cat_cols):
-            out = []
-            out.extend(num_cols)
-            try:
-                ohe = preproc.named_transformers_["cat"].named_steps["ohe"]
-                out.extend(list(ohe.get_feature_names_out(cat_cols)))
-            except Exception:
-                out.extend(cat_cols)
-            return out
-
-        feat_names = get_feature_names(best.named_steps["pre"], num_cols, cat_cols)
         fi_df = pd.DataFrame({
             "feature": feat_names,
             "importance_mean": perm.importances_mean,
-            "importance_std": perm.importances_std,
+            "importance_std": perm.importances_std
         }).sort_values("importance_mean", ascending=False).head(30)
         fi_df.to_csv(save_dir / "behavior_feature_importance.csv", index=False)
     except Exception as e:
