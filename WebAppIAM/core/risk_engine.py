@@ -1,81 +1,133 @@
 import os
+import json
 import joblib
 import numpy as np
 import logging
+import threading
+from django.conf import settings
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
-# Configure paths - now pointing to PRODUCTION models
-ML_MODELS_DIR = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), 
-    '../../../ml_pipeline/models/production'
-))
+# Path to deployed artifacts
+ML_MODELS_DIR = getattr(
+    settings,
+    "ML_MODELS_DIR",
+    os.path.abspath(os.path.join(settings.BASE_DIR, "ml_pipeline", "models", "production"))
+)
 
-# Initialize models as None for lazy loading
-risk_model = None
-behavior_model = None
+# Lazy globals
+_risk_model = None
+_risk_meta = {}
+_behavior_model = None
+_behavior_meta = {}
+_loaded = False
+_lock = threading.Lock()
 
-def load_models():
-    """Lazy-load models on first use with error handling"""
-    global risk_model, behavior_model
-    
-    if not risk_model:
+
+def _load_models():
+    global _loaded, _risk_model, _risk_meta, _behavior_model, _behavior_meta
+    if _loaded:
+        return
+    with _lock:
+        if _loaded:
+            return
         try:
-            risk_path = os.path.join(ML_MODELS_DIR, 'risk_model.pkl')
-            risk_model = joblib.load(risk_path)
-            logger.info(f"Loaded risk model from {risk_path}")
+            risk_path = os.path.join(ML_MODELS_DIR, "risk_model.pkl")
+            risk_meta_path = os.path.join(ML_MODELS_DIR, "risk_model_meta.json")
+            _risk_model = joblib.load(risk_path)
+            _risk_meta = json.loads(open(risk_meta_path, "r").read())
+            logger.info("Loaded risk model v%s", _risk_meta.get("version"))
         except Exception as e:
-            logger.error(f"Risk model loading failed: {str(e)}")
-            raise RuntimeError("Risk model unavailable - contact administrator")
+            logger.error("Risk model loading failed: %s", e)
 
-    if not behavior_model:
         try:
-            behavior_path = os.path.join(ML_MODELS_DIR, 'behavior_model.pkl')
-            behavior_model = joblib.load(behavior_path)
-            logger.info(f"Loaded behavior model from {behavior_path}")
+            behavior_path = os.path.join(ML_MODELS_DIR, "behavior_model.pkl")
+            behavior_meta_path = os.path.join(ML_MODELS_DIR, "behavior_model_meta.json")
+            _behavior_model = joblib.load(behavior_path)
+            _behavior_meta = json.loads(open(behavior_meta_path, "r").read())
+            logger.info("Loaded behavior model v%s", _behavior_meta.get("version"))
         except Exception as e:
-            logger.error(f"Behavior model loading failed: {str(e)}")
-            raise RuntimeError("Behavior model unavailable - contact administrator")
-    
-    return risk_model, behavior_model
+            logger.error("Behavior model loading failed: %s", e)
 
-def calculate_risk_score(face_match, fingerprint_verified, behavior_anomaly):
-    """Calculate risk score using production ML model"""
-    load_models()  # Ensure models are loaded
-    
-    # Create feature vector
-    features = np.array([[face_match, fingerprint_verified, behavior_anomaly]])
-    
-    # Handle model versioning differences
+        _loaded = True
+
+
+def _assert_schema(n_cols: int, meta: dict):
+    expected = meta.get("expected_features", [])
+    if not expected:
+        logger.warning("No expected_features in model meta; skipping schema check.")
+        return
+    if n_cols != len(expected):
+        raise ValueError(f"Feature count mismatch: got {n_cols}, expected {len(expected)}")
+
+
+def calculate_risk_score(face_match: float,
+                         fingerprint_verified: bool,
+                         behavior_anomaly: float) -> float:
+    """
+    Returns probability-like risk score in [0, 1].
+    Falls back to rule-based if model unavailable.
+    """
+    _load_models()
+    feats = np.array([[face_match, float(fingerprint_verified), behavior_anomaly]], dtype=float)
+
+    if _risk_model is None:
+        logger.warning("Risk model unavailable, falling back to rule-based score.")
+        return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
+
     try:
-        return float(risk_model.predict(features)[0])
-    except AttributeError:
-        # Fallback for older model versions
-        return float(risk_model.predict_proba(features)[0][1])
+        _assert_schema(feats.shape[1], _risk_meta)
+        if hasattr(_risk_model, "predict_proba"):
+            return float(_risk_model.predict_proba(feats)[0, 1])
+        # Regressor fallback
+        return float(np.clip(_risk_model.predict(feats)[0], 0.0, 1.0))
+    except Exception as e:
+        logger.exception("Risk model inference failed, fallback to rule: %s", e)
+        return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
 
-def analyze_behavior_anomaly(session):
-    """Analyze behavior anomaly using production ML model"""
-    load_models()  # Ensure models are loaded
-    
-    # Extract features from session object
-    features = np.array([[
-        getattr(session, 'time_anomaly', 0),
-        getattr(session, 'device_anomaly', 0),
-        getattr(session, 'location_anomaly', 0),
+
+def analyze_behavior_anomaly(session) -> float:
+    """
+    Returns behavior anomaly score in [0, 1].
+    Falls back to rule-based if model unavailable.
+    """
+    _load_models()
+    feats = np.array([[
+        getattr(session, 'time_anomaly', 0.0),
+        getattr(session, 'device_anomaly', 0.0),
+        getattr(session, 'location_anomaly', 0.0),
         getattr(session, 'action_entropy', 0.5),
         getattr(session, 'ip_risk', 0.1),
-        getattr(session, 'session_duration', 300)
-    ]])
-    
-    # Handle different model interfaces
+        getattr(session, 'session_duration', 300.0),
+    ]], dtype=float)
+
+    if _behavior_model is None:
+        logger.warning("Behavior model unavailable, using rule fallback.")
+        return _rule_behavior(session)
+
     try:
-        return float(behavior_model.predict(features)[0])
+        _assert_schema(feats.shape[1], _behavior_meta)
+        if hasattr(_behavior_model, "predict_proba"):
+            return float(_behavior_model.predict_proba(feats)[0, 1])
+        # Regressor fallback
+        return float(np.clip(_behavior_model.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
-        logger.warning(f"Behavior prediction exception: {str(e)}")
-        # Fallback to rule-based if model fails
-        return min(1.0, max(0.0, 
-            (session.time_anomaly / 1440 * 0.3) + 
-            (session.device_anomaly * 0.4) + 
-            (session.location_anomaly * 0.3)
-        ))
+        logger.exception("Behavior model inference failed, fallback to rule: %s", e)
+        return _rule_behavior(session)
+
+
+# ---------------- Rule-based fallbacks (keep your existing ones or these) ----------------
+def _rule_risk(face_match, fingerprint_verified, behavior_anomaly):
+    return float(np.clip(
+        0.4 * (1 - face_match) +
+        0.3 * (1 - float(fingerprint_verified)) +
+        0.3 * behavior_anomaly,
+        0.0, 1.0
+    ))
+
+
+def _rule_behavior(session):
+    t = float(getattr(session, 'time_anomaly', 0.0))        # assume already 0..1
+    d = float(getattr(session, 'device_anomaly', 0.0))      # 0/1
+    l = float(getattr(session, 'location_anomaly', 0.0))    # 0..1
+    return float(np.clip(0.3 * t + 0.4 * d + 0.3 * l, 0.0, 1.0))
