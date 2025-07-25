@@ -72,9 +72,15 @@ class FaceAPITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="u1", password="p")
 
-    @patch("requests.get", side_effect=requests.RequestException("fail"))
-    def test_check_face_api_status_unavailable(self, mock_get):
+    @patch("core.face_api.get_face_client")
+    def test_check_face_api_status_unavailable(self, mock_client):
+        mock_client.side_effect = Exception("fail")
         self.assertFalse(check_face_api_status())
+
+    @patch("core.face_api.get_face_client")
+    def test_check_face_api_status_success(self, mock_client):
+        mock_client.return_value.person_group.list.return_value = iter([])
+        self.assertTrue(check_face_api_status())
 
     def test_verify_face_disabled(self):
         with self.settings(FACE_API_ENABLED=False):
