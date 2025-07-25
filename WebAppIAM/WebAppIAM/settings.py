@@ -144,6 +144,7 @@ EMAIL_HOST_USER = 'webappIAM@outlook.com'
 EMAIL_HOST_PASSWORD = 'testcase@123456'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'webappIAM@outlook.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'testcase@123456')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
 # Azure Face API
 AZURE_FACE_API_KEY = os.environ.get('AZURE_FACE_API_KEY',
