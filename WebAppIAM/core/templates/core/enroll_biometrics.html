@@ -399,7 +399,7 @@
         faceDone: {{ face_done|yesno:"true,false" }},
         webauthnDone: {{ webauthn_done|yesno:"true,false" }},
         requireBoth: {{ require_both|yesno:"true,false" }},
-        profileRedirect: "{% url 'core:profile_complete' %}",
+        profileRedirect: "{% url 'core:complete_profile' %}",
     };
 
     const optionsEl = document.getElementById('webauthn-options');
