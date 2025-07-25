@@ -237,6 +237,28 @@
             box-shadow: 0 0 0 3px var(--primary-weak);
         }
 
+        .toggle-visibility {
+            position: absolute;
+            right: 10px;
+            top: 32px;
+            width: 24px;
+            height: 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-dim);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .toggle-visibility svg {
+            width: 20px;
+            height: 20px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
         /* Buttons */
         .btn {
             display: inline-flex;
@@ -624,6 +646,23 @@
     } catch(e){}
     if (location.hash) initial = location.hash.slice(1);
     activate(initial);
+
+    // Show/hide password fields in change password form
+    document.querySelectorAll('form[action*="change_password"] input[type="password"]').forEach(function(input){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'toggle-visibility';
+        btn.setAttribute('aria-label', 'Toggle password visibility');
+        btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+        input.insertAdjacentElement('afterend', btn);
+        btn.addEventListener('click', function(){
+            const visible = input.type === 'text';
+            input.type = visible ? 'password' : 'text';
+            btn.innerHTML = visible
+                ? `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
+                : `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-3.17 4.15M1 1l22 22"></path></svg>`;
+        });
+    });
 })();
 </script>
 </body>
