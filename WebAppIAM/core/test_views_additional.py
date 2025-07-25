@@ -20,6 +20,7 @@ from .views import (
     login,
 )
 from .models import UserBehaviorProfile
+from .face_api import FaceAPIError
 from .health import check_services
 
 User = get_user_model()
@@ -145,6 +146,22 @@ class RegistrationFlowTests(TestCase):
         _ = self.user.has_biometrics
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(mock_enroll.called)
+
+    @patch.object(User, 'has_biometrics', DummyProp())
+    @patch("core.views.generate_registration_options", return_value=SimpleNamespace(challenge="c", to_dict=lambda: {}))
+    @patch("core.views.enroll_face", side_effect=FaceAPIError("down"))
+    @patch("core.views.redirect", return_value=HttpResponse("redir"))
+    @patch("core.views.render", return_value=HttpResponse("ok"))
+    def test_register_biometrics_face_error(self, mock_render, mock_redirect, mock_enroll, mock_opts):
+        file_mock = MagicMock()
+        file_mock.read.return_value = b"x"
+        request = self.factory.post("/", {"face_data": file_mock})
+        request.user = self.user
+        request.session = {}
+        request._messages = MagicMock()
+        resp = register_biometrics(request)
+        self.assertEqual(resp.content, b"redir")
+        self.assertTrue(request._messages.add.called)
 
 class LoginTests(TestCase):
     def setUp(self):

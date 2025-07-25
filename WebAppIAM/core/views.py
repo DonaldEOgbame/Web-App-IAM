@@ -38,7 +38,7 @@ from .webauthn_utils import (
     verify_authentication_response,
     options_to_json,
 )
-from .face_api import verify_face, enroll_face
+from .face_api import verify_face, enroll_face, FaceAPIError
 from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
 from .forms import (
     RegistrationForm, LoginForm, FaceEnrollForm, FingerprintReRegisterForm,
@@ -356,10 +356,14 @@ def register_biometrics(request):
         # Handle biometric registration (face or fingerprint)
         if 'face_data' in request.FILES:
             face_data = request.FILES['face_data'].read()
-            if enroll_face(user, face_data):
-                user.save()
-                request.session['complete_profile_user'] = user.id
-                return redirect('core:complete_profile')
+            try:
+                if enroll_face(user, face_data):
+                    user.save()
+                    request.session['complete_profile_user'] = user.id
+                    return redirect('core:complete_profile')
+            except FaceAPIError as e:
+                messages.error(request, str(e))
+                return redirect('core:register_biometrics')
         
         # Handle WebAuthn registration
         # (existing WebAuthn logic remains the same)

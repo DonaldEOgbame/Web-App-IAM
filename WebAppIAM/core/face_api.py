@@ -1,8 +1,8 @@
 import os
-import requests
 import logging
 import base64
 from django.conf import settings
+from django.core.cache import cache
 from azure.cognitiveservices.vision.face import FaceClient
 from msrest.authentication import CognitiveServicesCredentials
 from .models import AuditLog
@@ -20,21 +20,20 @@ def get_face_client():
     return FaceClient(face_endpoint, credentials)
 
 def check_face_api_status():
-    """Check if the Face API is available"""
+    """Check if the Face API is available."""
     if not settings.FACE_API_ENABLED:
         return False
-        
+
+    if cache.get("face_api_down"):
+        return False
+
     try:
-        # Make a lightweight request to check if the API is up
-        response = requests.get(
-            f"{settings.AZURE_FACE_API_ENDPOINT}/face/v1.0/persongroups/{settings.AZURE_FACE_PERSON_GROUP_ID}",
-            headers={
-                'Ocp-Apim-Subscription-Key': settings.AZURE_FACE_API_KEY
-            },
-            timeout=3  # Short timeout to prevent blocking
-        )
-        return response.status_code < 400
-    except (requests.RequestException, ConnectionError):
+        client = get_face_client()
+        next(client.person_group.list(top=1), None)
+        return True
+    except Exception:
+        logger.exception("Face API health check failed")
+        cache.set("face_api_down", True, 60)
         return False
 
 def enroll_face(user, face_image_data):
@@ -48,9 +47,12 @@ def enroll_face(user, face_image_data):
     Returns:
         Face ID or raises exception
     """
-    # Check if Face API is enabled
-    if not settings.FACE_API_ENABLED:
+    # Check if Face API is enabled and properly configured
+    if not bool(settings.FACE_API_ENABLED):
         raise FaceAPIError("Face API is disabled")
+    if settings.AZURE_FACE_PERSON_GROUP_ID == "your-person-group-id":
+        logger.error("AZURE_FACE_PERSON_GROUP_ID is not configured")
+        raise FaceAPIError("Face API configuration error")
     
     # Check API availability
     if not check_face_api_status():
@@ -76,9 +78,17 @@ def enroll_face(user, face_image_data):
     
     # Detect faces in the image
     face_image_data.seek(0)
-    detected_faces = face_client.face.detect_with_stream(face_image_data)
+    detected_faces = face_client.face.detect_with_stream(
+        face_image_data,
+        return_face_attributes=["liveness"]
+    )
     if not detected_faces:
         raise ValueError("No faces detected in the image")
+    if len(detected_faces) > 1:
+        raise FaceAPIError("Multiple faces detected. Please use a single face image.")
+    liveness = getattr(detected_faces[0].face_attributes, "liveness", None)
+    if liveness is not None and liveness < 0.5:
+        raise FaceAPIError("Liveness detection failed. Please try again.")
 
     # Add face to the person
     face_image_data.seek(0)
@@ -151,13 +161,21 @@ def verify_face(user, face_image_data, use_fallback=True, max_retries=2):
         try:
             # Detect faces in the image
             face_image_data.seek(0)
-            detected_faces = face_client.face.detect_with_stream(face_image_data)
+            detected_faces = face_client.face.detect_with_stream(
+                face_image_data,
+                return_face_attributes=["liveness"]
+            )
             if not detected_faces:
                 if attempt == max_retries:
                     raise ValueError("No faces detected in the image")
                 logger.warning(f"No faces detected in attempt {attempt+1}, retrying...")
                 face_image_data.seek(0)
                 continue
+            if len(detected_faces) > 1:
+                raise FaceAPIError("Multiple faces detected")
+            live = getattr(detected_faces[0].face_attributes, "liveness", None)
+            if live is not None and live < 0.5:
+                raise FaceAPIError("Liveness detection failed")
             
             # Verify against the enrolled face
             verification_result = face_client.face.verify_face_to_person(
