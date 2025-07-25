@@ -15,11 +15,18 @@
     --radius:16px; --shadow:0 12px 32px rgba(0,0,0,.28); --transition:180ms ease;
   }
   *{ box-sizing:border-box; }
-  html,body{ margin:0; min-height:100%; background:var(--bg); color:var(--text);
-    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif; line-height:1.5; }
-  a{ color:var(--primary); text-decoration:none; } a:hover{ text-decoration:underline; }
+  html,body{
+    margin:0; min-height:100%;
+    background:var(--bg); color:var(--text);
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
+    line-height:1.5;
+  }
+  a{ color:var(--primary); text-decoration:none; }
+  a:hover{ text-decoration:underline; }
 
-  .wrap{ min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 16px; }
+  .wrap{
+    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 16px;
+  }
   .card{
     width:100%; max-width:460px; background:var(--surface); border:1px solid var(--border);
     border-radius:var(--radius); box-shadow:var(--shadow); padding:32px 28px; position:relative;
@@ -43,34 +50,39 @@
     color:var(--text); padding:10px 12px; border-radius:10px;
     transition:border var(--transition), box-shadow var(--transition);
   }
-  input:focus{ border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak); outline:none; }
+  input:focus{
+    border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak); outline:none;
+  }
+
+  /* wrapper that hosts the eye button */
+  .password-wrapper{
+    position:relative;
+  }
+  .password-wrapper input{
+    padding-right:44px; /* leave room for the eye button */
+  }
+  .toggle-visibility{
+    position:absolute; top:50%; right:12px; transform:translateY(-50%);
+    width:28px; height:28px; border:none; background:transparent;
+    color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .toggle-visibility:focus{
+    outline:none; box-shadow:0 0 0 3px var(--primary-weak); border-radius:6px;
+  }
+  .toggle-visibility svg{
+    width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2;
+  }
 
   .btn{
     display:inline-flex; align-items:center; justify-content:center; gap:6px;
     padding:12px 16px; border:none; border-radius:10px; background:var(--primary);
     color:#fff; font-weight:600; cursor:pointer; transition:opacity .15s ease, transform .15s ease;
   }
-  .btn:hover{ opacity:.95; } .btn:active{ transform:translateY(1px); }
+  .btn:hover{ opacity:.95; }
+  .btn:active{ transform:translateY(1px); }
   .btn[disabled]{ opacity:.6; cursor:not-allowed; }
   .btn-outline{ background:transparent; color:var(--text); border:1px solid var(--border); }
   .btn-outline:hover{ background:var(--surface-2); }
-
-  .toggle-visibility{
-    position:absolute;
-    right:10px;
-    top:32px;
-    width:24px;height:24px;
-    background:transparent;
-    border:none;
-    color:var(--text-dim);
-    cursor:pointer;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  }
-  .toggle-visibility svg{
-    width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;
-  }
 
   .messages{ list-style:none; margin:0 0 16px; padding:0; }
   .messages li{
@@ -95,7 +107,7 @@
   }
   @keyframes spin{ to{ transform:translateY(-50%) rotate(360deg); } }
 
-  /* --- Biometric Panel (hidden until event-trigger) --- */
+  /* --- Biometric Panel --- */
   .biometric-panel{
     display:none; margin-top:20px; padding:20px; border:1px solid var(--border);
     border-radius:12px; background:var(--surface-2);
@@ -133,7 +145,7 @@
     </ul>
     {% endif %}
 
-    <!-- ============== PASSWORD FIRST (EVENT TRIGGER) ============== -->
+    <!-- PASSWORD-FIRST LOGIN -->
     <form id="loginForm" method="post" action="{% url 'core:login' %}" novalidate>
       {% csrf_token %}
       {{ form.as_p }}
@@ -144,10 +156,11 @@
       <button id="loginBtn" class="btn" type="submit">Login</button>
       <p id="loginStatus" class="status" aria-live="polite"></p>
     </form>
+
     <div class="link"><a href="{% url 'core:password_reset' %}">Forgot password?</a></div>
     <div class="link">Don't have an account? <a href="{% url 'core:register' %}">Register</a></div>
 
-    <!-- ============== BIOMETRICS (SHOWN AFTER PASSWORD OK) ============== -->
+    <!-- BIOMETRICS -->
     <section id="biometricPanel" class="biometric-panel" aria-hidden="true">
       <div class="step-head">
         <h2 style="margin:0;font-size:1.05rem;">Biometric verification required</h2>
@@ -189,15 +202,13 @@
 (function(){
   // ---------- CONFIG (endpoints your backend exposes) ----------
   const ENDPOINTS = {
-    login: "{% url 'core:login' %}",  // should return JSON on AJAX: {status: 'password_ok_biometric_required'|'ok'|'error', face:bool, webauthn:bool, next:'/dashboard'}
+    login: "{% url 'core:login' %}",  // should return JSON on AJAX
     face_verify: "{% url 'core:verify_biometrics' %}",
     webauthn_options: "{% url 'core:webauthn_authentication_options' %}",
     webauthn_verify: "{% url 'core:webauthn_authentication_verify' %}"
   };
 
-  const requireBiometrics = true; // Biometrics NOT optional overall
-  // Choice is optional: server should tell us which modalities user has/enrolled for this session/user
-  // We’ll reveal only those blocks (faceBlock/webauthnBlock)
+  const requireBiometrics = true;
 
   // ---------- CSRF ----------
   function getCookie(name) {
@@ -207,7 +218,7 @@
   }
   const csrftoken = getCookie('csrftoken') || (document.querySelector('input[name=csrfmiddlewaretoken]')?.value ?? '');
 
-  // ---------- Simple helpers ----------
+  // ---------- Helpers ----------
   function setStatus(el, msg, type){
     if(!el) return;
     el.textContent = msg;
@@ -234,25 +245,47 @@
     return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
   }
 
-  // ---------- Show/hide password ----------
-  (function initShowPassword(){
-    const pwdInput = document.querySelector('input[type="password"]');
-    if(!pwdInput) return;
-    const btnToggle = document.createElement('button');
-    btnToggle.type = 'button';
-    btnToggle.className = 'toggle-visibility';
-    btnToggle.setAttribute('aria-label', 'Toggle password visibility');
-    btnToggle.innerHTML = `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-    pwdInput.insertAdjacentElement('afterend', btnToggle);
+  // ---------- Password visibility toggle (FIXED & ROBUST) ----------
+  function initPasswordToggles(){
+    const selectors = 'input[type="password"]';
+    const inputs = Array.from(document.querySelectorAll(selectors));
+    inputs.forEach(input => {
+      // prevent double-wrapping if re-run
+      if (input.dataset.toggleInit === '1') return;
+      input.dataset.toggleInit = '1';
 
-    btnToggle.addEventListener('click', () => {
-      const visible = pwdInput.type === 'text';
-      pwdInput.type = visible ? 'password' : 'text';
-      btnToggle.innerHTML = visible
-        ? `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
-        : `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-3.17 4.15M1 1l22 22"></path></svg>`;
+      // Wrap the input so we can position the eye inside
+      const wrapper = document.createElement('div');
+      wrapper.className = 'password-wrapper';
+      input.parentNode.insertBefore(wrapper, input);
+      wrapper.appendChild(input);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'toggle-visibility';
+      btn.setAttribute('aria-label', 'Toggle password visibility');
+      btn.setAttribute('aria-pressed', 'false');
+      btn.innerHTML = eyeSvg();
+      wrapper.appendChild(btn);
+
+      btn.addEventListener('click', () => {
+        const visible = input.type === 'text';
+        input.type = visible ? 'password' : 'text';
+        btn.setAttribute('aria-pressed', String(!visible));
+        btn.innerHTML = visible ? eyeSvg() : eyeOffSvg();
+        // keep caret at end
+        input.focus();
+        input.selectionStart = input.selectionEnd = input.value.length;
+      });
     });
-  })();
+  }
+
+  function eyeSvg(){
+    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  }
+  function eyeOffSvg(){
+    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94"></path><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-3.17 4.15"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+  }
 
   // ---------- Keystroke dynamics ----------
   (function initKeystrokeDynamics(){
@@ -292,7 +325,6 @@
   const fpButton = document.getElementById('fpButton');
   const fpStatus = document.getElementById('fpStatus');
 
-  // Camera stream handle for cleanup if needed
   let faceStream = null;
 
   async function ajaxLogin(e){
@@ -314,23 +346,19 @@
       const result = await resp.json();
 
       if(result.status === 'ok'){
-        // Password only path (shouldn't happen if biometrics always required, but keep it safe)
         window.location.href = result.next || '/';
         return;
       }
 
       if(result.status === 'password_ok_biometric_required' && requireBiometrics){
         setStatus(loginStatus, 'Password ok. Please complete biometric verification.', 'success');
-        // Show biometrics dynamically, based on what server says this user supports
         if(result.face) initFaceBlock(true);
         if(result.webauthn) initWebAuthnBlock(true);
         activatePanel(biometricPanel);
-        // Hide the password form to declutter
         loginForm.style.display = 'none';
         return;
       }
 
-      // Errors
       setStatus(loginStatus, result.message || 'Login failed', 'error');
 
     }catch(err){
@@ -391,7 +419,6 @@
 
         if(result.status === 'success'){
           setStatus(faceStatus, 'Face verified!', 'success');
-          // Done — redirect
           window.location.href = result.redirect || '/';
         }else{
           setStatus(faceStatus, result.message || 'Face verification failed', 'error');
@@ -434,9 +461,10 @@
 
         options.challenge = b64UrlToBuf(options.challenge);
         if(options.allowCredentials){
-          options.allowCredentials = options.allowCredentials.map(c=>{
-            return {...c, id: b64UrlToBuf(c.id)};
-          });
+          options.allowCredentials = options.allowCredentials.map(c=>({
+            ...c,
+            id: b64UrlToBuf(c.id)
+          }));
         }
 
         // 2) Get credential
@@ -493,6 +521,8 @@
     if(faceStream) faceStream.getTracks().forEach(t => t.stop());
   });
 
+  // INIT
+  initPasswordToggles();
 })();
 </script>
 </body>

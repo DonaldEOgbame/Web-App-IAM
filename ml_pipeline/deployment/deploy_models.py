@@ -9,12 +9,13 @@ from ml_pipeline.validation.validate_models import validate_models
 
 class ModelDeployer:
     def __init__(self):
-        self.base_dir = os.path.dirname(os.path.abspath(__file__))
-        self.trained_dir = os.path.join(self.base_dir, "../../models/trained")
-        self.prod_dir = os.path.join(self.base_dir, "../../models/production")
-        self.archive_dir = os.path.join(self.base_dir, "../../models/archive")
-        self.reports_dir = os.path.join(self.base_dir, "../../validation_reports")
-        
+        # Get project root (three levels up from this file)
+        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        self.trained_dir = os.path.join(self.project_root, "models", "trained")
+        self.prod_dir = os.path.join(self.project_root, "models", "production")
+        self.archive_dir = os.path.join(self.project_root, "models", "archive")
+        self.reports_dir = os.path.join(self.project_root, "validation_reports")
+
         # Create directories if they don't exist
         os.makedirs(self.trained_dir, exist_ok=True)
         os.makedirs(self.prod_dir, exist_ok=True)

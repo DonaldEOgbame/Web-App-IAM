@@ -3,7 +3,7 @@ import pandas as pd
 from scipy.stats import beta, skewnorm
 import os
 
-def generate_risk_data(samples=500000, output_dir="../data"):
+def generate_risk_data(samples=500000, output_dir="data"):
     os.makedirs(output_dir, exist_ok=True)
     
     # Core distributions

@@ -24,7 +24,7 @@ class MarkovDeviceModel:
         self.devices.append(next_dev)
         return next_dev
 
-def generate_behavior_data(users=20000, sessions_per_user=50, output_dir="../data"):
+def generate_behavior_data(users=20000, sessions_per_user=50, output_dir="data"):
     os.makedirs(output_dir, exist_ok=True)
     all_sessions = []
     
