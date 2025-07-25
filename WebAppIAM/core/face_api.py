@@ -3,6 +3,7 @@ import logging
 import base64
 from django.conf import settings
 from django.core.cache import cache
+import time
 from azure.cognitiveservices.vision.face import FaceClient
 from msrest.authentication import CognitiveServicesCredentials
 from .models import AuditLog
@@ -14,26 +15,38 @@ class FaceAPIError(Exception):
     pass
 
 def get_face_client():
+    """Return a FaceClient or raise if settings missing."""
     face_key = settings.AZURE_FACE_API_KEY
     face_endpoint = settings.AZURE_FACE_API_ENDPOINT
+    if settings.AZURE_FACE_PERSON_GROUP_ID in (None, "", "your-person-group-id"):
+        raise FaceAPIError("AZURE_FACE_PERSON_GROUP_ID is not configured")
     credentials = CognitiveServicesCredentials(face_key)
     return FaceClient(face_endpoint, credentials)
+
+def _record_failure():
+    count = cache.get("face_api_failure_count", 0) + 1
+    cache.set("face_api_failure_count", count, 300)
+    if count >= 3:
+        cache.set("face_api_circuit_until", time.time() + 300, 300)
+
 
 def check_face_api_status():
     """Check if the Face API is available."""
     if not settings.FACE_API_ENABLED:
         return False
 
-    if cache.get("face_api_down"):
+    circuit_until = cache.get("face_api_circuit_until")
+    if circuit_until and circuit_until > time.time():
         return False
 
     try:
         client = get_face_client()
         next(client.person_group.list(top=1), None)
+        cache.set("face_api_failure_count", 0, 300)
         return True
     except Exception:
         logger.exception("Face API health check failed")
-        cache.set("face_api_down", True, 60)
+        _record_failure()
         return False
 
 def enroll_face(user, face_image_data):
@@ -47,12 +60,9 @@ def enroll_face(user, face_image_data):
     Returns:
         Face ID or raises exception
     """
-    # Check if Face API is enabled and properly configured
+    # Check if Face API is enabled
     if not bool(settings.FACE_API_ENABLED):
         raise FaceAPIError("Face API is disabled")
-    if settings.AZURE_FACE_PERSON_GROUP_ID == "your-person-group-id":
-        logger.error("AZURE_FACE_PERSON_GROUP_ID is not configured")
-        raise FaceAPIError("Face API configuration error")
     
     # Check API availability
     if not check_face_api_status():
