@@ -16,16 +16,16 @@ ML_MODELS_DIR = getattr(
 )
 
 # Lazy globals
-risk_model = None
+_risk_model = None
 _risk_meta = {}
-behavior_model = None
+_behavior_model = None
 _behavior_meta = {}
 _loaded = False
 _lock = threading.Lock()
 
 
 def _load_models():
-    global _loaded, risk_model, _risk_meta, behavior_model, _behavior_meta
+    global _loaded, _risk_model, _risk_meta, _behavior_model, _behavior_meta
     if _loaded:
         return
     with _lock:
@@ -34,7 +34,7 @@ def _load_models():
         try:
             risk_path = os.path.join(ML_MODELS_DIR, "risk_model.pkl")
             risk_meta_path = os.path.join(ML_MODELS_DIR, "risk_model_meta.json")
-            risk_model = joblib.load(risk_path)
+            _risk_model = joblib.load(risk_path)
             _risk_meta = json.loads(open(risk_meta_path, "r").read())
             logger.info("Loaded risk model v%s", _risk_meta.get("version"))
         except Exception as e:
@@ -43,21 +43,13 @@ def _load_models():
         try:
             behavior_path = os.path.join(ML_MODELS_DIR, "behavior_model.pkl")
             behavior_meta_path = os.path.join(ML_MODELS_DIR, "behavior_model_meta.json")
-            behavior_model = joblib.load(behavior_path)
+            _behavior_model = joblib.load(behavior_path)
             _behavior_meta = json.loads(open(behavior_meta_path, "r").read())
             logger.info("Loaded behavior model v%s", _behavior_meta.get("version"))
         except Exception as e:
             logger.error("Behavior model loading failed: %s", e)
 
         _loaded = True
-
-
-def load_models():
-    """Public helper to load models or raise if unavailable."""
-    _load_models()
-    if risk_model is None or behavior_model is None:
-        raise RuntimeError("ML models not loaded")
-    return risk_model, behavior_model
 
 
 def _assert_schema(n_cols: int, meta: dict):
@@ -79,16 +71,16 @@ def calculate_risk_score(face_match: float,
     _load_models()
     feats = np.array([[face_match, float(fingerprint_verified), behavior_anomaly]], dtype=float)
 
-    if risk_model is None:
+    if _risk_model is None:
         logger.warning("Risk model unavailable, falling back to rule-based score.")
         return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
 
     try:
         _assert_schema(feats.shape[1], _risk_meta)
-        if hasattr(risk_model, "predict_proba"):
-            return float(risk_model.predict_proba(feats)[0, 1])
+        if hasattr(_risk_model, "predict_proba"):
+            return float(_risk_model.predict_proba(feats)[0, 1])
         # Regressor fallback
-        return float(np.clip(risk_model.predict(feats)[0], 0.0, 1.0))
+        return float(np.clip(_risk_model.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
         logger.exception("Risk model inference failed, fallback to rule: %s", e)
         return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
@@ -109,16 +101,16 @@ def analyze_behavior_anomaly(session) -> float:
         getattr(session, 'session_duration', 300.0),
     ]], dtype=float)
 
-    if behavior_model is None:
+    if _behavior_model is None:
         logger.warning("Behavior model unavailable, using rule fallback.")
         return _rule_behavior(session)
 
     try:
         _assert_schema(feats.shape[1], _behavior_meta)
-        if hasattr(behavior_model, "predict_proba"):
-            return float(behavior_model.predict_proba(feats)[0, 1])
+        if hasattr(_behavior_model, "predict_proba"):
+            return float(_behavior_model.predict_proba(feats)[0, 1])
         # Regressor fallback
-        return float(np.clip(behavior_model.predict(feats)[0], 0.0, 1.0))
+        return float(np.clip(_behavior_model.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
         logger.exception("Behavior model inference failed, fallback to rule: %s", e)
         return _rule_behavior(session)
