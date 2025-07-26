@@ -147,15 +147,26 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'webappIAM@outlook.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'thenewpasswordisgreat!@##')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
-# Azure Face API
-AZURE_FACE_API_KEY = os.environ.get('AZURE_FACE_API_KEY',
-                                    'FFveXtbSQaaGJWRS5Mxj93MF02EQromA5BC77OjHCdbHMxgawg0OJQQJ99BGACYeBjFXJ3w3AAAKACOGqsqC')
-AZURE_FACE_API_KEY_SECONDARY = os.environ.get('AZURE_FACE_API_KEY_SECONDARY',
-                                              '5DcKp6aLK3sAp4wsBPcqEgFrfP3dxecrYiNB5Gzrr12vBlWwunfMJQQJ99BGACYeBjFXJ3w3AAAKACOGjSzE')
-AZURE_FACE_API_LOCATION = os.environ.get('AZURE_FACE_API_LOCATION', 'eastus')
-AZURE_FACE_API_ENDPOINT = os.environ.get('AZURE_FACE_API_ENDPOINT',
-                                         'https://facin-api-test.cognitiveservices.azure.com/')
-AZURE_FACE_PERSON_GROUP_ID = 'webappiam-default'
+# CompreFace
+FACE_API_ENABLED = True
+COMPRESPACE_API_BASE = "http://localhost:8000/api"   # or your deployed base
+COMPRESPACE_API_KEY = "ccc58c39-b114-4986-ad02-ab9fedc6c816"
+
+# Tuning (optional)
+COMPRESPACE_DET_PROB_THRESHOLD = 0.85
+COMPRESPACE_RECOGNITION_THRESHOLD = 0.75
+
+# Video enrollment
+ENROLL_VIDEO_ENABLED = True
+ENROLL_VIDEO_SAMPLE_FPS = 3.0
+ENROLL_VIDEO_MAX_FRAMES = 30
+ENROLL_VIDEO_TOP_K = 5
+ENROLL_FACE_MIN_SIDE = 180
+ENROLL_SHARPNESS_MIN = 80.0
+
+# Timeouts
+REQUEST_TIMEOUT_HEALTH = 5
+REQUEST_TIMEOUT_OPS = 15
 
 # WebAuthn Configuration
 # Defaults provide sensible values for local development but can be overridden

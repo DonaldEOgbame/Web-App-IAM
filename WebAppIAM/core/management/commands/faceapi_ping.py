@@ -1,18 +1,21 @@
 from django.core.management.base import BaseCommand
-from core.face_api import get_face_client
 import logging
+from core.face_api import check_face_api_status
 
 logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
-    help = "Check connectivity to the Azure Face API"
+    help = "Check connectivity to the Face service (CompreFace)"
 
     def handle(self, *args, **options):
         try:
-            client = get_face_client()
-            next(client.person_group.list(top=1), None)
-            self.stdout.write(self.style.SUCCESS("Face API reachable"))
+            ok = check_face_api_status()
+            if ok:
+                self.stdout.write(self.style.SUCCESS("CompreFace reachable"))
+                return 0
+            self.stderr.write(self.style.ERROR("CompreFace is not reachable"))
+            return 1
         except Exception as e:
-            logger.exception("Face API ping failed")
-            self.stderr.write(self.style.ERROR(f"Face API check failed: {e}"))
+            logger.exception("Face service ping failed")
+            self.stderr.write(self.style.ERROR(f"Face service check failed: {e}"))
             return 1
