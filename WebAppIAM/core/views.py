@@ -38,6 +38,7 @@ from .webauthn_utils import (
     verify_authentication_response,
     options_to_json,
 )
+from webauthn.helpers import bytes_to_base64url, base64url_to_bytes
 from .face_api import verify_face, enroll_face, FaceAPIError
 from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
 from .forms import (
@@ -392,7 +393,9 @@ def webauthn_registration_options(request):
     if not user:
         return JsonResponse({'error': 'Authentication required'}, status=403)
     options = generate_registration_options(user)
-    request.session['webauthn_registration_challenge'] = options.challenge
+    request.session['webauthn_registration_challenge'] = bytes_to_base64url(
+        options.challenge
+    )
     return JsonResponse(json.loads(options_to_json(options)))
 
 def webauthn_registration_verify(request):
@@ -404,6 +407,8 @@ def webauthn_registration_verify(request):
         return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
     data = json.loads(request.body)
     challenge = request.session.get('webauthn_registration_challenge')
+    if isinstance(challenge, str):
+        challenge = base64url_to_bytes(challenge)
     
     try:
         credential = verify_registration_response(user, data, challenge)
@@ -633,7 +638,9 @@ def webauthn_authentication_options(request):
     
     user = User.objects.get(id=user_id)
     options = generate_authentication_options(user)
-    request.session['webauthn_authentication_challenge'] = options.challenge
+    request.session['webauthn_authentication_challenge'] = bytes_to_base64url(
+        options.challenge
+    )
     return JsonResponse(json.loads(options_to_json(options)))
 
 @csrf_exempt
@@ -651,6 +658,8 @@ def webauthn_authentication_verify(request):
     session = UserSession.objects.get(id=session_id)
     data = json.loads(request.body)
     challenge = request.session.get('webauthn_authentication_challenge')
+    if isinstance(challenge, str):
+        challenge = base64url_to_bytes(challenge)
     
     try:
         credential = verify_authentication_response(user, data, challenge)
