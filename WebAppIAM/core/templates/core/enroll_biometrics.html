@@ -391,6 +391,7 @@ window.addEventListener('beforeunload', stopCamera);
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopCamera(); });
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
   // ---------- Diagnostics ----------
   async function runDiagnostics(){
     setBadge(els.overall, 'pulse', 'Diagnostics running…');
@@ -685,6 +686,8 @@ document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopCame
         els.passkeyCard.classList.remove('disabled');
       }
 =======
+=======
+>>>>>>> Stashed changes
 /* ---------- Passkey (WebAuthn) ---------- */
 function readInlineOptions(){
   const el = document.getElementById('webauthn-options');
@@ -706,6 +709,9 @@ function normalizePublicKey(options){
       authenticatorAttachment: pk.authenticatorSelection?.authenticatorAttachment || 'platform',
       residentKey: pk.authenticatorSelection?.residentKey || 'preferred',
       requireResidentKey: pk.authenticatorSelection?.requireResidentKey || false
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     }
   };
