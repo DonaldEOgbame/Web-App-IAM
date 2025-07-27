@@ -60,6 +60,31 @@ def _reset_failures():
 
 
 # ==============================
+# Client helper (compatibility)
+# ==============================
+def get_face_client():
+    """Return a minimal client compatible with older tests."""
+
+    class _PersonGroup:
+        def list(self):
+            # Use the CompreFace health endpoint as a lightweight check
+            r = requests.get(
+                f"{COMPRE_BASE}/v1/management/health",
+                headers=_headers(),
+                timeout=REQ_TIMEOUT_HEALTH,
+            )
+            if r.status_code >= 500:
+                raise FaceAPIError(f"Health check failed: {r.status_code}")
+            return []
+
+    class _Client:
+        def __init__(self):
+            self.person_group = _PersonGroup()
+
+    return _Client()
+
+
+# ==============================
 # CompreFace low-level helpers
 # ==============================
 def _headers() -> dict:
@@ -95,15 +120,12 @@ def check_face_api_status() -> bool:
         return False
 
     try:
-        ok = _compreface_health_ok()
-        if ok:
-            _reset_failures()
-            return True
-        logger.warning("CompreFace health check failed")
-        _record_failure()
-        return False
+        client = get_face_client()
+        client.person_group.list()
+        _reset_failures()
+        return True
     except Exception:
-        logger.exception("CompreFace health check exception")
+        logger.exception("CompreFace health check failed")
         _record_failure()
         return False
 

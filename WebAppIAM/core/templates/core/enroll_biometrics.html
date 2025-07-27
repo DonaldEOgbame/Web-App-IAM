@@ -911,14 +911,18 @@
       const ct = res.headers.get('content-type') || '';
       if (ct.includes('application/json')) {
         const j = await res.json();
-        if (j.status && (j.status==='ok' || j.status==='success')) {
-          faceState.done = true;
-          setBadge(els.faceStatus, 'success', 'Completed');
-          refreshOverall();
-          toast('Face enrolled successfully!', 'success');
-        } else {
-          throw new Error(j.message || 'Server returned error');
-        }
+          if (j.status && (j.status==='ok' || j.status==='success')) {
+            faceState.done = true;
+            setBadge(els.faceStatus, 'success', 'Completed');
+            refreshOverall();
+            if (j.redirect) {
+              window.location.href = j.redirect;
+              return;
+            }
+            toast('Face enrolled successfully!', 'success');
+          } else {
+            throw new Error(j.message || 'Server returned error');
+          }
       } else {
         // Treat plain 2xx as success (view re-render)
         faceState.done = true;
@@ -1009,7 +1013,11 @@
         passkeyState.done = true;
         setBadge(els.passkeyStatus, 'success', 'Completed');
         refreshOverall();
-        toast('Passkey enrolled successfully!', 'success');
+        if (res.redirect) {
+          window.location.href = res.redirect;
+        } else {
+          toast('Passkey enrolled successfully!', 'success');
+        }
       }catch(err){
         console.error(err);
         const msg = (err && err.name === 'NotAllowedError')
