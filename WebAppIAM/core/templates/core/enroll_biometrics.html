@@ -971,6 +971,9 @@
         setSpinner(els.passkeyStatus, 'Requesting options...');
 
         const options = await passkey.options();
+        if (!options || !options.publicKey || !options.publicKey.challenge) {
+          throw new Error(options?.error || 'Invalid server response');
+        }
 
         const publicKey = {
           ...options.publicKey,
