@@ -458,6 +458,11 @@
           headers:{'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'}
         });
         const options = await optResp.json();
+        if (!options || !options.challenge) {
+          setStatus(fpStatus, options?.message || 'Invalid server response', 'error');
+          fpButton.classList.remove('submitting');
+          return;
+        }
 
         options.challenge = b64UrlToBuf(options.challenge);
         if(options.allowCredentials){
