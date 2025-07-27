@@ -238,8 +238,10 @@ def create_new_device_notification(user, session, device_info):
 
 # --- Helper functions ---
 def is_admin(user):
-    """Check if the user is an administrator"""
-    return user.is_staff and user.is_superuser
+    """Check if the user is an administrator."""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    return user.is_superuser or getattr(user, "role", None) == "ADMIN"
 
 # --- Security Logging ---
 def log_security_event(request, event_type, details, success=False):

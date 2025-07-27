@@ -33,9 +33,9 @@ urlpatterns = [
     path('admin/dashboard/', views.admin_dashboard, name='admin_dashboard'),
 
     # Admin Management URLs
-    path('admin/users/activate/<int:user_id>/', views.activate_user, name='activate_user'),
-    path('admin/users/lock/<int:user_id>/', views.lock_user, name='lock_user'),
-    path('admin/users/unlock/<int:user_id>/', views.unlock_user, name='unlock_user'),
+    path('admin/users/activate/<int:user_id>/', views.activate_user, name='admin_activate_user'),
+    path('admin/users/lock/<int:user_id>/', views.lock_user, name='admin_lock_user'),
+    path('admin/users/unlock/<int:user_id>/', views.unlock_user, name='admin_unlock_user'),
 
 
     # Profile Management
