@@ -24,6 +24,10 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 import base64
+from webauthn import verify_registration_response as lib_verify_registration_response
+from webauthn.helpers.structs import RegistrationCredential, AuthenticatorAttestationResponse
+from webauthn.helpers.exceptions import InvalidRegistrationResponse
+from webauthn.helpers import bytes_to_base64url, base64url_to_bytes
 import os
 
 from .models import (
@@ -34,7 +38,7 @@ from .models import (
 from .models_keystroke import KeystrokeDynamics
 from .webauthn_utils import (
     generate_registration_options,
-    verify_registration_response,
+    # verify_registration_response,  # ⛔️ not used for registration verify anymore (we use library directly)
     generate_authentication_options,
     verify_authentication_response,
     options_to_json,
@@ -47,6 +51,11 @@ from .forms import (
     RiskPolicyForm, ReportSubmissionForm, CustomPasswordChangeForm,
     DocumentUploadForm, ProfileCompletionForm, ProfileUpdateForm, PasswordResetForm, PasswordResetConfirmForm
 )
+
+# ✅ Official py-webauthn (v2.6.0) imports for registration verify
+from webauthn import verify_registration_response as lib_verify_registration_response
+from webauthn.helpers.structs import RegistrationCredential
+from webauthn.helpers.exceptions import InvalidRegistrationResponse
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +164,6 @@ def notify_admin(subject, context):
 
 def create_new_device_notification(user, session, device_info):
     """Create notification for new device login"""
-    # Create or update device fingerprint
     import hashlib
     device_hash = hashlib.sha256(
         f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
@@ -407,6 +415,21 @@ def webauthn_registration_options(request):
     )
     return JsonResponse(json.loads(options_to_json(options)))
 
+def _expected_origin(request):
+    origin = getattr(settings, "WEBAUTHN_ORIGIN", "").strip()
+    if origin:
+        return origin
+    scheme = "https" if request.is_secure() else "http"
+    return f"{scheme}://{request.get_host()}"
+
+def _expected_rp_id(request):
+    rp_id = getattr(settings, "WEBAUTHN_RP_ID", "").strip()
+    if rp_id:
+        return rp_id
+    # Fallback to host (strip port)
+    host = request.get_host().split(":")[0]
+    return host
+
 def webauthn_registration_verify(request):
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
@@ -414,35 +437,86 @@ def webauthn_registration_verify(request):
     user = get_registration_user(request)
     if not user:
         return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
-    data = json.loads(request.body)
-    challenge = request.session.get('webauthn_registration_challenge')
-    if isinstance(challenge, str):
-        challenge = base64url_to_bytes(challenge)
-    
+
+    # Retrieve expected challenge (stored as base64url)
+    challenge_b64u = request.session.get('webauthn_registration_challenge')
+    if not challenge_b64u:
+        return JsonResponse({'status': 'error', 'message': 'Challenge missing or expired'}, status=400)
     try:
-        credential = verify_registration_response(user, data, challenge)
+        expected_challenge = base64url_to_bytes(challenge_b64u)
+    except Exception:
+        return JsonResponse({'status': 'error', 'message': 'Invalid stored challenge'}, status=400)
+
+    # Parse client payload
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Invalid JSON: {e}'}, status=400)
+
+    # Build RegistrationCredential (NO client_extension_results arg in 2.6.0)
+    try:
+        cred = RegistrationCredential(
+            id=data["id"],
+            raw_id=base64url_to_bytes(data["rawId"]),
+            type=data.get("type", "public-key"),
+            response=AuthenticatorAttestationResponse(
+                client_data_json=base64url_to_bytes(data["response"]["clientDataJSON"]),
+                attestation_object=base64url_to_bytes(data["response"]["attestationObject"]),
+                transports=data.get("response", {}).get("transports", []),
+            ),
+        )
+    except KeyError as e:
+        return JsonResponse({'status': 'error', 'message': f'Missing field: {e}'}, status=400)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'Invalid credential payload: {e}'}, status=400)
+
+    expected_origin = _expected_origin(request)
+    expected_rp_id = _expected_rp_id(request)
+
+    # Verify with py-webauthn
+    try:
+        verification = lib_verify_registration_response(
+            credential=cred,
+            expected_challenge=expected_challenge,
+            expected_rp_id=expected_rp_id,
+            expected_origin=expected_origin,
+            require_user_verification=True,
+        )
+    except InvalidRegistrationResponse as e:
+        logger.warning("WebAuthn registration verify failed: %s", e)
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    except Exception as e:
+        logger.exception("Unexpected WebAuthn registration error")
+        return JsonResponse({'status': 'error', 'message': 'Verification failed'}, status=400)
+
+    # Persist as base64url (your model uses TextField)
+    try:
+        cred_id_b64u = bytes_to_base64url(verification.credential_id)
+        pubkey_b64u = bytes_to_base64url(verification.credential_public_key)
+        sign_count = int(getattr(verification, "sign_count", 0) or 0)
+
         WebAuthnCredential.objects.create(
             user=user,
-            credential_id=credential.credential_id,
-            public_key=credential.public_key,
+            credential_id=cred_id_b64u,
+            public_key=pubkey_b64u,
+            sign_count=sign_count,
+            last_used_at=timezone.now(),
         )
-        # Fix: Sync enrollment status properly - no need for separate fields
-        # The has_biometrics property already checks for WebAuthn credentials
-        user.save()
-        
-        AuditLog.objects.create(
-            user=user,
-            action='FINGERPRINT_ENROLL',
-            details='Fingerprint enrolled',
-            ip_address=get_client_ip(request)
-        )
-        
-        request.session['complete_profile_user'] = user.id
-        return JsonResponse({'status': 'success', 'redirect': reverse('core:complete_profile')})
-    except Exception as e:
-        logger.error(f"WebAuthn registration failed: {str(e)}")
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    except Exception:
+        logger.exception("Failed to persist WebAuthn credential")
+        return JsonResponse({'status': 'error', 'message': 'Could not save credential'}, status=500)
 
+    request.session['complete_profile_user'] = user.id
+    request.session.pop('webauthn_registration_challenge', None)
+
+    AuditLog.objects.create(
+        user=user,
+        action='FINGERPRINT_ENROLL',
+        details='Fingerprint enrolled',
+        ip_address=get_client_ip(request)
+    )
+
+    return JsonResponse({'status': 'success', 'redirect': reverse('core:complete_profile')})
 # --- Authentication Views ---
 def login(request):
     """User login view with rate limiting and security checks"""

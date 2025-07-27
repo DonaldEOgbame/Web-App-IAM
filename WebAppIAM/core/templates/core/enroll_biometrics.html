@@ -14,13 +14,9 @@
     --success: #22c55e; --warning: #fbbf24; --danger: #ef4444;
     --radius: 16px; --shadow: 0 12px 32px rgba(0, 0, 0, 0.28); --transition: 180ms ease;
   }
-  
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-  
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
   html, body {
     height: 100%;
     background: var(--bg);
@@ -29,499 +25,108 @@
     overflow-x: hidden;
     position: relative;
   }
-  
+
   /* Animated background particles */
-  #particles {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    z-index: 0;
-    pointer-events: none;
-  }
-  
-  .particle {
-    position: absolute;
-    border-radius: 50%;
-    background: var(--primary);
-    opacity: 0.1;
-    animation: float 20s infinite linear;
-  }
-  
-  @keyframes float {
-    0% { transform: translateY(0) translateX(0); }
-    50% { transform: translateY(-50px) translateX(20px); }
-    100% { transform: translateY(0) translateX(0); }
-  }
-  
-  .page {
-    max-width: 980px;
-    margin: 24px auto;
-    padding: 0 16px;
-    position: relative;
-    z-index: 10;
-  }
-  
+  #particles { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+  .particle { position: absolute; border-radius: 50%; background: var(--primary); opacity: 0.1; animation: float 20s infinite linear; }
+  @keyframes float { 0%{transform:translate(0,0)} 50%{transform:translate(20px,-50px)} 100%{transform:translate(0,0)} }
+
+  .page { max-width: 980px; margin: 24px auto; padding: 0 16px; position: relative; z-index: 10; }
+
   .header {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    margin: 8px 0 24px;
-    animation: fadeIn 0.8s ease-out;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    margin: 8px 0 24px; animation: fadeIn 0.8s ease-out;
   }
-  
   .title {
-    font-size: clamp(24px, 2.5vw, 32px);
-    font-weight: 700;
+    font-size: clamp(24px, 2.5vw, 32px); font-weight: 700;
     background: linear-gradient(to right, #8b5cf6, #6366f1);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    margin-bottom: 6px;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px;
   }
-  
-  .subtitle {
-    color: var(--text-dim);
-    font-size: 15px;
-    font-weight: 400;
-    max-width: 600px;
-  }
-  
-  .grid {
-    position: relative;
-    z-index: 1;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 24px;
-    margin-top: 20px;
-  }
-  
-  @media (max-width: 860px) {
-    .grid {
-      grid-template-columns: 1fr;
-    }
-  }
-  
-  .factor-card {
+  .subtitle { color: var(--text-dim); font-size: 15px; max-width: 600px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 20px; }
+  @media (max-width: 860px){ .grid{ grid-template-columns: 1fr; } }
+
+  .factor-card{
     background: linear-gradient(180deg, var(--surface), var(--surface-2));
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow);
-    padding: 22px;
-    cursor: pointer;
-    position: relative;
-    transition: transform var(--transition), border-color var(--transition), background var(--transition);
-    overflow: hidden;
-    transform-style: preserve-3d;
-    perspective: 1000px;
-    animation: cardAppear 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 22px; cursor: pointer; position: relative; transition: transform var(--transition), border-color var(--transition), background var(--transition);
+    overflow: hidden; transform-style: preserve-3d; perspective: 1000px; animation: cardAppear .6s cubic-bezier(.175,.885,.32,1.275);
   }
-  
-  .factor-card:nth-child(1) { animation-delay: 0.1s; }
-  .factor-card:nth-child(2) { animation-delay: 0.2s; }
-  
-  @keyframes cardAppear {
-    0% { opacity: 0; transform: translateY(30px) rotateX(10deg); }
-    100% { opacity: 1; transform: translateY(0) rotateX(0); }
+  .factor-card:nth-child(1){ animation-delay: .1s; }
+  .factor-card:nth-child(2){ animation-delay: .2s; }
+  @keyframes cardAppear{ 0%{opacity:0; transform: translateY(30px) rotateX(10deg)} 100%{opacity:1; transform: translateY(0) rotateX(0)} }
+  .factor-card::before{ content:""; position:absolute; inset:0; background:linear-gradient(120deg, rgba(139,92,246,.1), transparent 70%); opacity:0; transition:.3s; pointer-events:none; z-index:-1; }
+  .factor-card:hover{ transform: translateY(-6px) scale(1.02) rotateX(1deg); border-color:#3a4150; box-shadow:0 20px 40px rgba(0,0,0,.35); }
+  .factor-card:hover::before{ opacity:1; }
+  .factor-card.disabled{ opacity:.7; cursor:not-allowed; transform:none !important; }
+
+  .factor-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:16px; }
+  .factor-title{ font-weight:600; font-size:18px; }
+  .muted{ color:var(--text-dim); font-size:14px; margin-top:8px; line-height:1.5; }
+
+  .badge{
+    display:inline-flex; align-items:center; gap:8px; font-size:13px; padding:8px 14px; border-radius:999px;
+    border:1px solid var(--border); background:var(--surface-2); color:var(--text-dim); transition:.3s;
   }
-  
-  .factor-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(120deg, rgba(139, 92, 246, 0.1), transparent 70%);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    z-index: -1;
+  .badge .dot{ width:10px; height:10px; border-radius:999px; background:#6b7280; transition:.3s; }
+  .badge.success .dot{ background:var(--success); box-shadow:0 0 8px rgba(34,197,94,.4); }
+  .badge.warn .dot{ background:var(--warning); box-shadow:0 0 8px rgba(251,191,36,.4); }
+  .badge.danger .dot{ background:var(--danger); box-shadow:0 0 8px rgba(239,68,68,.4); }
+  .badge.pulse .dot{ animation:pulse 1.5s infinite; }
+  @keyframes pulse{ 0%{transform:scale(1);opacity:1} 50%{transform:scale(1.2);opacity:.7} 100%{transform:scale(1);opacity:1} }
+
+  .footer{ margin-top:30px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; position:relative; z-index:1; }
+  .btn{ border:1px solid var(--border); background:var(--surface-2); color:var(--text); padding:12px 24px; border-radius:12px; cursor:pointer; transition:.3s; font-weight:500; display:inline-flex; align-items:center; gap:8px; font-size:15px; }
+  .btn:hover{ transform: translateY(-3px); border-color:#3a4150; box-shadow:0 8px 20px rgba(0,0,0,.2); }
+  .btn-primary{ background:linear-gradient(to right,#8b5cf6,#6366f1); border-color:transparent; color:#fff; font-weight:600; box-shadow:0 4px 15px rgba(139,92,246,.3); }
+  .btn-primary:hover{ transform: translateY(-3px); box-shadow:0 8px 25px rgba(139,92,246,.4); }
+  .btn-primary[disabled]{ opacity:.6; cursor:not-allowed; transform:none !important; box-shadow:none; }
+
+  .overall{ display:flex; align-items:center; gap:10px; }
+  .info{
+    background: rgba(139, 92, 246, .12); border:1px solid rgba(139,92,246,.35); color:#d7c9ff;
+    padding:14px; border-radius:var(--radius); font-size:14px; margin-top:24px; line-height:1.6; animation: fadeIn .8s ease-out .3s both;
   }
-  
-  .factor-card:hover {
-    transform: translateY(-6px) scale(1.02) rotateX(1deg);
-    border-color: #3a4150;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+
+  /* Face modal */
+  .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.7); backdrop-filter: blur(8px); z-index:100; opacity:0; transition:opacity .3s; }
+  .modal.open{ display:flex; opacity:1; animation: fadeIn .3s ease; }
+  .modal-card{ width:min(680px,92vw); background:var(--surface); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); padding:20px; position:relative; transform:scale(.95); transition: transform .3s; }
+  .modal.open .modal-card{ transform:scale(1); }
+  .modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .modal-title{ font-size:20px; font-weight:600; }
+  .video-wrap{ position:relative; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#0b0d12; }
+  video, canvas { width:100%; aspect-ratio:4/3; display:block; }
+  .overlay-text{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: clamp(32px,6vw,48px);
+    color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.6); pointer-events:none; transition:.3s;
   }
-  
-  .factor-card:hover::before {
-    opacity: 1;
+  .overlay-sub{
+    position:absolute; left:50%; transform:translateX(-50%); bottom:14px; font-size:14px; color:#d1d5db; background:rgba(0,0,0,.35);
+    padding:8px 16px; border-radius:999px; border:1px solid rgba(255,255,255,.15); backdrop-filter: blur(4px); z-index:5;
   }
-  
-  .factor-card.disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-    transform: none !important;
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+  .progress-ring{ position:absolute; top:50%; left:50%; transform: translate(-50%,-50%); width:120px; height:120px; z-index:4; }
+  .progress-circle{
+    fill:none; stroke:var(--primary); stroke-width:6; stroke-dasharray:339.292; stroke-dashoffset:339.292; stroke-linecap:round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 1s linear;
   }
-  
-  .factor-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-  
-  .factor-title {
-    font-weight: 600;
-    font-size: 18px;
-  }
-  
-  .muted {
-    color: var(--text-dim);
-    font-size: 14px;
-    margin-top: 8px;
-    line-height: 1.5;
-  }
-  
-  .badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    padding: 8px 14px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text-dim);
-    transition: all 0.3s ease;
-  }
-  
-  .badge .dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 999px;
-    background: #6b7280;
-    transition: all 0.3s ease;
-  }
-  
-  .badge.success .dot {
-    background: var(--success);
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-  }
-  
-  .badge.warn .dot {
-    background: var(--warning);
-    box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
-  }
-  
-  .badge.danger .dot {
-    background: var(--danger);
-    box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
-  }
-  
-  .badge.pulse .dot {
-    animation: pulse 1.5s infinite;
-  }
-  
-  @keyframes pulse {
-    0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.2); opacity: 0.7; }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  
-  .footer {
-    margin-top: 30px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
-    position: relative;
-    z-index: 1;
-  }
-  
-  .btn {
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    color: var(--text);
-    padding: 12px 24px;
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-weight: 500;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 15px;
-  }
-  
-  .btn:hover {
-    transform: translateY(-3px);
-    border-color: #3a4150;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-  }
-  
-  .btn-primary {
-    background: linear-gradient(to right, #8b5cf6, #6366f1);
-    border-color: transparent;
-    color: white;
-    font-weight: 600;
-    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);
-  }
-  
-  .btn-primary:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 25px rgba(139, 92, 246, 0.4);
-  }
-  
-  .btn-primary[disabled] {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none !important;
-    box-shadow: none;
-  }
-  
-  .overall {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .info {
-    position: relative;
-    z-index: 1;
-    background: rgba(139, 92, 246, 0.12);
-    border: 1px solid rgba(139, 92, 246, 0.35);
-    color: #d7c9ff;
-    padding: 14px;
-    border-radius: var(--radius);
-    font-size: 14px;
-    margin-top: 24px;
-    line-height: 1.6;
-    animation: fadeIn 0.8s ease-out 0.3s both;
-  }
-  
-  /* Diagnostics button style */
-  #overall-badge.btn-like {
-    cursor: pointer;
-    user-select: none;
-    transition: all 0.3s ease;
-  }
-  
-  #overall-badge.btn-like:hover {
-    border-color: #3a4150;
-    transform: translateY(-2px);
-  }
-  
-  /* Face overlay modal */
-  .modal {
-    position: fixed;
-    inset: 0;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    z-index: 100;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-  }
-  
-  .modal.open {
-    display: flex;
-    opacity: 1;
-    animation: fadeIn 0.3s ease;
-  }
-  
-  .modal-card {
-    width: min(680px, 92vw);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    box-shadow: var(--shadow);
-    padding: 20px;
-    position: relative;
-    transform: scale(0.95);
-    transition: transform 0.3s ease;
-  }
-  
-  .modal.open .modal-card {
-    transform: scale(1);
-  }
-  
-  .modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-  }
-  
-  .modal-title {
-    font-size: 20px;
-    font-weight: 600;
-  }
-  
-  .video-wrap {
-    position: relative;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-    background: #0b0d12;
-  }
-  
-  video, canvas {
-    width: 100%;
-    aspect-ratio: 4/3;
-    display: block;
-  }
-  
-  .overlay-text {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 700;
-    font-size: clamp(32px, 6vw, 48px);
-    color: #fff;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-    pointer-events: none;
-    transition: all 0.3s ease;
-  }
-  
-  .overlay-sub {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    bottom: 14px;
-    font-size: 14px;
-    color: #d1d5db;
-    background: rgba(0, 0, 0, 0.35);
-    padding: 8px 16px;
-    border-radius: 999px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(4px);
-    z-index: 5;
-  }
-  
-  .modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 16px;
-  }
-  
-  .progress-ring {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 120px;
-    height: 120px;
-    z-index: 4;
-  }
-  
-  .progress-circle {
-    fill: none;
-    stroke: var(--primary);
-    stroke-width: 6;
-    stroke-dasharray: 339.292;
-    stroke-dashoffset: 339.292;
-    stroke-linecap: round;
-    transform: rotate(-90deg);
-    transform-origin: 50% 50%;
-    transition: stroke-dashoffset 1s linear;
-  }
-  
-  .sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    white-space: nowrap;
-    border: 0;
-  }
-  
-  /* toast notifications */
-  #toast {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    z-index: 200;
-    width: 320px;
-  }
-  
-  .toast {
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    padding: 14px 16px;
-    border-radius: 12px;
-    color: var(--text);
-    box-shadow: var(--shadow);
-    font-size: 14px;
-    transform: translateX(120%);
-    opacity: 0;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  
-  .toast.show {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  
-  .toast-icon {
-    width: 24px;
-    height: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-  
-  .toast.success .toast-icon {
-    background: rgba(34, 197, 94, 0.15);
-    color: var(--success);
-  }
-  
-  .toast.warn .toast-icon {
-    background: rgba(251, 191, 36, 0.15);
-    color: var(--warning);
-  }
-  
-  .toast.danger .toast-icon {
-    background: rgba(239, 68, 68, 0.15);
-    color: var(--danger);
-  }
-  
-  .toast.info .toast-icon {
-    background: rgba(139, 92, 246, 0.15);
-    color: var(--primary);
-  }
-  
-  .spinner {
-    width: 18px;
-    height: 18px;
-    border: 3px solid rgba(139, 92, 246, 0.3);
-    border-radius: 50%;
-    border-top: 3px solid var(--primary);
-    animation: spin 1s linear infinite;
-    display: inline-block;
-  }
-  
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-  
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
+
+  .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+
+  /* toasts */
+  #toast{ position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:200; width:320px; }
+  .toast{ background:var(--surface-2); border:1px solid var(--border); padding:14px 16px; border-radius:12px; color:var(--text); box-shadow:var(--shadow); font-size:14px; transform: translateX(120%); opacity:0; transition: all .4s cubic-bezier(.175,.885,.32,1.275); display:flex; align-items:center; gap:12px; }
+  .toast.show{ transform: translateX(0); opacity:1; }
+  .toast-icon{ width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
+  .toast.success .toast-icon{ background:rgba(34,197,94,.15); color:var(--success); }
+  .toast.warn .toast-icon{ background:rgba(251,191,36,.15); color:var(--warning); }
+  .toast.danger .toast-icon{ background:rgba(239,68,68,.15); color:var(--danger); }
+  .toast.info .toast-icon{ background:rgba(139,92,246,.15); color:var(--primary); }
+  .spinner{ width:18px; height:18px; border:3px solid rgba(139,92,246,.3); border-radius:50%; border-top:3px solid var(--primary); animation: spin 1s linear infinite; display:inline-block; }
+  @keyframes spin{ to{ transform: rotate(360deg) } }
+  @keyframes fadeIn{ from{opacity:0} to{opacity:1} }
 </style>
 </head>
 <body>
@@ -533,8 +138,9 @@
      data-face-upload-url="{% url 'core:register_biometrics' %}"
      data-passkey-options-url="{% url 'core:webauthn_registration_options' %}"
      data-passkey-verify-url="{% url 'core:webauthn_registration_verify' %}"
-     data-countdown="3"
-     data-next-url="{% url 'core:complete_profile' %}">
+     data-next-url="{% url 'core:complete_profile' %}"
+     data-require-both="{{ require_both|yesno:'true,false' }}"
+     data-countdown="3">
 
   <!-- hidden form just to ensure Django sets CSRF cookie -->
   <form style="display:none">{% csrf_token %}</form>
@@ -558,7 +164,7 @@
         <div class="factor-title">Face Recognition</div>
         <div class="badge" id="face-status"><span class="dot"></span> Tap to start</div>
       </div>
-      <p class="muted">We'll capture a photo of your face. Ensure good lighting and look directly at your camera.</p>
+      <p class="muted">We’ll capture one clear frame. Ensure good lighting and look at the camera.</p>
     </div>
 
     <!-- Passkey -->
@@ -567,23 +173,20 @@
         <div class="factor-title">Fingerprint / Passkey</div>
         <div class="badge" id="passkey-status"><span class="dot"></span> Tap to start</div>
       </div>
-      <p class="muted">Create a passkey using your device's biometrics or security key for password-free logins.</p>
+      <p class="muted">Create a passkey using your device’s biometrics or a security key for password‑free logins.</p>
     </div>
   </section>
 
   <div class="info">
-    <strong>Privacy Tip:</strong> We only process a single captured frame on our secure servers. 
-    No raw video is stored or transmitted.
+    <strong>Privacy Tip:</strong> We only process a single captured frame on our secure servers. No raw video is stored or transmitted.
   </div>
 
   <div class="footer">
     <button class="btn btn-primary" id="btn-continue" disabled>
-      <span>Continue to Dashboard</span>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M5 12h14M12 5l7 7-7 7"></path>
-      </svg>
+      <span>Continue</span>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>
     </button>
-    <span class="subtitle">Complete both Face and Passkey to proceed</span>
+    <span class="subtitle" id="continue-hint">Complete both Face and Passkey to proceed</span>
   </div>
 </div>
 
@@ -596,19 +199,14 @@
     <div class="video-wrap">
       <video id="video" playsinline muted></video>
       <canvas id="canvas" class="sr-only"></canvas>
-      
-      <svg class="progress-ring" viewBox="0 0 120 120">
-        <circle class="progress-circle" r="54" cx="60" cy="60"></circle>
-      </svg>
-      
+
+      <svg class="progress-ring" viewBox="0 0 120 120"><circle class="progress-circle" r="54" cx="60" cy="60"></circle></svg>
       <div class="overlay-text" id="countdown-text">3</div>
       <div class="overlay-sub" id="overlay-sub">Position your face in the frame</div>
     </div>
     <div class="modal-actions">
       <button class="btn" id="cancel-face">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"></path></svg>
         Cancel
       </button>
     </div>
@@ -618,120 +216,181 @@
 <!-- toasts -->
 <div id="toast" aria-live="polite" aria-atomic="true"></div>
 
+{% if webauthn_options %}
+{{ webauthn_options|json_script:"webauthn-options" }}
+{% endif %}
+
 <script>
-  // ---------- Utilities ----------
-  const qs = (s, el=document) => el.querySelector(s);
-  
-  function toast(msg, type="info", ms=3200) { 
-    const t = document.createElement('div');
-    t.className = `toast ${type}`;
-    t.innerHTML = `
-      <div class="toast-icon">
-        ${type === 'success' ? '✓' : 
-          type === 'danger' ? '✕' : 
-          type === 'warn' ? '⚠' : 'i'}
-      </div>
-      <div>${msg}</div>
-    `;
-    qs('#toast').appendChild(t);
-    
-    setTimeout(() => {
-      t.classList.add('show');
-    }, 10);
-    
-    setTimeout(() => {
-      t.classList.remove('show');
-      setTimeout(() => t.remove(), 400);
-    }, ms);
-  }
-  
-  function getCookie(name) {
-    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
-    return m ? decodeURIComponent(m.pop()) : '';
-  }
-  
-  function setBadge(el, stateClass, text){
-    el.classList.remove('success','warn','danger', 'pulse');
-    if (stateClass) el.classList.add(stateClass);
-    el.innerHTML = '<span class="dot"></span> ' + text;
-  }
-  
-  function setSpinner(el, text) {
-    setBadge(el, null, text);
-    const dot = el.querySelector('.dot');
-    if (dot) {
-      dot.innerHTML = '<div class="spinner"></div>';
-      dot.classList.remove('dot');
+/* ---------- Utilities ---------- */
+const qs = (s, el=document) => el.querySelector(s);
+
+function toast(msg, type="info", ms=3200){
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `<div class="toast-icon">${type==='success'?'✓':type==='danger'?'✕':type==='warn'?'⚠':'i'}</div><div>${msg}</div>`;
+  qs('#toast').appendChild(t);
+  setTimeout(()=>t.classList.add('show'),10);
+  setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),400); }, ms);
+}
+function getCookie(name){ const m=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }
+function setBadge(el, cls, text){ el.classList.remove('success','warn','danger','pulse'); if(cls) el.classList.add(cls); el.innerHTML='<span class="dot"></span> '+text; }
+function setSpinner(el, text){ setBadge(el, null, text); const dot=el.querySelector('.dot'); if(dot){ dot.innerHTML='<div class="spinner"></div>'; dot.classList.remove('dot'); } }
+const CSRF = getCookie('csrftoken');
+
+async function getJSON(url, opts={}){ const res=await fetch(url,{credentials:'same-origin',...opts}); if(!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }
+async function postJSON(url, data, extra={}){
+  const res = await fetch(url, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF, ...(extra.headers||{})}, body: JSON.stringify(data), ...extra });
+  if(res.redirected){ return { redirect: res.url, status:'success' }; }
+  const ct = res.headers.get('content-type') || '';
+  const payload = ct.includes('application/json') ? await res.json().catch(()=>({})) : {};
+  if(!res.ok){ throw new Error(payload.message || payload.error || `HTTP ${res.status}`); }
+  return payload;
+}
+
+const b64url = {
+  toBuf: (b64u) => {
+    b64u = String(b64u||'').replace(/-/g,'+').replace(/_/g,'/');
+    const pad = b64u.length % 4; if(pad) b64u += '='.repeat(4-pad);
+    const bin = atob(b64u); const arr = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+    return arr.buffer;
+  },
+  fromBuf: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+};
+
+/* ---------- State & Elements ---------- */
+const root = qs('#enroll-page');
+const urls = {
+  faceUpload: root.dataset.faceUploadUrl || '', // '' = current URL
+  passkeyOptions: root.dataset.passkeyOptionsUrl,
+  passkeyVerify: root.dataset.passkeyVerifyUrl,
+  next: root.dataset.nextUrl,
+};
+const requireBoth = (root.dataset.requireBoth||'true') === 'true';
+
+const state = { face:{done:false, stream:null}, passkey:{done:false} };
+const els = {
+  overall: qs('#overall-badge'),
+  continue: qs('#btn-continue'),
+  continueHint: qs('#continue-hint'),
+  faceCard: qs('#face-card'),
+  faceStatus: qs('#face-status'),
+  passkeyCard: qs('#passkey-card'),
+  passkeyStatus: qs('#passkey-status'),
+  faceModal: qs('#face-modal'),
+  video: qs('#video'),
+  canvas: qs('#canvas'),
+  countdown: qs('#countdown-text'),
+  cancelFace: qs('#cancel-face'),
+  progressCircle: qs('.progress-circle'),
+};
+
+function refreshOverall(){
+  const ok = requireBoth ? (state.face.done && state.passkey.done) : (state.face.done || state.passkey.done);
+  if(state.face.done && state.passkey.done){ setBadge(els.overall,'success','All factors complete'); }
+  else if(state.face.done || state.passkey.done){ setBadge(els.overall,'warn','Partially complete'); }
+  else { setBadge(els.overall,'','Ready to start'); }
+  els.continue.disabled = !ok;
+  els.continueHint.textContent = requireBoth ? 'Complete both Face and Passkey to proceed' : 'Complete Face or Passkey to proceed';
+}
+
+/* ---------- Diagnostics ---------- */
+async function runDiagnostics(){
+  setBadge(els.overall,'pulse','Diagnostics running…');
+  const notes = [];
+  if(!CSRF) notes.push('No CSRF cookie detected');
+  try{
+    if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) notes.push('Camera API unsupported');
+    else {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      if(!devices.some(d=>d.kind==='videoinput')) notes.push('No camera found');
     }
+  }catch(e){ notes.push('Camera check failed: '+e.message); }
+  if(window.isSecureContext === false) notes.push('Not a secure context (HTTPS required for WebAuthn)');
+  if(!('credentials' in navigator) || !('create' in navigator.credentials)) notes.push('WebAuthn not supported');
+  try{ await getJSON(urls.passkeyOptions, {method:'POST', headers:{'X-CSRFToken':CSRF}}); }catch{ try{ await getJSON(urls.passkeyOptions); }catch{ notes.push('Passkey options endpoint unreachable'); } }
+  if(notes.length){ setBadge(els.overall,'danger','Issues found — tap for details'); toast(notes.join(' • '),'danger',6000); }
+  else { setBadge(els.overall,'success','Ready to start'); toast('Diagnostics completed successfully','success'); }
+}
+function activate(el, fn){
+  el.addEventListener('click', ()=>{ if(!el.classList.contains('disabled')) fn(); });
+  el.addEventListener('keydown', (e)=>{ if((e.key==='Enter'||e.key===' ') && !el.classList.contains('disabled')){ e.preventDefault(); fn(); }});
+}
+activate(els.overall, runDiagnostics);
+
+/* ---------- Face Flow ---------- */
+function openFaceModal(){ els.faceModal.classList.add('open'); els.faceModal.setAttribute('aria-hidden','false'); }
+function closeFaceModal(){ els.faceModal.classList.remove('open'); els.faceModal.setAttribute('aria-hidden','true'); stopCamera(); }
+
+async function startCamera(){
+  try{
+    const constraints = { video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} }, audio:false };
+    state.face.stream = await navigator.mediaDevices.getUserMedia(constraints);
+    els.video.srcObject = state.face.stream; await els.video.play(); ensureCanvas(); return true;
+  }catch(err){ console.error('Camera Error:', err); return false; }
+}
+function stopCamera(){ if(state.face.stream){ state.face.stream.getTracks().forEach(t=>t.stop()); state.face.stream=null; els.video.srcObject=null; } }
+function ensureCanvas(){ const vw=els.video.videoWidth||640, vh=els.video.videoHeight||480; els.canvas.width=vw; els.canvas.height=vh; }
+function frameBrightness(ctx,w,h){
+  try{ const d=ctx.getImageData(0,0,w,h).data; let sum=0; for(let i=0;i<d.length;i+=4){ sum+=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } return sum/(d.length/4); }
+  catch(e){ console.error('Brightness Error:',e); return 0; }
+}
+async function captureBlob(){
+  ensureCanvas();
+  const ctx = els.canvas.getContext('2d',{willReadFrequently:true});
+  const shots=[];
+  for(let i=0;i<3;i++){
+    ctx.drawImage(els.video,0,0,els.canvas.width,els.canvas.height);
+    const blob = await new Promise(r=>els.canvas.toBlob(r,'image/jpeg',0.92));
+    const bright = frameBrightness(ctx,els.canvas.width,els.canvas.height);
+    shots.push({blob, bright}); await new Promise(r=>setTimeout(r,150));
   }
-  
-  const CSRF = getCookie('csrftoken');
+  shots.sort((a,b)=>b.bright-a.bright);
+  return shots[0].blob;
+}
+async function runFaceFlow(){
+  els.faceCard.classList.add('disabled'); setBadge(els.faceStatus,null,'Preparing camera…'); openFaceModal();
+  const ok = await startCamera();
+  if(!ok){ closeFaceModal(); setBadge(els.faceStatus,'danger','Camera unavailable'); els.faceCard.classList.remove('disabled'); toast('Could not access your camera','danger'); return; }
 
-  async function getJSON(url, opts={}) {
-    const res = await fetch(url, {credentials:'same-origin', ...opts});
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  }
-  
-  async function postJSON(url, data, extra={}) {
-    const res = await fetch(url, {
-      method:'POST', credentials:'same-origin',
-      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF, ...(extra.headers||{})},
-      body: JSON.stringify(data), ...extra
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json().catch(()=> ({}));
-  }
+  const n = parseInt(root.dataset.countdown||'3',10);
+  const circle = els.progressCircle; const C = 2*Math.PI*54; circle.style.strokeDashoffset = C;
+  for(let i=n;i>0;i--){ els.countdown.textContent = i; const progress = 1-((i-1)/n); circle.style.strokeDashoffset = C - (progress*C); await new Promise(r=>setTimeout(r,1000)); }
+  els.countdown.textContent = 'Capturing…'; circle.style.strokeDashoffset = '0';
 
-  // b64url helpers for WebAuthn
-  const b64url = {
-    toBuf: (b64u) => {
-      b64u = b64u.replace(/-/g,'+').replace(/_/g,'/');
-      const pad = b64u.length % 4; if (pad) b64u += '='.repeat(4-pad);
-      return Uint8Array.from(atob(b64u), c => c.charCodeAt(0)).buffer;
-    },
-    fromBuf: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
-  };
+  try{
+    const blob = await captureBlob();
+    setBadge(els.faceStatus, null, 'Uploading…');
+    const fd = new FormData(); fd.append('face_data', blob, 'face.jpg');
+    const res = await fetch(urls.faceUpload || '', { method:'POST', credentials:'same-origin', headers:{'X-CSRFToken':CSRF}, body: fd });
 
-  // ---------- State ----------
-  const root = qs('#enroll-page');
-  const urls = {
-    faceUpload: root.dataset.faceUploadUrl,
-    passkeyOptions: root.dataset.passkeyOptionsUrl,
-    passkeyVerify: root.dataset.passkeyVerifyUrl,
-    next: root.dataset.nextUrl,
-  };
-  const faceState = { done:false, stream:null };
-  const passkeyState = { done:false };
+    if(res.redirected){ state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall(); window.location.href=res.url; return; }
 
-  const els = {
-    overall: qs('#overall-badge'),
-    continue: qs('#btn-continue'),
-    faceCard: qs('#face-card'),
-    faceStatus: qs('#face-status'),
-    passkeyCard: qs('#passkey-card'),
-    passkeyStatus: qs('#passkey-status'),
-    faceModal: qs('#face-modal'),
-    video: qs('#video'),
-    canvas: qs('#canvas'),
-    countdown: qs('#countdown-text'),
-    cancelFace: qs('#cancel-face'),
-    progressCircle: qs('.progress-circle'),
-  };
-
-  function refreshOverall(){
-    if (faceState.done && passkeyState.done) {
-      setBadge(els.overall, 'success', 'All factors complete');
-      els.continue.disabled = false;
-    } else if (faceState.done || passkeyState.done) {
-      setBadge(els.overall, 'warn', 'Partially complete');
-      els.continue.disabled = true;
-    } else {
-      setBadge(els.overall, '', 'Ready to start');
-      els.continue.disabled = true;
+    const ct = res.headers.get('content-type') || '';
+    if(ct.includes('application/json')){
+      const data = await res.json();
+      if(data.status==='ok' || data.status==='success'){ state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall(); if(data.redirect){ window.location.href=data.redirect; } else { toast('Face enrolled successfully!','success'); } }
+      else { throw new Error(data.message || 'Server returned error'); }
+    }else{
+      if(res.ok){ state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall(); toast('Face enrolled successfully!','success'); }
+      else { throw new Error(`HTTP ${res.status}`); }
     }
+  }catch(err){
+    console.error('Face Enrollment Error:', err);
+    toast('Face enrollment failed: '+(err.message||'Please try again'),'danger');
+    setBadge(els.faceStatus,'danger','Failed — tap to retry');
+  }finally{
+    closeFaceModal(); els.faceCard.classList.remove('disabled'); circle.style.strokeDashoffset = C;
   }
+}
+activate(els.faceCard, ()=>{
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ setBadge(els.faceStatus,'danger','Camera not supported'); toast('Camera access is not supported in this browser','danger'); return; }
+  runFaceFlow();
+});
+els.cancelFace.addEventListener('click', closeFaceModal);
+window.addEventListener('beforeunload', stopCamera);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopCamera(); });
 
+<<<<<<< Updated upstream
   // ---------- Diagnostics ----------
   async function runDiagnostics(){
     setBadge(els.overall, 'pulse', 'Diagnostics running…');
@@ -1025,64 +684,121 @@
       }finally{
         els.passkeyCard.classList.remove('disabled');
       }
+=======
+/* ---------- Passkey (WebAuthn) ---------- */
+function readInlineOptions(){
+  const el = document.getElementById('webauthn-options');
+  if(!el) return null;
+  try{ return JSON.parse(el.textContent); }catch{ return null; }
+}
+function normalizePublicKey(options){
+  // Accept either {challenge, user, ...} or {publicKey:{...}}
+  let pk = options?.publicKey ? options.publicKey : options;
+  if(!pk) throw new Error('Invalid server response');
+  // Convert b64url → ArrayBuffers
+  pk = {
+    ...pk,
+    challenge: b64url.toBuf(pk.challenge),
+    user: { ...pk.user, id: b64url.toBuf(pk.user.id) },
+    excludeCredentials: (pk.excludeCredentials||[]).map(c=>({...c, id: b64url.toBuf(c.id)})),
+    // preserve server-sent authenticatorSelection but prefer platform by default
+    authenticatorSelection: {
+      authenticatorAttachment: pk.authenticatorSelection?.authenticatorAttachment || 'platform',
+      residentKey: pk.authenticatorSelection?.residentKey || 'preferred',
+      requireResidentKey: pk.authenticatorSelection?.requireResidentKey || false
+>>>>>>> Stashed changes
     }
   };
-
-  activate(els.passkeyCard, ()=>{
-    if (!('credentials' in navigator) || !('create' in navigator.credentials)){
-      setBadge(els.passkeyStatus, 'danger', 'WebAuthn not supported');
-      toast('WebAuthn not supported in this browser', 'danger');
-      return;
-    }
-    passkey.create();
-  });
-
-  // ---------- Continue ----------
-  qs('#btn-continue').addEventListener('click', ()=>{
-    if (faceState.done && passkeyState.done){
-      window.location.href = urls.next;
-    } else {
-      toast('Please complete both Face and Passkey enrollment', 'warn');
-    }
-  });
-
-  // ---------- Animated Background ----------
-  function createParticles() {
-    const container = document.getElementById('particles');
-    const particleCount = 60;
-    
-    for (let i = 0; i < particleCount; i++) {
-      const particle = document.createElement('div');
-      particle.classList.add('particle');
-      
-      // Random size and position
-      const size = Math.random() * 100 + 20;
-      const x = Math.random() * 100;
-      const y = Math.random() * 100;
-      
-      particle.style.width = `${size}px`;
-      particle.style.height = `${size}px`;
-      particle.style.left = `${x}%`;
-      particle.style.top = `${y}%`;
-      
-      // Random color from gradient
-      const colors = ['#8b5cf6', '#6366f1', '#0ea5e9', '#22c55e'];
-      const color = colors[Math.floor(Math.random() * colors.length)];
-      particle.style.background = color;
-      
-      // Random animation delay and duration
-      const delay = Math.random() * 10;
-      const duration = 15 + Math.random() * 15;
-      particle.style.animationDelay = `${delay}s`;
-      particle.style.animationDuration = `${duration}s`;
-      
-      container.appendChild(particle);
-    }
+  return pk;
+}
+async function getPasskeyOptions(){
+  const inline = readInlineOptions();
+  if(inline) return inline;
+  try{
+    return await getJSON(urls.passkeyOptions, { method:'POST', headers:{'X-CSRFToken':CSRF} });
+  }catch{
+    return await getJSON(urls.passkeyOptions);
   }
-  
-  // Initial setup
-  createParticles();
-  refreshOverall();
+}
+async function registerPasskey(){
+  try{
+    els.passkeyCard.classList.add('disabled');
+    setSpinner(els.passkeyStatus, 'Requesting options…');
+
+    const options = await getPasskeyOptions();
+    const publicKey = normalizePublicKey(options);
+
+    setSpinner(els.passkeyStatus,'Waiting for device…');
+    const cred = await navigator.credentials.create({ publicKey });
+    if(!cred) throw new Error('No credential created');
+
+    const payload = {
+      id: cred.id,
+      rawId: b64url.fromBuf(cred.rawId),
+      type: cred.type,
+      response: {
+        attestationObject: b64url.fromBuf(cred.response.attestationObject),
+        clientDataJSON: b64url.fromBuf(cred.response.clientDataJSON),
+        transports: cred.response.getTransports?.() || []
+      },
+      // ✅ send extension results so webauthn 2.6.0 can populate client_extension_results
+      clientExtensionResults: cred.getClientExtensionResults?.() || {}
+    };
+
+    setSpinner(els.passkeyStatus,'Verifying…');
+    const res = await postJSON(urls.passkeyVerify, payload);
+
+    const ok = res && (res.ok || res.status==='ok' || res.status==='success' || res.success===true);
+    if(ok){
+      state.passkey.done = true;
+      setBadge(els.passkeyStatus,'success','Completed'); refreshOverall();
+      if(res.redirect){ window.location.href = res.redirect; }
+      else { toast('Passkey enrolled successfully!','success'); }
+    }else{
+      throw new Error(res?.error || res?.message || 'Server verification failed');
+    }
+  }catch(err){
+    console.error('Passkey Error:', err);
+    const msg = (err.name==='NotAllowedError') ? 'Cancelled or timed out' : (err.message || 'Failed');
+    setBadge(els.passkeyStatus,'danger','Failed — tap to retry');
+    toast(`Passkey: ${msg}`,'danger');
+  }finally{
+    els.passkeyCard.classList.remove('disabled');
+  }
+}
+activate(els.passkeyCard, ()=>{
+  if(window.isSecureContext === false){ setBadge(els.passkeyStatus,'danger','HTTPS required'); toast('WebAuthn requires HTTPS','danger'); return; }
+  if(!('credentials' in navigator) || !('create' in navigator.credentials)){ setBadge(els.passkeyStatus,'danger','WebAuthn not supported'); toast('WebAuthn not supported in this browser','danger'); return; }
+  registerPasskey();
+});
+
+/* ---------- Continue ---------- */
+qs('#btn-continue').addEventListener('click', ()=>{
+  const ok = requireBoth ? (state.face.done && state.passkey.done) : (state.face.done || state.passkey.done);
+  if(ok){ window.location.href = urls.next; }
+  else { toast(requireBoth ? 'Please complete both Face and Passkey' : 'Please complete Face or Passkey','warn'); }
+});
+
+/* ---------- Background Particles ---------- */
+function createParticles(){
+  const container = document.getElementById('particles');
+  const count = 60;
+  for(let i=0;i<count;i++){
+    const d=document.createElement('div'); d.className='particle';
+    const size = Math.random()*100+20, x=Math.random()*100, y=Math.random()*100;
+    d.style.width = d.style.height = size+'px';
+    d.style.left = x+'%'; d.style.top = y+'%';
+    const colors = ['#8b5cf6','#6366f1','#0ea5e9','#22c55e'];
+    d.style.background = colors[Math.floor(Math.random()*colors.length)];
+    d.style.animationDelay = (Math.random()*10)+'s';
+    d.style.animationDuration = (15+Math.random()*15)+'s';
+    container.appendChild(d);
+  }
+}
+
+/* ---------- Init ---------- */
+createParticles();
+refreshOverall();
 </script>
 </body>
 </html>
