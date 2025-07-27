@@ -12,7 +12,9 @@ logger = logging.getLogger(__name__)
 ML_MODELS_DIR = getattr(
     settings,
     "ML_MODELS_DIR",
-    os.path.abspath(os.path.join(settings.BASE_DIR, "ml_pipeline", "models", "production"))
+    os.path.abspath(
+        os.path.join(settings.BASE_DIR, "..", "ml_pipeline", "models", "production")
+    ),
 )
 
 # Lazy globals
