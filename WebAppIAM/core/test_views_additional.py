@@ -194,6 +194,15 @@ class LoginTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn(b"bad", resp.content)
 
+    @patch("core.views.get_token", return_value="tok")
+    @patch("core.views.render", return_value=HttpResponse("ok"))
+    def test_login_get_sets_csrf_in_session(self, m_render, m_token):
+        request = self.factory.get("/")
+        request.session = {}
+        resp = login(request)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(request.session.get("csrftoken"), "tok")
+
 class ForceCoverageTests(TestCase):
     def test_force_views_lines(self):
         from . import views
