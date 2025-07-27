@@ -11,6 +11,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
 from django.views.decorators.csrf import csrf_exempt
+from django.middleware.csrf import get_token
 from django.views.decorators.http import require_http_methods, require_POST
 from django.conf import settings
 from django.core.mail import send_mail
@@ -543,6 +544,8 @@ def login(request):
                 messages.error(request, 'Invalid username or password.')
     else:
         form = LoginForm()
+    # Store CSRF token in session for WebAuthn API calls
+    request.session['csrftoken'] = get_token(request)
 
     return render(request, 'core/login.html', {'form': form})
 
@@ -629,7 +632,7 @@ def webauthn_authentication_options(request):
     
     # Verify the session contains a valid CSRF token
     csrf_token = request.META.get('HTTP_X_CSRFTOKEN')
-    if not csrf_token or not request.session.get('csrf_token') == csrf_token:
+    if not csrf_token or request.session.get('csrftoken') != csrf_token:
         return JsonResponse({'error': 'CSRF validation failed'}, status=403)
     
     user_id = request.session.get('pending_auth_user_id')
