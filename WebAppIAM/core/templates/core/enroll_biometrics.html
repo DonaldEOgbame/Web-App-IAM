@@ -139,7 +139,6 @@
      data-passkey-options-url="{% url 'core:webauthn_registration_options' %}"
      data-passkey-verify-url="{% url 'core:webauthn_registration_verify' %}"
      data-next-url="{% url 'core:complete_profile' %}"
-     data-require-both="{{ require_both|yesno:'true,false' }}"
      data-countdown="3">
 
   <!-- hidden form just to ensure Django sets CSRF cookie -->
@@ -173,7 +172,7 @@
         <div class="factor-title">Fingerprint / Passkey</div>
         <div class="badge" id="passkey-status"><span class="dot"></span> Tap to start</div>
       </div>
-      <p class="muted">Create a passkey using your device’s biometrics or a security key for password‑free logins.</p>
+      <p class="muted">Create a passkey using your device’s biometrics and a security key for password‑free logins.</p>
     </div>
   </section>
 
@@ -221,7 +220,7 @@
 {% endif %}
 
 <script>
-/* ---------- Utilities ---------- */
+/* -------------------------------- Utilities -------------------------------- */
 const qs = (s, el=document) => el.querySelector(s);
 
 function toast(msg, type="info", ms=3200){
@@ -235,12 +234,22 @@ function toast(msg, type="info", ms=3200){
 function getCookie(name){ const m=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)'); return m?decodeURIComponent(m.pop()):''; }
 function setBadge(el, cls, text){ el.classList.remove('success','warn','danger','pulse'); if(cls) el.classList.add(cls); el.innerHTML='<span class="dot"></span> '+text; }
 function setSpinner(el, text){ setBadge(el, null, text); const dot=el.querySelector('.dot'); if(dot){ dot.innerHTML='<div class="spinner"></div>'; dot.classList.remove('dot'); } }
+
 const CSRF = getCookie('csrftoken');
 
-async function getJSON(url, opts={}){ const res=await fetch(url,{credentials:'same-origin',...opts}); if(!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); }
+async function getJSON(url, opts={}){
+  const res = await fetch(url,{credentials:'same-origin', ...opts});
+  if(!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
 async function postJSON(url, data, extra={}){
-  const res = await fetch(url, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':CSRF, ...(extra.headers||{})}, body: JSON.stringify(data), ...extra });
-  if(res.redirected){ return { redirect: res.url, status:'success' }; }
+  // Note: following redirects in fetch does NOT navigate the page.
+  // We still ignore any server redirect instructions here.
+  const res = await fetch(url, {
+    method:'POST', credentials:'same-origin',
+    headers:{'Content-Type':'application/json','X-CSRFToken':CSRF, ...(extra.headers||{})},
+    body: JSON.stringify(data), ...extra
+  });
   const ct = res.headers.get('content-type') || '';
   const payload = ct.includes('application/json') ? await res.json().catch(()=>({})) : {};
   if(!res.ok){ throw new Error(payload.message || payload.error || `HTTP ${res.status}`); }
@@ -257,7 +266,7 @@ const b64url = {
   fromBuf: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
 };
 
-/* ---------- State & Elements ---------- */
+/* --------------------------- State & Element Handles --------------------------- */
 const root = qs('#enroll-page');
 const urls = {
   faceUpload: root.dataset.faceUploadUrl || '', // '' = current URL
@@ -265,7 +274,9 @@ const urls = {
   passkeyVerify: root.dataset.passkeyVerifyUrl,
   next: root.dataset.nextUrl,
 };
-const requireBoth = (root.dataset.requireBoth||'true') === 'true';
+
+/* Force BOTH factors on the client (always “and”) */
+const requireBoth = true;
 
 const state = { face:{done:false, stream:null}, passkey:{done:false} };
 const els = {
@@ -284,30 +295,41 @@ const els = {
   progressCircle: qs('.progress-circle'),
 };
 
+function canProceed(){ return state.face.done && state.passkey.done; }
+
 function refreshOverall(){
-  const ok = requireBoth ? (state.face.done && state.passkey.done) : (state.face.done || state.passkey.done);
-  if(state.face.done && state.passkey.done){ setBadge(els.overall,'success','All factors complete'); }
+  const ok = canProceed();
+  if(ok){ setBadge(els.overall,'success','All factors complete'); }
   else if(state.face.done || state.passkey.done){ setBadge(els.overall,'warn','Partially complete'); }
   else { setBadge(els.overall,'','Ready to start'); }
   els.continue.disabled = !ok;
-  els.continueHint.textContent = requireBoth ? 'Complete both Face and Passkey to proceed' : 'Complete Face or Passkey to proceed';
+  els.continueHint.textContent = 'Complete both Face and Passkey to proceed';
 }
 
-/* ---------- Diagnostics ---------- */
+/* ------------------------------ Diagnostics ------------------------------ */
 async function runDiagnostics(){
   setBadge(els.overall,'pulse','Diagnostics running…');
   const notes = [];
+
   if(!CSRF) notes.push('No CSRF cookie detected');
+
   try{
     if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) notes.push('Camera API unsupported');
     else {
       const devices = await navigator.mediaDevices.enumerateDevices();
       if(!devices.some(d=>d.kind==='videoinput')) notes.push('No camera found');
     }
-  }catch(e){ notes.push('Camera check failed: '+e.message); }
+  }catch(e){ notes.push('Camera check failed'); }
+
   if(window.isSecureContext === false) notes.push('Not a secure context (HTTPS required for WebAuthn)');
   if(!('credentials' in navigator) || !('create' in navigator.credentials)) notes.push('WebAuthn not supported');
-  try{ await getJSON(urls.passkeyOptions, {method:'POST', headers:{'X-CSRFToken':CSRF}}); }catch{ try{ await getJSON(urls.passkeyOptions); }catch{ notes.push('Passkey options endpoint unreachable'); } }
+
+  try{
+    await getJSON(urls.passkeyOptions, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  }catch{
+    try{ await getJSON(urls.passkeyOptions); }catch{ notes.push('Passkey options endpoint unreachable'); }
+  }
+
   if(notes.length){ setBadge(els.overall,'danger','Issues found — tap for details'); toast(notes.join(' • '),'danger',6000); }
   else { setBadge(els.overall,'success','Ready to start'); toast('Diagnostics completed successfully','success'); }
 }
@@ -317,7 +339,7 @@ function activate(el, fn){
 }
 activate(els.overall, runDiagnostics);
 
-/* ---------- Face Flow ---------- */
+/* -------------------------------- Face Flow -------------------------------- */
 function openFaceModal(){ els.faceModal.classList.add('open'); els.faceModal.setAttribute('aria-hidden','false'); }
 function closeFaceModal(){ els.faceModal.classList.remove('open'); els.faceModal.setAttribute('aria-hidden','true'); stopCamera(); }
 
@@ -325,14 +347,24 @@ async function startCamera(){
   try{
     const constraints = { video:{ facingMode:'user', width:{ideal:1280}, height:{ideal:720} }, audio:false };
     state.face.stream = await navigator.mediaDevices.getUserMedia(constraints);
-    els.video.srcObject = state.face.stream; await els.video.play(); ensureCanvas(); return true;
+    els.video.srcObject = state.face.stream;
+    await els.video.play();
+    if (els.video.readyState < 2) {
+      await new Promise(r => {
+        const onMeta = () => { els.video.removeEventListener('loadedmetadata', onMeta); r(); };
+        els.video.addEventListener('loadedmetadata', onMeta);
+        setTimeout(r, 100);
+      });
+    }
+    ensureCanvas();
+    return true;
   }catch(err){ console.error('Camera Error:', err); return false; }
 }
 function stopCamera(){ if(state.face.stream){ state.face.stream.getTracks().forEach(t=>t.stop()); state.face.stream=null; els.video.srcObject=null; } }
 function ensureCanvas(){ const vw=els.video.videoWidth||640, vh=els.video.videoHeight||480; els.canvas.width=vw; els.canvas.height=vh; }
 function frameBrightness(ctx,w,h){
   try{ const d=ctx.getImageData(0,0,w,h).data; let sum=0; for(let i=0;i<d.length;i+=4){ sum+=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; } return sum/(d.length/4); }
-  catch(e){ console.error('Brightness Error:',e); return 0; }
+  catch(e){ return 0; }
 }
 async function captureBlob(){
   ensureCanvas();
@@ -352,7 +384,7 @@ async function runFaceFlow(){
   const ok = await startCamera();
   if(!ok){ closeFaceModal(); setBadge(els.faceStatus,'danger','Camera unavailable'); els.faceCard.classList.remove('disabled'); toast('Could not access your camera','danger'); return; }
 
-  const n = parseInt(root.dataset.countdown||'3',10);
+  const n = parseInt('3',10);
   const circle = els.progressCircle; const C = 2*Math.PI*54; circle.style.strokeDashoffset = C;
   for(let i=n;i>0;i--){ els.countdown.textContent = i; const progress = 1-((i-1)/n); circle.style.strokeDashoffset = C - (progress*C); await new Promise(r=>setTimeout(r,1000)); }
   els.countdown.textContent = 'Capturing…'; circle.style.strokeDashoffset = '0';
@@ -363,16 +395,23 @@ async function runFaceFlow(){
     const fd = new FormData(); fd.append('face_data', blob, 'face.jpg');
     const res = await fetch(urls.faceUpload || '', { method:'POST', credentials:'same-origin', headers:{'X-CSRFToken':CSRF}, body: fd });
 
-    if(res.redirected){ state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall(); window.location.href=res.url; return; }
-
+    // Ignore any server redirect; do not navigate from here.
     const ct = res.headers.get('content-type') || '';
     if(ct.includes('application/json')){
       const data = await res.json();
-      if(data.status==='ok' || data.status==='success'){ state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall(); if(data.redirect){ window.location.href=data.redirect; } else { toast('Face enrolled successfully!','success'); } }
-      else { throw new Error(data.message || 'Server returned error'); }
+      if(data.status==='ok' || data.status==='success'){
+        state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall();
+        toast('Face enrolled successfully!','success');
+      } else {
+        throw new Error(data.message || 'Server returned error');
+      }
     }else{
-      if(res.ok){ state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall(); toast('Face enrolled successfully!','success'); }
-      else { throw new Error(`HTTP ${res.status}`); }
+      if(res.ok){
+        state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall();
+        toast('Face enrolled successfully!','success');
+      } else {
+        throw new Error(`HTTP ${res.status}`);
+      }
     }
   }catch(err){
     console.error('Face Enrollment Error:', err);
@@ -390,332 +429,28 @@ els.cancelFace.addEventListener('click', closeFaceModal);
 window.addEventListener('beforeunload', stopCamera);
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) stopCamera(); });
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-  // ---------- Diagnostics ----------
-  async function runDiagnostics(){
-    setBadge(els.overall, 'pulse', 'Diagnostics running…');
-    const notes = [];
+/* ---------------------------- Passkey (WebAuthn) ---------------------------- */
+const INCLUDE_EXTENSION_RESULTS = false;
 
-    // CSRF presence
-    if (!CSRF) notes.push('No CSRF cookie detected');
-
-    // Camera
-    let camOK = false;
-    try{
-      camOK = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-      if (!camOK) notes.push('Camera API unsupported');
-      else {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        if (!devices.some(d=>d.kind==='videoinput')) notes.push('No camera found');
-      }
-    }catch{ notes.push('Camera check failed'); }
-
-    // WebAuthn + secure context
-    if (window.isSecureContext === false) notes.push('Not a secure context (HTTPS required for WebAuthn)');
-    if (!('credentials' in navigator) || !('create' in navigator.credentials)) notes.push('WebAuthn not supported');
-
-    // Options endpoint reachability
-    try{
-      await getJSON(urls.passkeyOptions, { method:'POST', headers:{'X-CSRFToken':CSRF} });
-    }catch{
-      notes.push('Passkey options endpoint unreachable');
-    }
-
-    if (notes.length === 0){
-      setBadge(els.overall, 'success', 'Ready to start');
-      toast('Diagnostics completed successfully', 'success');
-    } else {
-      setBadge(els.overall, 'danger', 'Issues found — tap for details');
-      toast(notes.join(' • '), 'danger', 6000);
-    }
-  }
-  
-  function activate(el, fn){
-    el.addEventListener('click', ()=> { if (!el.classList.contains('disabled')) fn(); });
-    el.addEventListener('keydown', (e)=> { if ((e.key==='Enter'||e.key===' ') && !el.classList.contains('disabled')) { e.preventDefault(); fn(); }});
-  }
-  activate(els.overall, runDiagnostics);
-
-  // ---------- Face flow ----------
-  function openFaceModal(){ 
-    els.faceModal.classList.add('open'); 
-    els.faceModal.setAttribute('aria-hidden','false'); 
-  }
-  
-  function closeFaceModal(){ 
-    els.faceModal.classList.remove('open'); 
-    els.faceModal.setAttribute('aria-hidden','true'); 
-    stopCamera(); 
-  }
-
-  async function startCamera(){
-    try{
-      const constraints = { 
-        video: { 
-          facingMode:'user', 
-          width:{ideal:1280}, 
-          height:{ideal:720} 
-        }, 
-        audio:false 
-      };
-      faceState.stream = await navigator.mediaDevices.getUserMedia(constraints);
-      els.video.srcObject = faceState.stream;
-      await els.video.play();
-      ensureCanvas();
-      return true;
-    }catch(err){
-      console.error(err);
-      return false;
-    }
-  }
-  
-  function stopCamera(){
-    if (faceState.stream){
-      faceState.stream.getTracks().forEach(t=>t.stop());
-      faceState.stream = null;
-      els.video.srcObject = null;
-    }
-  }
-  
-  function ensureCanvas(){
-    const vw = els.video.videoWidth || 640;
-    const vh = els.video.videoHeight || 480;
-    els.canvas.width = vw; 
-    els.canvas.height = vh;
-  }
-  
-  function frameBrightness(ctx, w, h){
-    try{
-      const d = ctx.getImageData(0,0,w,h).data;
-      let sum=0; for (let i=0;i<d.length;i+=4){ sum += 0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]; }
-      return sum/(d.length/4);
-    }catch{ return 0; }
-  }
-  
-  async function captureBlob(){
-    ensureCanvas();
-    const ctx = els.canvas.getContext('2d', {willReadFrequently:true});
-
-    // Take 3 frames over ~450ms and pick the brightest
-    const shots = [];
-    for (let i=0;i<3;i++){
-      ctx.drawImage(els.video, 0, 0, els.canvas.width, els.canvas.height);
-      const b = await new Promise(res=>els.canvas.toBlob(res,'image/jpeg',0.92));
-      const bright = frameBrightness(ctx, els.canvas.width, els.canvas.height);
-      shots.push({b, bright});
-      await new Promise(r=>setTimeout(r, 150));
-    }
-    shots.sort((a,b)=>b.bright-a.bright);
-    return shots[0].b;
-  }
-
-  async function runFaceFlow(){
-    els.faceCard.classList.add('disabled');
-    setBadge(els.faceStatus, null, 'Preparing camera...');
-    openFaceModal();
-
-    const ok = await startCamera();
-    if (!ok){
-      closeFaceModal();
-      setBadge(els.faceStatus, 'danger', 'Camera unavailable');
-      els.faceCard.classList.remove('disabled');
-      toast('Could not access your camera', 'danger');
-      return;
-    }
-
-    const n = parseInt(root.dataset.countdown || '3', 10);
-    const circle = els.progressCircle;
-    const circumference = 2 * Math.PI * 54;
-    
-    // Reset progress
-    circle.style.strokeDashoffset = circumference;
-    
-    // Animate countdown
-    for (let i = n; i > 0; i--) {
-      els.countdown.textContent = i;
-      const progress = 1 - ((i-1) / n);
-      circle.style.strokeDashoffset = circumference - (progress * circumference);
-      await new Promise(r => setTimeout(r, 1000));
-    }
-    
-    els.countdown.textContent = 'Capturing…';
-    circle.style.strokeDashoffset = '0';
-
-    try{
-      const blob = await captureBlob();
-      setBadge(els.faceStatus, null, 'Uploading...');
-      const fd = new FormData();
-      fd.append('face_data', blob, 'face.jpg');
-
-      const res = await fetch(urls.faceUpload, {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {'X-CSRFToken': CSRF},
-        body: fd
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      // Redirect on success
-      if (res.redirected) {
-        faceState.done = true;
-        setBadge(els.faceStatus, 'success', 'Completed');
-        refreshOverall();
-        window.location.href = res.url; 
-        return;
-      }
-
-      // JSON success payload
-      const ct = res.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        const j = await res.json();
-          if (j.status && (j.status==='ok' || j.status==='success')) {
-            faceState.done = true;
-            setBadge(els.faceStatus, 'success', 'Completed');
-            refreshOverall();
-            if (j.redirect) {
-              window.location.href = j.redirect;
-              return;
-            }
-            toast('Face enrolled successfully!', 'success');
-          } else {
-            throw new Error(j.message || 'Server returned error');
-          }
-      } else {
-        // Treat plain 2xx as success (view re-render)
-        faceState.done = true;
-        setBadge(els.faceStatus, 'success', 'Completed');
-        refreshOverall();
-        toast('Face enrolled successfully!', 'success');
-      }
-    }catch(err){
-      console.error(err);
-      toast('Face enrollment failed: ' + (err.message || 'Please try again'), 'danger');
-      setBadge(els.faceStatus, 'danger', 'Failed — tap to retry');
-    }finally{
-      closeFaceModal();
-      els.faceCard.classList.remove('disabled');
-      circle.style.strokeDashoffset = circumference;
-    }
-  }
-
-  activate(els.faceCard, ()=>{
-    if (!('mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices)){
-      setBadge(els.faceStatus, 'danger', 'Camera not supported');
-      toast('Camera access is not supported in this browser', 'danger');
-      return;
-    }
-    runFaceFlow();
-  });
-  
-  els.cancelFace.addEventListener('click', closeFaceModal);
-  window.addEventListener('beforeunload', stopCamera);
-  document.addEventListener('visibilitychange', ()=> { if (document.hidden) stopCamera(); });
-
-  // ---------- Passkey flow ----------
-  const passkey = {
-    async options(){
-      return await getJSON(urls.passkeyOptions, { method:'POST', headers:{'X-CSRFToken': CSRF} });
-    },
-    
-    async create(){
-      try{
-        els.passkeyCard.classList.add('disabled');
-        setSpinner(els.passkeyStatus, 'Requesting options...');
-
-        const options = await passkey.options();
-        if (!options || !options.publicKey || !options.publicKey.challenge) {
-          throw new Error(options?.error || 'Invalid server response');
-        }
-
-        const publicKey = {
-          ...options.publicKey,
-          challenge: b64url.toBuf(options.publicKey.challenge),
-          user: { ...options.publicKey.user, id: b64url.toBuf(options.publicKey.user.id) },
-          excludeCredentials: (options.publicKey.excludeCredentials || []).map(c=> ({...c, id: b64url.toBuf(c.id)})),
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            residentKey: options.publicKey.authenticatorSelection?.residentKey || 'preferred',
-            requireResidentKey: options.publicKey.authenticatorSelection?.requireResidentKey || false
-          },
-          userVerification: 'required',
-          attestation: options.publicKey.attestation || 'none'
-        };
-
-        if (window.isSecureContext === false) throw new Error('Requires HTTPS');
-
-        setSpinner(els.passkeyStatus, 'Waiting for device…');
-        const cred = await navigator.credentials.create({ publicKey });
-        if (!cred) throw new Error('No credential');
-
-        const payload = {
-          id: cred.id,
-          rawId: b64url.fromBuf(cred.rawId),
-          type: cred.type,
-          response: {
-            attestationObject: b64url.fromBuf(cred.response.attestationObject),
-            clientDataJSON: b64url.fromBuf(cred.response.clientDataJSON),
-            transports: cred.response.getTransports?.() || []
-          },
-          clientExtensionResults: cred.getClientExtensionResults?.() || {}
-        };
-
-        setSpinner(els.passkeyStatus, 'Verifying…');
-        const res = await postJSON(urls.passkeyVerify, payload);
-        if (!(res && (res.ok || res.status === 'ok' || res.status === 'success'))) {
-          throw new Error(res?.message || 'Server verification failed');
-        }
-
-        passkeyState.done = true;
-        setBadge(els.passkeyStatus, 'success', 'Completed');
-        refreshOverall();
-        if (res.redirect) {
-          window.location.href = res.redirect;
-        } else {
-          toast('Passkey enrolled successfully!', 'success');
-        }
-      }catch(err){
-        console.error(err);
-        const msg = (err && err.name === 'NotAllowedError')
-          ? 'Cancelled or timed out'
-          : (err?.message || 'Failed');
-        setBadge(els.passkeyStatus, 'danger', `Failed — tap to retry`);
-        toast(`Passkey: ${msg}`, 'danger');
-      }finally{
-        els.passkeyCard.classList.remove('disabled');
-      }
-=======
-=======
->>>>>>> Stashed changes
-/* ---------- Passkey (WebAuthn) ---------- */
 function readInlineOptions(){
   const el = document.getElementById('webauthn-options');
   if(!el) return null;
   try{ return JSON.parse(el.textContent); }catch{ return null; }
 }
 function normalizePublicKey(options){
-  // Accept either {challenge, user, ...} or {publicKey:{...}}
   let pk = options?.publicKey ? options.publicKey : options;
   if(!pk) throw new Error('Invalid server response');
-  // Convert b64url → ArrayBuffers
-  pk = {
+  return {
     ...pk,
     challenge: b64url.toBuf(pk.challenge),
     user: { ...pk.user, id: b64url.toBuf(pk.user.id) },
     excludeCredentials: (pk.excludeCredentials||[]).map(c=>({...c, id: b64url.toBuf(c.id)})),
-    // preserve server-sent authenticatorSelection but prefer platform by default
     authenticatorSelection: {
       authenticatorAttachment: pk.authenticatorSelection?.authenticatorAttachment || 'platform',
       residentKey: pk.authenticatorSelection?.residentKey || 'preferred',
       requireResidentKey: pk.authenticatorSelection?.requireResidentKey || false
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
     }
   };
-  return pk;
 }
 async function getPasskeyOptions(){
   const inline = readInlineOptions();
@@ -734,6 +469,8 @@ async function registerPasskey(){
     const options = await getPasskeyOptions();
     const publicKey = normalizePublicKey(options);
 
+    if(window.isSecureContext === false) throw new Error('Requires HTTPS');
+
     setSpinner(els.passkeyStatus,'Waiting for device…');
     const cred = await navigator.credentials.create({ publicKey });
     if(!cred) throw new Error('No credential created');
@@ -746,23 +483,23 @@ async function registerPasskey(){
         attestationObject: b64url.fromBuf(cred.response.attestationObject),
         clientDataJSON: b64url.fromBuf(cred.response.clientDataJSON),
         transports: cred.response.getTransports?.() || []
-      },
-      // ✅ send extension results so webauthn 2.6.0 can populate client_extension_results
-      clientExtensionResults: cred.getClientExtensionResults?.() || {}
+      }
     };
+    if (INCLUDE_EXTENSION_RESULTS) {
+      payload.clientExtensionResults = cred.getClientExtensionResults?.() || {};
+    }
 
     setSpinner(els.passkeyStatus,'Verifying…');
     const res = await postJSON(urls.passkeyVerify, payload);
 
     const ok = res && (res.ok || res.status==='ok' || res.status==='success' || res.success===true);
-    if(ok){
-      state.passkey.done = true;
-      setBadge(els.passkeyStatus,'success','Completed'); refreshOverall();
-      if(res.redirect){ window.location.href = res.redirect; }
-      else { toast('Passkey enrolled successfully!','success'); }
-    }else{
-      throw new Error(res?.error || res?.message || 'Server verification failed');
-    }
+    if(!ok) throw new Error(res?.error || res?.message || 'Server verification failed');
+
+    state.passkey.done = true;
+    setBadge(els.passkeyStatus,'success','Completed'); refreshOverall();
+    toast('Passkey enrolled successfully!','success');
+
+    // No navigation here—user must click Continue after Face is also complete.
   }catch(err){
     console.error('Passkey Error:', err);
     const msg = (err.name==='NotAllowedError') ? 'Cancelled or timed out' : (err.message || 'Failed');
@@ -778,14 +515,13 @@ activate(els.passkeyCard, ()=>{
   registerPasskey();
 });
 
-/* ---------- Continue ---------- */
+/* ------------------------------ Continue Button ------------------------------ */
 qs('#btn-continue').addEventListener('click', ()=>{
-  const ok = requireBoth ? (state.face.done && state.passkey.done) : (state.face.done || state.passkey.done);
-  if(ok){ window.location.href = urls.next; }
-  else { toast(requireBoth ? 'Please complete both Face and Passkey' : 'Please complete Face or Passkey','warn'); }
+  if (canProceed()) { window.location.href = urls.next; }
+  else { toast('Please complete both Face and Passkey','warn'); }
 });
 
-/* ---------- Background Particles ---------- */
+/* -------------------------- Background Particles -------------------------- */
 function createParticles(){
   const container = document.getElementById('particles');
   const count = 60;
@@ -802,7 +538,7 @@ function createParticles(){
   }
 }
 
-/* ---------- Init ---------- */
+/* ---------------------------------- Init ---------------------------------- */
 createParticles();
 refreshOverall();
 </script>
