@@ -759,7 +759,8 @@
     try{
       await getJSON(urls.passkeyOptions, { method:'POST', headers:{'X-CSRFToken':CSRF} });
     }catch{
-      notes.push('Passkey options endpoint unreachable');
+      try{ await getJSON(urls.passkeyOptions); }
+      catch { notes.push('Passkey options endpoint unreachable'); }
     }
 
     if (notes.length === 0){
@@ -956,7 +957,12 @@
   // ---------- Passkey flow ----------
   const passkey = {
     async options(){
-      return await getJSON(urls.passkeyOptions, { method:'POST', headers:{'X-CSRFToken': CSRF} });
+      // Prefer POST with CSRF, fallback to GET for setups that expect GET
+      try{
+        return await getJSON(urls.passkeyOptions, { method:'POST', headers:{'X-CSRFToken': CSRF} });
+      }catch{
+        return await getJSON(urls.passkeyOptions);
+      }
     },
     
     async create(){

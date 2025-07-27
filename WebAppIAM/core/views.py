@@ -379,20 +379,12 @@ def register_biometrics(request):
         # Handle WebAuthn registration
         # (existing WebAuthn logic remains the same)
     
-    options = None
-    if not user.face_data:
-        options = generate_registration_options(user)
-        request.session['webauthn_registration_challenge'] = bytes_to_base64url(
-            options.challenge
+    return render(request, 'core/enroll_biometrics.html', {
+        'webauthn_options': (
+            json.loads(options_to_json(generate_registration_options(user)))
+            if not user.face_data else None
         )
-
-    return render(
-        request,
-        'core/enroll_biometrics.html',
-        {
-            'webauthn_options': json.loads(options_to_json(options)) if options else None
-        },
-    )
+    })
 
 def webauthn_registration_options(request):
     if not settings.WEBAUTHN_ENABLED:
