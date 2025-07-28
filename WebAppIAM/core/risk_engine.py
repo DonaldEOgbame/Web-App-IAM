@@ -18,16 +18,17 @@ ML_MODELS_DIR = getattr(
 )
 
 # Lazy globals
-_risk_model = None
-_risk_meta = {}
-_behavior_model = None
-_behavior_meta = {}
+# Exposed globals for tests to patch
+risk_model = None
+risk_meta = {}
+behavior_model = None
+behavior_meta = {}
 _loaded = False
 _lock = threading.Lock()
 
 
 def _load_models():
-    global _loaded, _risk_model, _risk_meta, _behavior_model, _behavior_meta
+    global _loaded, risk_model, risk_meta, behavior_model, behavior_meta
     if _loaded:
         return
     with _lock:
@@ -36,18 +37,18 @@ def _load_models():
         try:
             risk_path = os.path.join(ML_MODELS_DIR, "risk_model.pkl")
             risk_meta_path = os.path.join(ML_MODELS_DIR, "risk_model_meta.json")
-            _risk_model = joblib.load(risk_path)
-            _risk_meta = json.loads(open(risk_meta_path, "r").read())
-            logger.info("Loaded risk model v%s", _risk_meta.get("version"))
+            risk_model = joblib.load(risk_path)
+            risk_meta = json.loads(open(risk_meta_path, "r").read())
+            logger.info("Loaded risk model v%s", risk_meta.get("version"))
         except Exception as e:
             logger.error("Risk model loading failed: %s", e)
 
         try:
             behavior_path = os.path.join(ML_MODELS_DIR, "behavior_model.pkl")
             behavior_meta_path = os.path.join(ML_MODELS_DIR, "behavior_model_meta.json")
-            _behavior_model = joblib.load(behavior_path)
-            _behavior_meta = json.loads(open(behavior_meta_path, "r").read())
-            logger.info("Loaded behavior model v%s", _behavior_meta.get("version"))
+            behavior_model = joblib.load(behavior_path)
+            behavior_meta = json.loads(open(behavior_meta_path, "r").read())
+            logger.info("Loaded behavior model v%s", behavior_meta.get("version"))
         except Exception as e:
             logger.error("Behavior model loading failed: %s", e)
 
@@ -64,10 +65,10 @@ def load_models():
     """
     _load_models()
 
-    if _risk_model is None or _behavior_model is None:
+    if risk_model is None or behavior_model is None:
         raise RuntimeError("ML models not loaded")
 
-    return _risk_model, _behavior_model
+    return risk_model, behavior_model
 
 
 def _assert_schema(n_cols: int, meta: dict):
@@ -98,7 +99,7 @@ def calculate_risk_score(face_match: float,
         return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
 
     try:
-        _assert_schema(feats.shape[1], _risk_meta)
+        _assert_schema(feats.shape[1], risk_meta)
         if hasattr(risk_model, "predict_proba"):
             return float(risk_model.predict_proba(feats)[0, 1])
         # Regressor fallback
@@ -132,7 +133,7 @@ def analyze_behavior_anomaly(session) -> float:
         return _rule_behavior(session)
 
     try:
-        _assert_schema(feats.shape[1], _behavior_meta)
+        _assert_schema(feats.shape[1], behavior_meta)
         if hasattr(behavior_model, "predict_proba"):
             return float(behavior_model.predict_proba(feats)[0, 1])
         # Regressor fallback

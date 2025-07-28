@@ -436,6 +436,7 @@
         try{
           const res = await fetch(ENDPOINTS.login, {
             method: 'POST',
+            credentials: 'include',
             headers: {
               'X-CSRFToken': CSRF,
               'X-Requested-With': 'XMLHttpRequest'
@@ -618,6 +619,7 @@
         // Get authentication options
         const res = await fetch(ENDPOINTS.passkeyOptions, {
           method: 'POST',
+          credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': CSRF
