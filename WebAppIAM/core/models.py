@@ -22,6 +22,7 @@ class Notification(models.Model):
     notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='INFO')
     link = models.CharField(max_length=256, blank=True, null=True)
     action_required = models.BooleanField(default=False)
+    metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:
         ordering = ['-created_at']
