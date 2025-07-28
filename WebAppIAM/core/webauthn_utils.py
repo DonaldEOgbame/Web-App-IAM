@@ -23,6 +23,7 @@ from webauthn.helpers.structs import (
     RegistrationCredential,
     AuthenticationCredential,
     PublicKeyCredentialDescriptor,
+    PublicKeyCredentialType,
 )
 from django.conf import settings
 
@@ -66,7 +67,7 @@ def generate_authentication_options(user):
     allow_credentials = [
         PublicKeyCredentialDescriptor(
             id=base64url_to_bytes(cred.credential_id),
-            type="public-key",
+            type=PublicKeyCredentialType.PUBLIC_KEY,
             transports=["internal"],
         )
         for cred in user.webauthn_credentials.all()
