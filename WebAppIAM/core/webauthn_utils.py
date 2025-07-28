@@ -93,7 +93,6 @@ def verify_authentication_response(user, data, expected_challenge):
             raw_id=credential.raw_id,
             response=credential.response,
             type=credential.type,
-            client_extension_results=credential.client_extension_results,
         ),
         expected_challenge=expected_challenge,
         expected_rp_id=settings.WEBAUTHN_RP_ID,

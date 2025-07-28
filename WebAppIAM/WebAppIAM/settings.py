@@ -174,7 +174,7 @@ REQUEST_TIMEOUT_OPS = 15
 WEBAUTHN_ENABLED = os.environ.get('WEBAUTHN_ENABLED', 'True') == 'True'
 WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
 WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'WebAppIAM')
-WEBAUTHN_EXPECTED_ORIGIN = os.environ.get('WEBAUTHN_EXPECTED_ORIGIN', 'http://localhost:8000')
+WEBAUTHN_EXPECTED_ORIGIN = os.environ.get('WEBAUTHN_EXPECTED_ORIGIN', 'http://localhost:8001')
 
 # Risk Engine Weights
 RISK_FACE_WEIGHT = 0.4
