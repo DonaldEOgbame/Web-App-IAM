@@ -120,24 +120,26 @@
 
     /* ---------- Biometric Panel ---------- */
     #biometricPanel { display:none; margin-top:32px; }
-    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
-    @media(min-width:480px){ .grid{grid-template-columns:1fr 1fr} }
+    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; }
 
     .factor-card {
       position:relative;
       background:linear-gradient(180deg,var(--surface),var(--surface-2));
       border:1px solid var(--border); border-radius:var(--radius);
-      box-shadow:var(--shadow); padding:20px;
+      box-shadow:var(--shadow); padding:28px 20px 20px;
       cursor:pointer; transition:transform var(--transition),border-color var(--transition);
+      min-height:140px;
     }
     .factor-card.disabled{opacity:.6;cursor:not-allowed}
     .factor-card:hover{transform:translateY(-4px) scale(1.02);border-color:#3a4150}
 
     .factor-head{
-      display:flex; justify-content:space-between; align-items:center; gap:8px;
       margin-bottom:16px;
     }
-    .factor-title{flex:1;font-weight:600;font-size:1rem;line-height:1.2;}
+    .factor-title{font-weight:600;font-size:1rem;line-height:1.2;}
+    .factor-card .badge{
+      position:absolute; top:8px; right:8px; white-space:nowrap;
+    }
 
     .badge{
       display:inline-flex; align-items:center; gap:8px; font-size:.8rem;
