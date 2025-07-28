@@ -584,6 +584,9 @@ def login(request):
                     )
                     
                     django_login(request, user_auth)
+                    # Ensure CSRF token persists after session rotation
+                    request.session['csrftoken'] = get_token(request)
+
                     # Create pending authentication session for biometric checks
                     session_key = getattr(request.session, 'session_key', None)
                     if isinstance(request.session, dict):
@@ -701,8 +704,9 @@ def verify_biometrics(request):
     session = get_object_or_404(UserSession, id=session_id)
     
     if request.method == 'POST':
-        if 'face_image' in request.FILES:
-            face_image = request.FILES['face_image']
+        image = request.FILES.get('face_image') or request.FILES.get('face_data')
+        if image:
+            face_image = image
             try:
                 result = verify_face(user, face_image)
                 session.face_match_score = result['confidence']
