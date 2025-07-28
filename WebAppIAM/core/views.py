@@ -793,7 +793,7 @@ def webauthn_authentication_verify(request):
             dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
             return JsonResponse({
                 'status': 'success',
-                'redirect': reverse(f'core:{dashboard_url}')
+                'next': reverse(f'core:{dashboard_url}')
             })
         else:
             return JsonResponse({
