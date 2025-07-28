@@ -372,6 +372,13 @@ def register_biometrics(request):
         user = get_object_or_404(User, id=request.session['pending_user_id'])
     if not user:
         return redirect('core:login')
+
+    if user.has_biometrics and not user.force_reenroll:
+        messages.info(request, 'Biometrics already enrolled.')
+        if request.user.is_authenticated:
+            dashboard_name = 'core:admin_dashboard' if user.role == 'ADMIN' else 'core:staff_dashboard'
+            return redirect(dashboard_name)
+        return redirect('core:login')
     
     if request.method == 'POST':
         # Handle biometric registration (face or fingerprint)
@@ -411,6 +418,8 @@ def webauthn_registration_options(request):
     user = get_registration_user(request)
     if not user:
         return JsonResponse({'error': 'Authentication required'}, status=403)
+    if user.has_biometrics and not user.force_reenroll:
+        return JsonResponse({'error': 'Biometrics already enrolled'}, status=400)
     options = generate_registration_options(user)
     request.session['webauthn_registration_challenge'] = bytes_to_base64url(
         options.challenge
@@ -439,6 +448,8 @@ def webauthn_registration_verify(request):
     user = get_registration_user(request)
     if not user:
         return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
+    if user.has_biometrics and not user.force_reenroll:
+        return JsonResponse({'status': 'error', 'message': 'Biometrics already enrolled'}, status=400)
 
     # Retrieve expected challenge (stored as base64url)
     challenge_b64u = request.session.get('webauthn_registration_challenge')
