@@ -2,11 +2,24 @@ from django.contrib import admin
 from .models import User, UserBehaviorProfile, WebAuthnCredential, UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
+
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
-    list_display = ('username', 'role', 'has_biometrics', 'is_active', 'is_staff')
-    list_filter = ('role', 'is_active', 'is_staff')
-    actions = ['lock_user', 'unlock_user']
+    """Admin options for the custom :class:`User` model."""
+
+    list_display = (
+        "username",
+        "role",
+        "has_biometrics",
+        "is_active",
+        "is_staff",
+    )
+    list_filter = ("role", "is_active", "is_staff")
+    actions = ["lock_user", "unlock_user"]
+
+    # Expose the role field when editing or creating a user
+    fieldsets = BaseUserAdmin.fieldsets + ((None, {"fields": ("role",)}),)
+    add_fieldsets = BaseUserAdmin.add_fieldsets + ((None, {"fields": ("role",)}),)
 
     def has_biometrics(self, obj):
         return obj.has_biometrics
