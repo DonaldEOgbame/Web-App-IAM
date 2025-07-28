@@ -997,6 +997,23 @@ def admin_dashboard(request):
     
     return render(request, 'core/admin_dashboard.html', context)
 
+
+@login_required
+@user_passes_test(is_admin)
+def admin_users(request):
+    """List all users for the admin dashboard."""
+    users = User.objects.all().select_related('profile')
+    pending_users = User.objects.filter(is_active=False)
+    return render(
+        request,
+        'core/admin_dashboard.html',
+        {
+            'users': users,
+            'pending_users': pending_users,
+            'show_user_management': True,
+        },
+    )
+
 # --- Document Vault Views ---
 @login_required
 def document_list(request):
