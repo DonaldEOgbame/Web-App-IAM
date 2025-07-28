@@ -584,6 +584,22 @@ def login(request):
                     )
                     
                     django_login(request, user_auth)
+                    # Create pending authentication session for biometric checks
+                    session_key = getattr(request.session, 'session_key', None)
+                    if isinstance(request.session, dict):
+                        session_key = request.session.get('session_key')
+                    if session_key is None:
+                        session_key = ''
+                    session_obj = UserSession.objects.create(
+                        user=user,
+                        session_key=session_key,
+                        ip_address=get_client_ip(request),
+                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        device_fingerprint=request.session.get('security_fingerprint')
+                    )
+                    request.session['pending_auth_user_id'] = user.id
+                    request.session['pending_auth_session_id'] = session_obj.id
+
                     next_url = reverse('core:admin_dashboard') if user.role == 'ADMIN' else reverse('core:staff_dashboard')
 
                     if is_ajax:
@@ -677,6 +693,8 @@ def verify_biometrics(request):
     session_id = request.session.get('pending_auth_session_id')
     
     if not user_id or not session_id:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'No pending authentication'}, status=400)
         return redirect('core:login')
     
     user = get_object_or_404(User, id=user_id)
