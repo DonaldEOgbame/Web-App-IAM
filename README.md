@@ -2,7 +2,14 @@
 
 ## Local Development
 
-Run the server on `localhost:8000` and configure WebAuthn and Face API settings:
+Run the server on `localhost:8000` and configure WebAuthn and Face API settings.
+If you choose a different port, update `WEBAUTHN_EXPECTED_ORIGIN` accordingly so
+the origin matches the server. For example when running on port `8001`:
+
+```bash
+export WEBAUTHN_EXPECTED_ORIGIN=http://localhost:8001
+```
+And for the default `localhost:8000` setup:
 
 ```bash
 export WEBAUTHN_RP_ID=localhost

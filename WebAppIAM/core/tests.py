@@ -146,6 +146,8 @@ class RiskEngineTests(TestCase):
     def test_load_models_raises_runtime_error(self):
         risk_engine.risk_model = None
         risk_engine.behavior_model = None
+        # Simulate models previously attempted to load
+        risk_engine._loaded = True
         with self.assertRaises(RuntimeError):
             risk_engine.load_models()
 
