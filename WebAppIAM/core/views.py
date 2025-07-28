@@ -848,15 +848,15 @@ def finalize_authentication(request, session):
     if behavior_profile.typical_device_fingerprint and session.device_fingerprint != behavior_profile.typical_device_fingerprint:
         fingerprint_anomaly = 1
     
-    session.behavior_anomaly_score = analyze_behavior_anomaly(user, session) or (
+    session.behavior_anomaly_score = analyze_behavior_anomaly(session) or (
         (time_anomaly + device_anomaly + fingerprint_anomaly) / 3
     )
     
     # Calculate risk score
     session.risk_score = calculate_risk_score(
-        face_match_score=session.face_match_score or 0,
+        face_match=session.face_match_score or 0,
         fingerprint_verified=session.fingerprint_verified,
-        behavior_anomaly_score=session.behavior_anomaly_score
+        behavior_anomaly=session.behavior_anomaly_score
     )
     
     # Determine risk level
