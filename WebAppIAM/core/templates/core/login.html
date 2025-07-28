@@ -5,7 +5,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Use system fonts to avoid external requests blocked by CSP -->
   <style>
     /* ---------- Global & Reset ---------- */
     :root {
@@ -133,18 +133,20 @@
     .factor-card.disabled{opacity:.6;cursor:not-allowed}
     .factor-card:hover{transform:translateY(-4px) scale(1.02);border-color:#3a4150}
 
-    .factor-head {
-      display:flex; align-items:flex-start; gap:12px;
+    .factor-head{
+      display:flex; justify-content:space-between; align-items:center; gap:8px;
+      margin-bottom:16px;
     }
     .factor-title{flex:1;font-weight:600;font-size:1rem;line-height:1.2;}
 
-    .badge {
-      display:inline-flex; align-items:center; gap:6px;
-      font-size:.8rem; padding:4px 8px; border-radius:999px;
-      background:var(--bg-soft); color:var(--text-dim);
+    .badge{
+      display:inline-flex; align-items:center; gap:8px; font-size:.8rem;
+      padding:6px 12px; border-radius:999px;
+      border:1px solid var(--border); background:var(--surface-2);
+      color:var(--text-dim); transition:.3s;
     }
-    .badge .dot {
-      width:8px;height:8px;border-radius:50%;background:#6b7280;
+    .badge .dot{
+      width:8px;height:8px;border-radius:50%;background:#6b7280;transition:.3s;
     }
     .badge.success .dot{background:var(--success);box-shadow:0 0 8px rgba(34,197,94,.4)}
     .badge.warn    .dot{background:var(--warning);box-shadow:0 0 8px rgba(251,191,36,.4)}
@@ -194,6 +196,8 @@
   <div id="particles"></div>
   
   <div class="page">
+    <!-- hidden form ensures Django sets the CSRF cookie for fetch requests -->
+    <form style="display:none">{% csrf_token %}</form>
     <header class="header">
       <h1 class="title">Welcome Back</h1>
       <div class="subtitle">Sign in to continue</div>
