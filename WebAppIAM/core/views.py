@@ -730,21 +730,16 @@ def verify_biometrics(request):
         'webauthn_enabled': settings.WEBAUTHN_ENABLED,
     })
 
-@csrf_exempt
 @require_http_methods(['POST'])
 def webauthn_authentication_options(request):
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
-    
-    # Verify the session contains a valid CSRF token
-    csrf_token = request.META.get('HTTP_X_CSRFTOKEN')
-    if not csrf_token or request.session.get('csrftoken') != csrf_token:
-        return JsonResponse({'error': 'CSRF validation failed'}, status=403)
-    
+
+    # Use Django's standard CSRF protection (middleware or @require_POST)
     user_id = request.session.get('pending_auth_user_id')
     if not user_id:
         return JsonResponse({'error': 'No pending authentication'}, status=400)
-    
+
     user = User.objects.get(id=user_id)
     options = generate_authentication_options(user)
     request.session['webauthn_authentication_challenge'] = bytes_to_base64url(
