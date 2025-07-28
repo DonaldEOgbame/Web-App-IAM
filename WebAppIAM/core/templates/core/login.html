@@ -2,533 +2,707 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Login</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ---------- Global & Reset ---------- */
+    :root {
+      --bg: #0f1115; --bg-soft: #14171c; --surface: #1a1d23; --surface-2: #1f232a;
+      --border: #2a2f38; --text: #e5e7eb; --text-dim: #9ca3af;
+      --primary: #8b5cf6; --primary-weak: rgba(139,92,246,0.15);
+      --success: #22c55e; --warning: #fbbf24; --danger: #ef4444;
+      --radius: 16px; --shadow: 0 12px 32px rgba(0,0,0,0.28); --transition: 180ms ease;
+    }
+    * { box-sizing: border-box; margin:0; padding:0; }
+    html, body {
+      height:100%; background:var(--bg); color:var(--text);
+      font-family:'Inter', system-ui, sans-serif; overflow-x:hidden; position:relative;
+    }
+    a{ color:var(--primary); text-decoration:none; }
+    a:hover{ text-decoration:underline; }
 
-<style>
-  :root{
-    --bg:#0f1115; --bg-soft:#14171c; --surface:#1a1d23; --surface-2:#1f232a;
-    --border:#2a2f38; --text:#e5e7eb; --text-dim:#9ca3af;
-    --primary:#8b5cf6; --primary-weak:rgba(139,92,246,.15);
-    --success:#22c55e; --warning:#fbbf24; --danger:#ef4444;
-    --radius:16px; --shadow:0 12px 32px rgba(0,0,0,.28); --transition:180ms ease;
-  }
-  *{ box-sizing:border-box; }
-  html,body{
-    margin:0; min-height:100%;
-    background:var(--bg); color:var(--text);
-    font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,Cantarell,"Noto Sans",sans-serif;
-    line-height:1.5;
-  }
-  a{ color:var(--primary); text-decoration:none; }
-  a:hover{ text-decoration:underline; }
+    /* ---------- Particles ---------- */
+    #particles { position:fixed; inset:0; z-index:0; pointer-events:none; }
+    .particle {
+      position:absolute; border-radius:50%; opacity:.1;
+      animation:float 20s infinite linear;
+    }
+    @keyframes float{0%{transform:translate(0,0)}50%{transform:translate(20px,-50px)}100%{transform:translate(0,0)}}
 
-  .wrap{
-    min-height:100vh; display:flex; align-items:center; justify-content:center; padding:32px 16px;
-  }
-  .card{
-    width:100%; max-width:460px; background:var(--surface); border:1px solid var(--border);
-    border-radius:var(--radius); box-shadow:var(--shadow); padding:32px 28px; position:relative;
-  }
-  h1{
-    margin:0 0 24px; text-align:center; font-weight:800; font-size:1.6rem;
-    background:linear-gradient(90deg,var(--primary),#a855f7,var(--primary));
-    background-size:200% 100%;
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-    animation:shimmer 2.5s infinite, fadeSlideIn 320ms ease forwards; opacity:0;
-  }
-  @keyframes shimmer{ 0%{background-position:0% 50%} 100%{background-position:200% 50%} }
-  @keyframes fadeSlideIn{ from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    /* ---------- Container ---------- */
+    .page { max-width:480px; margin:40px auto; padding:0 16px; position:relative; z-index:10; }
+    .header {
+      text-align:center; margin-bottom:24px; animation:fadeIn .8s ease-out;
+    }
+    .title {
+      font-size:clamp(28px,5vw,36px); font-weight:800;
+      background:linear-gradient(90deg, #8b5cf6, #a855f7, #8b5cf6);
+      background-size:200% 100%;
+      -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+      animation:shimmer 2.5s infinite, fadeSlideIn .32s ease forwards; opacity:0;
+    }
+    .subtitle { color:var(--text-dim); font-size:.95rem; margin-top:8px; }
 
-  form{ display:grid; gap:16px; }
-  form p{ margin:0; display:flex; flex-direction:column; gap:6px; }
-  form p > label{ font-size:.95rem; color:var(--text-dim); }
+    @keyframes shimmer{0%{background-position:0% 50%}100%{background-position:200% 50%}}
+    @keyframes fadeSlideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 
-  input[type="text"], input[type="password"]{
-    width:100%; background:var(--bg-soft); border:1px solid var(--border);
-    color:var(--text); padding:10px 12px; border-radius:10px;
-    transition:border var(--transition), box-shadow var(--transition);
-  }
-  input:focus{
-    border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak); outline:none;
-  }
+    .card {
+      background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius); box-shadow:var(--shadow);
+      padding:32px 24px; position:relative;
+    }
 
-  /* wrapper that hosts the eye button */
-  .password-wrapper{
-    position:relative;
-  }
-  .password-wrapper input{
-    padding-right:44px; /* leave room for the eye button */
-  }
-  .toggle-visibility{
-    position:absolute; top:50%; right:12px; transform:translateY(-50%);
-    width:28px; height:28px; border:none; background:transparent;
-    color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center;
-  }
-  .toggle-visibility:focus{
-    outline:none; box-shadow:0 0 0 3px var(--primary-weak); border-radius:6px;
-  }
-  .toggle-visibility svg{
-    width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2;
-  }
+    /* ---------- Messages ---------- */
+    .messages { list-style:none; margin-bottom:16px; }
+    .messages li {
+      margin-bottom:8px; padding:10px 12px; border-radius:10px;
+      background:var(--surface-2); color:var(--text);
+      border-left:3px solid var(--primary);
+    }
+    .messages li.error{border-left-color:var(--danger)}
+    .messages li.success{border-left-color:var(--success)}
+    .messages li.warning{border-left-color:var(--warning)}
 
-  .btn{
-    display:inline-flex; align-items:center; justify-content:center; gap:6px;
-    padding:12px 16px; border:none; border-radius:10px; background:var(--primary);
-    color:#fff; font-weight:600; cursor:pointer; transition:opacity .15s ease, transform .15s ease;
-  }
-  .btn:hover{ opacity:.95; }
-  .btn:active{ transform:translateY(1px); }
-  .btn[disabled]{ opacity:.6; cursor:not-allowed; }
-  .btn-outline{ background:transparent; color:var(--text); border:1px solid var(--border); }
-  .btn-outline:hover{ background:var(--surface-2); }
+    /* ---------- Form ---------- */
+    form { display:grid; gap:16px; }
+    form p { margin:0; display:flex; flex-direction:column; gap:6px; }
+    form label { font-size:.95rem; color:var(--text-dim); }
+    input[type="text"], input[type="password"] {
+      width:100%; background:var(--bg-soft); border:1px solid var(--border);
+      color:var(--text); padding:10px 12px; border-radius:10px;
+      transition: border var(--transition), box-shadow var(--transition);
+    }
+    input:focus {
+      border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak); outline:none;
+    }
 
-  .messages{ list-style:none; margin:0 0 16px; padding:0; }
-  .messages li{
-    margin-bottom:8px; padding:10px 12px; border-radius:10px; background:var(--surface-2);
-    color:var(--text); border-left:3px solid var(--primary);
-  }
-  .messages li.error{ border-left-color:var(--danger); }
-  .messages li.success{ border-left-color:var(--success); }
-  .messages li.warning{ border-left-color:var(--warning); }
+    /* ---------- Password Toggle ---------- */
+    .password-wrapper { position:relative; }
+    .password-wrapper input { padding-right:44px; }
+    .toggle-visibility {
+      position:absolute; top:50%; right:12px; transform:translateY(-50%);
+      background:transparent; border:none; color:var(--text-dim); cursor:pointer;
+    }
+    .toggle-visibility:focus {
+      outline:none; box-shadow:0 0 0 3px var(--primary-weak); border-radius:6px;
+    }
+    .toggle-visibility svg {
+      width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2;
+    }
 
-  .status{ font-size:.9rem; color:var(--text-dim); }
-  .status.success{ color:var(--success); }
-  .status.error{ color:var(--danger); }
+    /* ---------- Buttons & Status ---------- */
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      padding:12px 16px; border:none; border-radius:10px; background:var(--primary);
+      color:#fff; font-weight:600; cursor:pointer; transition:opacity .15s, transform .15s;
+    }
+    .btn:hover{opacity:.95} .btn:active{transform:translateY(1px)}
+    .btn[disabled]{opacity:.6;cursor:not-allowed}
 
-  .submitting{
-    opacity:.6; pointer-events:none; position:relative;
-  }
-  .submitting::after{
-    content:""; width:18px;height:18px; border:2px solid rgba(255,255,255,.4);
-    border-top-color:#fff; border-radius:50%;
-    animation:spin .6s linear infinite; position:absolute; right:14px; top:50%; transform:translateY(-50%);
-  }
-  @keyframes spin{ to{ transform:translateY(-50%) rotate(360deg); } }
+    .status {
+      font-size:.9rem; color:var(--text-dim); min-height:1.2em;
+    }
+    .status.success{color:var(--success)} .status.error{color:var(--danger)}
 
-  /* --- Biometric Panel --- */
-  .biometric-panel{
-    display:none; margin-top:20px; padding:20px; border:1px solid var(--border);
-    border-radius:12px; background:var(--surface-2);
-  }
-  .biometric-panel.active{ display:block; animation:fadeSlideIn 220ms ease forwards; }
+    .submitting{
+      opacity:.6; pointer-events:none; position:relative;
+    }
+    .submitting::after{
+      content:""; width:18px;height:18px;
+      border:2px solid rgba(255,255,255,.4); border-top-color:#fff;
+      border-radius:50%; animation:spin .6s linear infinite;
+      position:absolute; right:14px; top:50%; transform:translateY(-50%);
+    }
+    @keyframes spin{to{transform:translateY(-50%) rotate(360deg)}}
 
-  .step-head{
-    display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
-  }
-  .badge{
-    font-size:.75rem; padding:2px 8px; border-radius:9999px; background:var(--bg-soft); color:var(--text-dim);
-  }
-  .badge.required{ background:var(--danger); color:#fff; }
-  .badge.optional{ background:var(--primary); color:#fff; }
+    /* ---------- Biometric Panel ---------- */
+    #biometricPanel { display:none; margin-top:32px; }
+    .grid { display:grid; grid-template-columns:1fr; gap:16px; }
+    @media(min-width:480px){ .grid{grid-template-columns:1fr 1fr} }
 
-  video{
-    width:100%; max-height:320px; background:#000; border-radius:10px;
-  }
-  .link{
-    text-align:center;
-    margin-top:10px;
-  }
-</style>
+    .factor-card {
+      position:relative;
+      background:linear-gradient(180deg,var(--surface),var(--surface-2));
+      border:1px solid var(--border); border-radius:var(--radius);
+      box-shadow:var(--shadow); padding:20px;
+      cursor:pointer; transition:transform var(--transition),border-color var(--transition);
+    }
+    .factor-card.disabled{opacity:.6;cursor:not-allowed}
+    .factor-card:hover{transform:translateY(-4px) scale(1.02);border-color:#3a4150}
+
+    .factor-head {
+      display:flex; align-items:flex-start; gap:12px;
+    }
+    .factor-title{flex:1;font-weight:600;font-size:1rem;line-height:1.2;}
+
+    .badge {
+      display:inline-flex; align-items:center; gap:6px;
+      font-size:.8rem; padding:4px 8px; border-radius:999px;
+      background:var(--bg-soft); color:var(--text-dim);
+    }
+    .badge .dot {
+      width:8px;height:8px;border-radius:50%;background:#6b7280;
+    }
+    .badge.success .dot{background:var(--success);box-shadow:0 0 8px rgba(34,197,94,.4)}
+    .badge.warn    .dot{background:var(--warning);box-shadow:0 0 8px rgba(251,191,36,.4)}
+    .badge.danger  .dot{background:var(--danger);box-shadow:0 0 8px rgba(239,68,68,.4)}
+
+    .muted{margin-top:8px;color:var(--text-dim);font-size:.85rem;line-height:1.4;}
+
+    /* ----- Face modal (new) ----- */
+    .modal{ position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.7); backdrop-filter: blur(8px); z-index:100; opacity:0; transition:opacity .3s; }
+    .modal.open{ display:flex; opacity:1; animation: fadeIn .3s ease; }
+    .modal-card{ width:min(480px,92vw); background:var(--surface); border:1px solid var(--border); border-radius:18px; box-shadow:var(--shadow); padding:20px; position:relative; transform:scale(.95); transition: transform .3s; }
+    .modal.open .modal-card{ transform:scale(1); }
+    .modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .modal-title{ font-size:18px; font-weight:600; }
+    .video-wrap{ position:relative; border:1px solid var(--border); border-radius:14px; overflow:hidden; background:#0b0d12; }
+    video, canvas { width:100%; aspect-ratio:4/3; display:block; }
+    .overlay-text{
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:700; font-size: clamp(32px,6vw,42px);
+      color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.6); pointer-events:none; transition:.3s;
+    }
+    .overlay-sub{
+      position:absolute; left:50%; transform:translateX(-50%); bottom:14px; font-size:14px; color:#d1d5db; background:rgba(0,0,0,.35);
+      padding:8px 16px; border-radius:999px; border:1px solid rgba(255,255,255,.15); backdrop-filter: blur(4px); z-index:5;
+    }
+    .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+
+    .progress-ring{ position:absolute; top:50%; left:50%; transform: translate(-50%,-50%); width:120px; height:120px; z-index:4; }
+    .progress-circle{
+      fill:none; stroke:var(--primary); stroke-width:6; stroke-dasharray:339.292; stroke-dashoffset:339.292; stroke-linecap:round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 1s linear;
+    }
+
+    /* ----- Toasts (new) ----- */
+    #toast{ position:fixed; right:16px; bottom:16px; display:flex; flex-direction:column; gap:8px; z-index:200; width:320px; }
+    .toast{ background:var(--surface-2); border:1px solid var(--border); padding:14px 16px; border-radius:12px; color:var(--text); box-shadow:var(--shadow); font-size:14px; transform: translateX(120%); opacity:0; transition: all .4s cubic-bezier(.175,.885,.32,1.275); display:flex; align-items:center; gap:12px; }
+    .toast.show{ transform: translateX(0); opacity:1; }
+    .toast-icon{ width:24px; height:24px; display:flex; align-items:center; justify-content:center; border-radius:50%; flex-shrink:0; }
+    .toast.success .toast-icon{ background:rgba(34,197,94,.15); color:var(--success); }
+    .toast.warn .toast-icon{ background:rgba(251,191,36,.15); color:var(--warning); }
+    .toast.danger .toast-icon{ background:rgba(239,68,68,.15); color:var(--danger); }
+    .toast.info .toast-icon{ background:rgba(139,92,246,.15); color:var(--primary); }
+    .spinner{ width:18px; height:18px; border:3px solid rgba(139,92,246,.3); border-radius:50%; border-top:3px solid var(--primary); animation: spin 1s linear infinite; display:inline-block; }
+    @keyframes spin{ to{ transform: rotate(360deg) } }
+  </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="card" role="main">
-    <h1>Welcome back</h1>
+  <!-- Particles background -->
+  <div id="particles"></div>
+  
+  <div class="page">
+    <header class="header">
+      <h1 class="title">Welcome Back</h1>
+      <div class="subtitle">Sign in to continue</div>
+    </header>
 
-    {% if messages %}
-    <ul class="messages" aria-live="polite">
-      {% for m in messages %}
-        <li class="{{ m.tags }}">{{ m }}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
+    <div class="card" role="main">
+      {% if messages %}
+      <ul class="messages" aria-live="polite">
+        {% for m in messages %}
+          <li class="{{ m.tags }}">{{ m }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
 
-    <!-- PASSWORD-FIRST LOGIN -->
-    <form id="loginForm" method="post" action="{% url 'core:login' %}" novalidate>
-      {% csrf_token %}
-      {{ form.as_p }}
+      <form id="loginForm" method="post" action="{% url 'core:login' %}">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <input type="hidden" name="keystroke_data" id="keystroke_data" />
+        <button id="loginBtn" class="btn" type="submit">Login</button>
+        <p id="loginStatus" class="status" aria-live="polite"></p>
+      </form>
 
-      <!-- Hidden field to carry keystroke dynamics -->
-      <input type="hidden" name="keystroke_data" id="keystroke_data" />
-
-      <button id="loginBtn" class="btn" type="submit">Login</button>
-      <p id="loginStatus" class="status" aria-live="polite"></p>
-    </form>
-
-    <div class="link"><a href="{% url 'core:password_reset' %}">Forgot password?</a></div>
-    <div class="link">Don't have an account? <a href="{% url 'core:register' %}">Register</a></div>
-
-    <!-- BIOMETRICS -->
-    <section id="biometricPanel" class="biometric-panel" aria-hidden="true">
-      <div class="step-head">
-        <h2 style="margin:0;font-size:1.05rem;">Biometric verification required</h2>
-        <span class="badge required">Required</span>
+      <div style="margin-top:16px; text-align:center;">
+        <a href="{% url 'core:password_reset' %}">Forgot password?</a> •
+        <a href="{% url 'core:register' %}">Register</a>
       </div>
-      <p class="status">Choose any biometric you’ve enrolled (Face or Fingerprint/Passkey) to continue.</p>
 
-      <!-- FACE -->
-      <div id="faceBlock" style="margin-top:16px; display:none;">
-        <div class="step-head">
-          <h3 style="margin:0;font-size:1rem;">Verify with Face</h3>
-          <span class="badge optional">Optional</span>
+      <!-- Biometrics Section -->
+      <section id="biometricPanel">
+        <div class="subtitle" style="text-align:center;margin-bottom:16px;">
+          Complete your sign‑in—pick one of the options below
         </div>
-
-        <form id="faceVerifyForm" method="post" enctype="multipart/form-data">
-          <video id="faceVideo" autoplay playsinline></video>
-          <div style="margin-top:8px;">
-            <button id="verifyFaceBtn" class="btn" type="submit">Verify Face</button>
+        <div class="grid">
+          <div id="face-card" class="factor-card" role="button" tabindex="0" aria-label="Verify with Face">
+            <div class="factor-head">
+              <div class="factor-title">Face Verification</div>
+              <div id="face-status" class="badge"><span class="dot"></span> Tap to start</div>
+            </div>
+            <p class="muted">Use your camera to verify your face.</p>
           </div>
-          <p id="faceStatus" class="status" aria-live="polite"></p>
-        </form>
-      </div>
-
-      <!-- WebAuthn -->
-      <div id="webauthnBlock" style="margin-top:20px; display:none;">
-        <div class="step-head">
-          <h3 style="margin:0;font-size:1rem;">Verify with Fingerprint / Passkey</h3>
-          <span class="badge optional">Optional</span>
+          <div id="passkey-card" class="factor-card" role="button" tabindex="0" aria-label="Verify with Passkey">
+            <div class="factor-head">
+              <div class="factor-title">Fingerprint / Passkey</div>
+              <div id="passkey-status" class="badge"><span class="dot"></span> Tap to start</div>
+            </div>
+            <p class="muted">Use your device’s biometric or security key.</p>
+          </div>
         </div>
-
-        <button id="fpButton" class="btn btn-outline" type="button">Use Fingerprint / Passkey</button>
-        <p id="fpStatus" class="status" aria-live="polite"></p>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
-</div>
 
-<script>
-(function(){
-  // ---------- CONFIG (endpoints your backend exposes) ----------
-  const ENDPOINTS = {
-    login: "{% url 'core:login' %}",  // should return JSON on AJAX
-    face_verify: "{% url 'core:verify_biometrics' %}",
-    webauthn_options: "{% url 'core:webauthn_authentication_options' %}",
-    webauthn_verify: "{% url 'core:webauthn_authentication_verify' %}"
-  };
+  <!-- Face modal (new) -->
+  <div class="modal" id="face-modal" aria-hidden="true" aria-labelledby="face-modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title">Face Verification</h2>
+      </div>
+      <div class="video-wrap">
+        <video id="video" playsinline muted></video>
+        <canvas id="canvas" style="display:none;"></canvas>
 
-  const requireBiometrics = true;
+        <svg class="progress-ring" viewBox="0 0 120 120"><circle class="progress-circle" r="54" cx="60" cy="60"></circle></svg>
+        <div class="overlay-text" id="countdown-text">3</div>
+        <div class="overlay-sub">Position your face in the frame</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancel-face">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
 
-  // ---------- CSRF ----------
-  function getCookie(name) {
-    const match = document.cookie.match(new RegExp('(^| )'+name+'=([^;]+)'));
-    if (match) return match[2];
-    return null;
-  }
-  const csrftoken = getCookie('csrftoken') || (document.querySelector('input[name=csrfmiddlewaretoken]')?.value ?? '');
+  <!-- Toasts container (new) -->
+  <div id="toast" aria-live="polite" aria-atomic="true"></div>
 
-  // ---------- Helpers ----------
-  function setStatus(el, msg, type){
-    if(!el) return;
-    el.textContent = msg;
-    el.className = 'status ' + (type || '');
-  }
-  function toggle(el, show){
-    if(!el) return;
-    el.style.display = show ? '' : 'none';
-  }
-  function activatePanel(panel){
-    if(!panel) return;
-    panel.classList.add('active');
-    panel.setAttribute('aria-hidden', 'false');
-    panel.scrollIntoView({ behavior: 'smooth' });
-  }
-  function toBase64Url(buf) {
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/,'');
-  }
-  function b64UrlToBuf(b64){
-    b64 = b64.replace(/-/g, '+').replace(/_/g, '/');
-    const pad = b64.length % 4;
-    if(pad) b64 += '='.repeat(4 - pad);
-    return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
-  }
+  <script>
+    /* -------------------------------- Utilities -------------------------------- */
+    const qs = (s, el=document) => el.querySelector(s);
+    const qsa = (s, el=document) => el.querySelectorAll(s);
 
-  // ---------- Password visibility toggle (FIXED & ROBUST) ----------
-  function initPasswordToggles(){
-    const selectors = 'input[type="password"]';
-    const inputs = Array.from(document.querySelectorAll(selectors));
-    inputs.forEach(input => {
-      // prevent double-wrapping if re-run
-      if (input.dataset.toggleInit === '1') return;
-      input.dataset.toggleInit = '1';
+    function toast(msg, type="info", ms=3200){
+      const t = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerHTML = `<div class="toast-icon">${type==='success'?'✓':type==='danger'?'✕':type==='warn'?'⚠':'i'}</div><div>${msg}</div>`;
+      qs('#toast').appendChild(t);
+      setTimeout(()=>t.classList.add('show'),10);
+      setTimeout(()=>{ t.classList.remove('show'); setTimeout(()=>t.remove(),400); }, ms);
+    }
+    
+    function getCookie(name){ 
+      const m=document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)'); 
+      return m ? decodeURIComponent(m.pop()) : ''; 
+    }
+    
+    function setBadge(el, cls, text){ 
+      el.classList.remove('success','warn','danger','pulse'); 
+      if(cls) el.classList.add(cls); 
+      el.innerHTML=`<span class="dot"></span> ${text}`; 
+    }
+    
+    function setSpinner(el, text){ 
+      setBadge(el, null, text); 
+      const dot=el.querySelector('.dot'); 
+      if(dot){ 
+        dot.innerHTML='<div class="spinner"></div>'; 
+        dot.classList.remove('dot'); 
+      } 
+    }
 
-      // Wrap the input so we can position the eye inside
-      const wrapper = document.createElement('div');
-      wrapper.className = 'password-wrapper';
-      input.parentNode.insertBefore(wrapper, input);
-      wrapper.appendChild(input);
+    const CSRF = getCookie('csrftoken');
 
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'toggle-visibility';
-      btn.setAttribute('aria-label', 'Toggle password visibility');
-      btn.setAttribute('aria-pressed', 'false');
-      btn.innerHTML = eyeSvg();
-      wrapper.appendChild(btn);
-
-      btn.addEventListener('click', () => {
-        const visible = input.type === 'text';
-        input.type = visible ? 'password' : 'text';
-        btn.setAttribute('aria-pressed', String(!visible));
-        btn.innerHTML = visible ? eyeSvg() : eyeOffSvg();
-        // keep caret at end
-        input.focus();
-        input.selectionStart = input.selectionEnd = input.value.length;
+    async function postJSON(url, data, extra={}){
+      const res = await fetch(url, {
+        method:'POST', 
+        credentials:'same-origin',
+        headers:{
+          'Content-Type':'application/json',
+          'X-CSRFToken':CSRF, 
+          ...(extra.headers||{})
+        },
+        body: JSON.stringify(data), 
+        ...extra
       });
-    });
-  }
+      
+      const ct = res.headers.get('content-type') || '';
+      const payload = ct.includes('application/json') 
+        ? await res.json().catch(()=>({})) 
+        : {};
+      
+      if(!res.ok){ 
+        throw new Error(payload.message || payload.error || `HTTP ${res.status}`); 
+      }
+      return payload;
+    }
 
-  function eyeSvg(){
-    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-  }
-  function eyeOffSvg(){
-    return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94"></path><path d="M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-3.17 4.15"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
-  }
+    const b64url = {
+      toBuf: (b64u) => {
+        b64u = String(b64u||'').replace(/-/g,'+').replace(/_/g,'/');
+        const pad = b64u.length % 4; 
+        if(pad) b64u += '='.repeat(4-pad);
+        const bin = atob(b64u); 
+        const arr = new Uint8Array(bin.length); 
+        for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+        return arr.buffer;
+      },
+      fromBuf: (buf) => 
+        btoa(String.fromCharCode(...new Uint8Array(buf)))
+          .replace(/\+/g,'-')
+          .replace(/\//g,'_')
+          .replace(/=+$/,'')
+    };
 
-  // ---------- Keystroke dynamics ----------
-  (function initKeystrokeDynamics(){
-    const events = [];
-    const userEl = document.getElementById('id_username');
-    const passEl = document.getElementById('id_password');
-    const ksHidden = document.getElementById('keystroke_data');
+    /* ---------- Endpoints & CSRF ---------- */
+    const ENDPOINTS = {
+      login: "{% url 'core:login' %}",
+      faceUpload: "{% url 'core:verify_biometrics' %}",
+      passkeyOptions: "{% url 'core:webauthn_authentication_options' %}",
+      passkeyVerify: "{% url 'core:webauthn_authentication_verify' %}"
+    };
 
-    function record(e){ events.push({type:e.type, key:e.key, time:Date.now()}); }
+    /* ---------- Elements ---------- */
+    const els = {
+      faceCard: qs('#face-card'),
+      faceStatus: qs('#face-status'),
+      passkeyCard: qs('#passkey-card'),
+      passkeyStatus: qs('#passkey-status'),
+      faceModal: qs('#face-modal'),
+      video: qs('#video'),
+      canvas: qs('#canvas'),
+      countdown: qs('#countdown-text'),
+      cancelFace: qs('#cancel-face'),
+      progressCircle: qs('.progress-circle'),
+      biometricPanel: qs('#biometricPanel'),
+      loginForm: qs('#loginForm'),
+      loginBtn: qs('#loginBtn'),
+      loginStatus: qs('#loginStatus')
+    };
 
-    if(userEl && passEl){
-      ['keydown','keyup'].forEach(evt=>{
-        userEl.addEventListener(evt, record);
-        passEl.addEventListener(evt, record);
+    /* ---------- State ---------- */
+    const state = { 
+      face: { stream: null },
+      passkey: {}
+    };
+
+    /* -------- Keystroke dynamics -------- */
+    (function(){
+      const events=[]; 
+      const u=qs('#id_username'), p=qs('#id_password'), h=qs('#keystroke_data');
+      if(u&&p){
+        ['keydown','keyup'].forEach(evt=>{
+          u.addEventListener(evt,e=>events.push({type:e.type,key:e.key,time:Date.now()}));
+          p.addEventListener(evt,e=>events.push({type:e.type,key:e.key,time:Date.now()}));
+        });
+      }
+      qs('#loginForm').addEventListener('submit',()=>{ 
+        if(h) h.value=JSON.stringify(events); 
+      });
+    })();
+
+    /* -------- Password toggle -------- */
+    (function(){
+      document.querySelectorAll('input[type="password"]').forEach(input=>{
+        if(input.dataset.toggled) return;
+        input.dataset.toggled='1';
+        const wrapper=document.createElement('div'); 
+        wrapper.className='password-wrapper';
+        input.parentNode.insertBefore(wrapper,input); 
+        wrapper.appendChild(input);
+        const btn=document.createElement('button'); 
+        btn.type='button'; 
+        btn.className='toggle-visibility';
+        btn.setAttribute('aria-label','Toggle password visibility');
+        btn.innerHTML=`<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+        wrapper.appendChild(btn);
+        btn.addEventListener('click',()=>{
+          const show=input.type==='password';
+          input.type=show?'text':'password';
+          btn.innerHTML=show
+            ? `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+            : `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+        });
+      });
+    })();
+
+    /* ---- Login & show biometrics ---- */
+    (function(){
+      async function ajaxLogin(e){
+        e.preventDefault();
+        els.loginStatus.textContent='Authenticating…'; 
+        els.loginStatus.className='status';
+        els.loginBtn.classList.add('submitting');
+        
+        const fd = new FormData(els.loginForm);
+        try{
+          const res = await fetch(ENDPOINTS.login, {
+            method: 'POST',
+            headers: {
+              'X-CSRFToken': CSRF,
+              'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: fd
+          });
+          
+          const data = await res.json();
+          if(data.status === 'ok'){
+            window.location.href = data.next || '/'; 
+            return;
+          }
+          
+          if(data.status === 'password_ok_biometric_required'){
+            els.loginForm.style.display='none'; 
+            els.biometricPanel.style.display='block'; 
+            return;
+          }
+          
+          els.loginStatus.textContent = data.message || 'Login failed'; 
+          els.loginStatus.classList.add('error');
+        } catch(err) {
+          console.error(err);
+          els.loginStatus.textContent='Network/server error'; 
+          els.loginStatus.classList.add('error');
+        } finally { 
+          els.loginBtn.classList.remove('submitting'); 
+        }
+      }
+      
+      els.loginForm.addEventListener('submit', ajaxLogin);
+    })();
+
+    /* ---- Activation helper ---- */
+    function activate(el, fn){
+      el.addEventListener('click', () => { 
+        if(!el.classList.contains('disabled')) fn(); 
+      });
+      el.addEventListener('keydown', e => { 
+        if((e.key==='Enter'||e.key===' ') && !el.classList.contains('disabled')){ 
+          e.preventDefault(); 
+          fn(); 
+        }
       });
     }
 
-    document.getElementById('loginForm')?.addEventListener('submit', ()=>{
-      if(ksHidden) ksHidden.value = JSON.stringify(events);
-    });
-  })();
-
-  // ---------- Password-first flow ----------
-  const loginForm = document.getElementById('loginForm');
-  const loginBtn  = document.getElementById('loginBtn');
-  const loginStatus = document.getElementById('loginStatus');
-
-  const biometricPanel = document.getElementById('biometricPanel');
-  const faceBlock = document.getElementById('faceBlock');
-  const webauthnBlock = document.getElementById('webauthnBlock');
-
-  const faceVideo = document.getElementById('faceVideo');
-  const faceForm = document.getElementById('faceVerifyForm');
-  const verifyFaceBtn = document.getElementById('verifyFaceBtn');
-  const faceStatus = document.getElementById('faceStatus');
-
-  const fpButton = document.getElementById('fpButton');
-  const fpStatus = document.getElementById('fpStatus');
-
-  let faceStream = null;
-
-  async function ajaxLogin(e){
-    e.preventDefault();
-    if(!loginForm) return;
-
-    setStatus(loginStatus, 'Authenticating...', '');
-    loginBtn?.classList.add('submitting');
-
-    const formData = new FormData(loginForm);
-
-    try{
-      const resp = await fetch(ENDPOINTS.login, {
-        method: 'POST',
-        headers: {'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
-        body: formData
-      });
-
-      const result = await resp.json();
-
-      if(result.status === 'ok'){
-        window.location.href = result.next || '/';
+    /* -------------------------------- Face Flow -------------------------------- */
+    function openFaceModal(){ 
+      els.faceModal.classList.add('open'); 
+      els.faceModal.setAttribute('aria-hidden','false'); 
+    }
+    
+    function closeFaceModal(){ 
+      els.faceModal.classList.remove('open'); 
+      els.faceModal.setAttribute('aria-hidden','true'); 
+      stopCamera(); 
+    }
+    
+    function stopCamera(){ 
+      if(state.face.stream){ 
+        state.face.stream.getTracks().forEach(t=>t.stop()); 
+        state.face.stream=null; 
+        els.video.srcObject=null; 
+      } 
+    }
+    
+    function ensureCanvas(){ 
+      const vw = els.video.videoWidth || 640;
+      const vh = els.video.videoHeight || 480;
+      els.canvas.width = vw; 
+      els.canvas.height = vh; 
+    }
+    
+    async function startCamera(){
+      try{
+        const constraints = { 
+          video: { 
+            facingMode: 'user', 
+            width: { ideal: 1280 }, 
+            height: { ideal: 720 } 
+          }, 
+          audio: false 
+        };
+        state.face.stream = await navigator.mediaDevices.getUserMedia(constraints);
+        els.video.srcObject = state.face.stream;
+        await els.video.play();
+        ensureCanvas();
+        return true;
+      } catch(err) { 
+        console.error('Camera Error:', err); 
+        return false; 
+      }
+    }
+    
+    async function captureBlob(){
+      ensureCanvas();
+      const ctx = els.canvas.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(els.video, 0, 0, els.canvas.width, els.canvas.height);
+      return new Promise(r => els.canvas.toBlob(r, 'image/jpeg', 0.92));
+    }
+    
+    async function runFaceVerification(){
+      els.faceCard.classList.add('disabled'); 
+      setBadge(els.faceStatus, null, 'Preparing camera…'); 
+      openFaceModal();
+      
+      const ok = await startCamera();
+      if(!ok){
+        closeFaceModal(); 
+        setBadge(els.faceStatus, 'danger', 'Camera unavailable'); 
+        els.faceCard.classList.remove('disabled'); 
+        toast('Could not access your camera', 'danger'); 
         return;
       }
 
-      if(result.status === 'password_ok_biometric_required' && requireBiometrics){
-        setStatus(loginStatus, 'Password ok. Please complete biometric verification.', 'success');
-        if(result.face) initFaceBlock(true);
-        if(result.webauthn) initWebAuthnBlock(true);
-        activatePanel(biometricPanel);
-        loginForm.style.display = 'none';
-        return;
+      // Countdown
+      const n = 3;
+      const circle = els.progressCircle; 
+      const C = 2 * Math.PI * 54; 
+      circle.style.strokeDashoffset = C;
+      
+      for(let i = n; i > 0; i--){
+        els.countdown.textContent = i;
+        const progress = 1 - ((i - 1) / n);
+        circle.style.strokeDashoffset = C - (progress * C);
+        await new Promise(r => setTimeout(r, 1000));
       }
-
-      setStatus(loginStatus, result.message || 'Login failed', 'error');
-
-    }catch(err){
-      console.error(err);
-      setStatus(loginStatus, 'Network / server error. Please try again.', 'error');
-    }finally{
-      loginBtn?.classList.remove('submitting');
-    }
-  }
-
-  loginForm?.addEventListener('submit', ajaxLogin);
-
-  // ---------- FACE VERIFICATION ----------
-  function initFaceBlock(show){
-    toggle(faceBlock, show);
-    if(!show) return;
-
-    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-      setStatus(faceStatus, 'Camera not supported in this browser.', 'error');
-      return;
-    }
-
-    navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user",
-        width: { min: 640, ideal: 1280 },
-        height: { min: 480, ideal: 720 }
-      }
-    }).then(stream => {
-      faceStream = stream;
-      if(faceVideo) faceVideo.srcObject = stream;
-    }).catch(err => {
-      setStatus(faceStatus, 'Unable to access camera: ' + (err?.message || err), 'error');
-    });
-
-    faceForm?.addEventListener('submit', async function(e){
-      e.preventDefault();
-      verifyFaceBtn?.classList.add('submitting');
-      setStatus(faceStatus, 'Verifying face...', '');
+      
+      els.countdown.textContent = 'Capturing…'; 
+      circle.style.strokeDashoffset = '0';
 
       try{
-        const canvas = document.createElement('canvas');
-        canvas.width = faceVideo.videoWidth || 640;
-        canvas.height = faceVideo.videoHeight || 480;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(faceVideo,0,0,canvas.width,canvas.height);
-
-        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
-        const data = new FormData();
-        data.append('face_image', blob, 'face.png');
-
-        const resp = await fetch(ENDPOINTS.face_verify, {
-          method:'POST',
-          headers:{'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
-          body:data
+        const blob = await captureBlob();
+        setBadge(els.faceStatus, null, 'Uploading…');
+        
+        const fd = new FormData(); 
+        fd.append('face_data', blob, 'face.jpg');
+        
+        const res = await fetch(ENDPOINTS.faceUpload, {
+          method: 'POST', 
+          credentials: 'same-origin', 
+          headers: { 'X-CSRFToken': CSRF }, 
+          body: fd
         });
-        const result = await resp.json();
-
-        if(result.status === 'success'){
-          setStatus(faceStatus, 'Face verified!', 'success');
-          window.location.href = result.redirect || '/';
-        }else{
-          setStatus(faceStatus, result.message || 'Face verification failed', 'error');
+        
+        const data = await res.json();
+        if(data.status === 'ok' || data.status === 'success'){
+          window.location.href = data.next || '/';
+        } else {
+          throw new Error(data.message || 'Verification failed');
         }
-
-      }catch(e){
-        console.error(e);
-        setStatus(faceStatus, 'Face verification failed', 'error');
-      }finally{
-        verifyFaceBtn?.classList.remove('submitting');
+      } catch(err) {
+        console.error('Face Verification Error:', err);
+        setBadge(els.faceStatus, 'danger', 'Failed — tap to retry'); 
+        toast('Face verification failed: ' + (err.message || 'Please try again'), 'danger');
+      } finally {
+        closeFaceModal(); 
+        els.faceCard.classList.remove('disabled'); 
+        circle.style.strokeDashoffset = C;
       }
-    }, { once:true });
-  }
+    }
 
-  // ---------- WEBAUTHN VERIFICATION ----------
-  function initWebAuthnBlock(show){
-    toggle(webauthnBlock, show);
-    if(!show) return;
-
-    fpButton?.addEventListener('click', async function(){
-      if(window.isSecureContext === false){
-        setStatus(fpStatus, 'WebAuthn requires HTTPS.', 'error');
-        return;
-      }
-      if(!('credentials' in navigator) || !('get' in navigator.credentials)){
-        setStatus(fpStatus, 'WebAuthn not supported in this browser.', 'error');
-        return;
-      }
-
-      try{
-        fpButton.classList.add('submitting');
-        setStatus(fpStatus, 'Preparing authenticator...', '');
-
-        // 1) Get assertion options
-        const optResp = await fetch(ENDPOINTS.webauthn_options, {
-          method:'POST',
-          headers:{'X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'}
+    /* ---------------------- Passkey (WebAuthn) Flow ---------------------- */
+    function normalizeAuthOptions(options){
+      return {
+        ...options,
+        challenge: b64url.toBuf(options.challenge),
+        allowCredentials: (options.allowCredentials || []).map(cred => ({
+          ...cred,
+          id: b64url.toBuf(cred.id)
+        }))
+      };
+    }
+    
+    async function runPasskeyVerification(){
+      els.passkeyCard.classList.add('disabled');
+      setSpinner(els.passkeyStatus, 'Requesting options…');
+      
+      try {
+        // Get authentication options
+        const res = await fetch(ENDPOINTS.passkeyOptions, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': CSRF
+          }
         });
-        const options = await optResp.json();
-        if (!options || !options.challenge) {
-          setStatus(fpStatus, options?.message || 'Invalid server response', 'error');
-          fpButton.classList.remove('submitting');
-          return;
-        }
-
-        options.challenge = b64UrlToBuf(options.challenge);
-        if(options.allowCredentials){
-          options.allowCredentials = options.allowCredentials.map(c=>({
-            ...c,
-            id: b64UrlToBuf(c.id)
-          }));
-        }
-
-        // 2) Get credential
-        const assertion = await navigator.credentials.get({publicKey: options});
-        if(!assertion){
-          setStatus(fpStatus, 'No credential returned', 'error');
-          return;
-        }
-
-        const data = {
-          id: assertion.id,
-          rawId: toBase64Url(assertion.rawId),
-          type: assertion.type,
+        
+        if(!res.ok) throw new Error('Failed to get options');
+        const options = await res.json();
+        
+        // Normalize for WebAuthn
+        const publicKey = normalizeAuthOptions(options.publicKey || options);
+        
+        setSpinner(els.passkeyStatus, 'Waiting for device…');
+        const cred = await navigator.credentials.get({ publicKey });
+        if(!cred) throw new Error('No credential returned');
+        
+        // Prepare verification payload
+        const payload = {
+          id: cred.id,
+          rawId: b64url.fromBuf(cred.rawId),
+          type: cred.type,
           response: {
-            clientDataJSON: toBase64Url(assertion.response.clientDataJSON),
-            authenticatorData: toBase64Url(assertion.response.authenticatorData),
-            signature: toBase64Url(assertion.response.signature),
-            userHandle: assertion.response.userHandle ? toBase64Url(assertion.response.userHandle) : null
+            authenticatorData: b64url.fromBuf(cred.response.authenticatorData),
+            clientDataJSON: b64url.fromBuf(cred.response.clientDataJSON),
+            signature: b64url.fromBuf(cred.response.signature),
+            userHandle: cred.response.userHandle ? b64url.fromBuf(cred.response.userHandle) : null
           }
         };
-
-        setStatus(fpStatus, 'Verifying...', '');
-
-        // 3) Verify on server
-        const verifyResp = await fetch(ENDPOINTS.webauthn_verify, {
-          method:'POST',
-          headers:{'Content-Type':'application/json','X-CSRFToken': csrftoken, 'X-Requested-With': 'XMLHttpRequest'},
-          body: JSON.stringify(data)
-        });
-        const result = await verifyResp.json();
-
-        if(result.status === 'success'){
-          setStatus(fpStatus, 'Authenticated!', 'success');
-          window.location.href = result.redirect || '/';
-        }else{
-          setStatus(fpStatus, result.message || 'Authentication failed', 'error');
+        
+        setSpinner(els.passkeyStatus, 'Verifying…');
+        const verifyRes = await postJSON(ENDPOINTS.passkeyVerify, payload);
+        
+        if(verifyRes.status === 'ok' || verifyRes.status === 'success'){
+          window.location.href = verifyRes.next || '/';
+        } else {
+          throw new Error(verifyRes.message || 'Verification failed');
         }
-
-      }catch(e){
-        console.error(e);
-        if(e && e.name === 'NotAllowedError'){
-          setStatus(fpStatus, 'Operation cancelled or timed out. Please try again.', 'error');
-        }else{
-          setStatus(fpStatus, 'Fingerprint / Passkey verification failed', 'error');
-        }
-      }finally{
-        fpButton.classList.remove('submitting');
+      } catch(err) {
+        console.error('Passkey Error:', err);
+        setBadge(els.passkeyStatus, 'danger', 'Failed — tap to retry');
+        toast(`Passkey verification failed: ${err.message || 'Please try again'}`, 'danger');
+      } finally {
+        els.passkeyCard.classList.remove('disabled');
       }
-    }, { once:true });
-  }
+    }
 
-  // Cleanup on unload
-  window.addEventListener('beforeunload', () => {
-    if(faceStream) faceStream.getTracks().forEach(t => t.stop());
-  });
+    /* ----- Particle init ----- */
+    (function(){
+      const c = qs('#particles');
+      for(let i=0; i<60; i++){
+        const d = document.createElement('div');
+        d.className = 'particle';
+        const s = Math.random() * 100 + 20;
+        d.style.width = d.style.height = `${s}px`;
+        d.style.left = `${Math.random()*100}%`;
+        d.style.top = `${Math.random()*100}%`;
+        d.style.animationDelay = `${Math.random()*10}s`;
+        d.style.animationDuration = `${15+Math.random()*15}s`;
+        const cols = ['#8b5cf6','#6366f1','#0ea5e9','#22c55e'];
+        d.style.background = cols[Math.floor(Math.random()*cols.length)];
+        c.appendChild(d);
+      }
+    })();
 
-  // INIT
-  initPasswordToggles();
-})();
-</script>
+    /* ------ Activation ------ */
+    activate(els.faceCard, () => {
+      if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        toast('Camera access is not supported in this browser', 'danger');
+        return;
+      }
+      runFaceVerification();
+    });
+    
+    activate(els.passkeyCard, () => {
+      if(!('credentials' in navigator) || !('get' in navigator.credentials)){
+        toast('Passkeys are not supported in this browser', 'danger');
+        return;
+      }
+      runPasskeyVerification();
+    });
+    
+    // Cancel button for face modal
+    els.cancelFace.addEventListener('click', closeFaceModal);
+    
+    // Cleanup camera on page unload
+    window.addEventListener('beforeunload', stopCamera);
+    document.addEventListener('visibilitychange', () => {
+      if(document.hidden) stopCamera();
+    });
+  </script>
 </body>
 </html>
