@@ -19,6 +19,8 @@ from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Include application URLs before the built-in admin to allow custom
+    # paths like ``admin/dashboard/`` to resolve correctly.
     path('', include('core.urls', namespace='core')),
+    path('admin/', admin.site.urls),
 ]
