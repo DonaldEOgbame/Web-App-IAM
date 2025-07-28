@@ -311,7 +311,9 @@
       } 
     }
 
-    const CSRF = getCookie('csrftoken');
+    function getCSRF(){
+      return getCookie('csrftoken');
+    }
 
     async function postJSON(url, data, extra={}){
       const res = await fetch(url, {
@@ -319,7 +321,7 @@
         credentials:'same-origin',
         headers:{
           'Content-Type':'application/json',
-          'X-CSRFToken':CSRF, 
+          'X-CSRFToken':getCSRF(),
           ...(extra.headers||{})
         },
         body: JSON.stringify(data), 
@@ -440,7 +442,7 @@
             method: 'POST',
             credentials: 'include',
             headers: {
-              'X-CSRFToken': CSRF,
+              'X-CSRFToken': getCSRF(),
               'X-Requested-With': 'XMLHttpRequest'
             },
             body: fd
@@ -580,7 +582,7 @@
         const res = await fetch(ENDPOINTS.faceUpload, {
           method: 'POST', 
           credentials: 'same-origin', 
-          headers: { 'X-CSRFToken': CSRF }, 
+          headers: { 'X-CSRFToken': getCSRF() },
           body: fd
         });
         
@@ -624,7 +626,7 @@
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': CSRF
+            'X-CSRFToken': getCSRF()
           }
         });
         
