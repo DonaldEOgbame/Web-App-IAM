@@ -22,6 +22,7 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
     RegistrationCredential,
     AuthenticationCredential,
+    PublicKeyCredentialDescriptor,
 )
 from django.conf import settings
 
@@ -62,16 +63,18 @@ def verify_registration_response(user, data, expected_challenge):
 
 def generate_authentication_options(user):
     """Generate WebAuthn authentication options for a user"""
-    credentials = []
-    for cred in user.webauthn_credentials.all():
-        credentials.append(base64url_to_bytes(cred.credential_id))
-    
+    allow_credentials = [
+        PublicKeyCredentialDescriptor(
+            id=base64url_to_bytes(cred.credential_id),
+            type="public-key",
+            transports=["internal"],
+        )
+        for cred in user.webauthn_credentials.all()
+    ]
+
     return wa_generate_authentication_options(
         rp_id=settings.WEBAUTHN_RP_ID,
-        allow_credentials=[
-            {"type": "public-key", "id": cred.credential_id, "transports": ["internal"]}
-            for cred in user.webauthn_credentials.all()
-        ],
+        allow_credentials=allow_credentials,
         user_verification=UserVerificationRequirement.PREFERRED,
     )
 
