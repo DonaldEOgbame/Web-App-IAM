@@ -32,7 +32,7 @@ class FinalizeAuthenticationTests(TestCase):
         profile = UserBehaviorProfile(user=self.user)
         profile.save = lambda *args, **kwargs: None
         # attach for attribute lookup used in views
-        self.user.userbehaviorprofile = profile
+        self.user.__dict__["behavior_profile"] = profile
         # attach dummy profile object without triggering descriptor
         self.user.__dict__["profile"] = SimpleNamespace(receive_email_alerts=False)
 
