@@ -50,7 +50,7 @@ def verify_registration_response(user, data, expected_challenge):
     verification = wa_verify_registration_response(
         credential=RegistrationCredential(
             id=credential.id,
-            raw_id=base64url_to_bytes(credential.raw_id),
+            raw_id=credential.raw_id,
             response=credential.response,
             type=credential.type,
             client_extension_results=credential.client_extension_results,
@@ -90,7 +90,7 @@ def verify_authentication_response(user, data, expected_challenge):
     verification = wa_verify_authentication_response(
         credential=AuthenticationCredential(
             id=credential.id,
-            raw_id=base64url_to_bytes(credential.raw_id),
+            raw_id=credential.raw_id,
             response=credential.response,
             type=credential.type,
             client_extension_results=credential.client_extension_results,
