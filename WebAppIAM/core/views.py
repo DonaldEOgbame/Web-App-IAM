@@ -811,7 +811,7 @@ def finalize_authentication(request, session):
     device_info = get_device_info(request)
     
     # Behavior analysis
-    behavior_profile = user.userbehaviorprofile
+    behavior_profile = user.behavior_profile
     current_time = timezone.now().time()
     time_anomaly = 0
     device_anomaly = 0
