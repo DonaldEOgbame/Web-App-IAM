@@ -15,9 +15,11 @@ And for the default `localhost:8000` setup:
 export WEBAUTHN_RP_ID=localhost
 export WEBAUTHN_EXPECTED_ORIGIN=http://localhost:8000
 export FACE_API_ENABLED=True
-export AZURE_FACE_API_ENDPOINT=https://<resource>.cognitiveservices.azure.com/
-export AZURE_FACE_API_KEY=<your-key>
-export AZURE_FACE_PERSON_GROUP_ID=<group-id>
+export FACE_ENROLL_DIR=/path/to/enrolled_faces
+# Optional DeepFace tuning
+export DEEPFACE_MODEL_NAME=ArcFace
+export DEEPFACE_DISTANCE_METRIC=cosine
+export DEEPFACE_DETECTOR_BACKEND=retinaface
 ```
 
 Then start Django:
