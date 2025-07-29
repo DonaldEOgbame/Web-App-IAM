@@ -170,16 +170,16 @@ def create_new_device_notification(user, session, device_info):
     ).hexdigest()[:32]
     
     device_fp, created = DeviceFingerprint.objects.get_or_create(
+        user=user,
         device_id=device_hash,
         defaults={
-            'user': user,
             'browser': device_info['browser'],
             'operating_system': device_info['os'],
             'device_type': device_info['device_type'],
             'user_agent': device_info['user_agent'],
             'last_ip': session.ip_address,
-            'last_location': session.location
-        }
+            'last_location': session.location,
+        },
     )
     
     if not created:
