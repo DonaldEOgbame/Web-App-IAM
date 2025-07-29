@@ -1320,7 +1320,10 @@ def change_password(request):
 def manage_devices(request):
     """View and manage trusted devices"""
     user = request.user
-    devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
+    if user.role == 'ADMIN':
+        devices = DeviceFingerprint.objects.all().select_related('user').order_by('-last_seen')
+    else:
+        devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
     
     context = {
         'devices': devices,
