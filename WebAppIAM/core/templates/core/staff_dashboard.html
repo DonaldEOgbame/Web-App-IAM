@@ -577,6 +577,7 @@
                             {% if n.action_required %}
                             <form method="post" action="{% url 'core:dismiss_device_notification' n.id %}" style="margin-top: 8px;">
                                 {% csrf_token %}
+                                <input type="hidden" name="next" value="{{ request.path }}#notifications">
                                 <button class="btn btn-outline" type="submit">Dismiss</button>
                             </form>
                             {% endif %}
