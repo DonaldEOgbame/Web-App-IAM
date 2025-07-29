@@ -143,6 +143,13 @@
             animation: shimmer 2.5s infinite, fadeSlideIn 320ms ease forwards;
             opacity: 0;
         }
+        .avatar{
+            width:40px;
+            height:40px;
+            border-radius:50%;
+            object-fit:cover;
+            margin-left:auto;
+        }
         @keyframes shimmer{
             0%{ background-position: 0% 50%; }
             100%{ background-position: 200% 50%; }
@@ -416,6 +423,9 @@
             <h1 class="hello">
                 Hello, {{ request.user.first_name|default:request.user.username }} 👋
             </h1>
+            {% if request.user.profile.profile_picture %}
+            <img class="avatar" src="{{ request.user.profile.profile_picture.url }}" alt="Profile picture">
+            {% endif %}
         </header>
 
         <main class="content">
@@ -761,6 +771,7 @@
 
     // On load: show stored or hash target or dashboard
     let initial = 'dashboard';
+    if ({{ show_profile_settings|yesno:"true,false" }}) initial = 'profile';
     try {
         initial = localStorage.getItem('active-section') || initial;
     } catch(e){}
