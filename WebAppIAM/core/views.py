@@ -722,7 +722,28 @@ def verify_biometrics(request):
                 result = verify_face(user, face_image)
                 session.face_match_score = result['confidence']
                 session.save()
-                return JsonResponse({'status': 'success', 'score': result['confidence']})
+
+                # Finalize authentication and log the user in
+                session = finalize_authentication(request, session)
+                if session.access_granted:
+                    django_login(request, user)
+                    dashboard_url = (
+                        'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
+                    )
+                    return JsonResponse(
+                        {
+                            'status': 'success',
+                            'score': result['confidence'],
+                            'next': reverse(f'core:{dashboard_url}'),
+                        }
+                    )
+                return JsonResponse(
+                    {
+                        'status': 'denied',
+                        'message': 'Access denied due to high risk',
+                    },
+                    status=403,
+                )
             except FaceAPIError as e:
                 logger.warning(f"Face verification failed: {e}")
                 messages.error(request, str(e))
