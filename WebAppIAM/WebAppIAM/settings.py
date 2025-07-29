@@ -138,16 +138,25 @@ AUTH_USER_MODEL = 'core.User'
 LOGIN_URL = '/login/'
 
 
-# Email settings (update for production)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp-mail.outlook.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'webappIAM@outlook.com'
-EMAIL_HOST_PASSWORD = 'testcase@123456'
-EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'webappIAM@outlook.com')
-EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'thenewpasswordisgreat!@##')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+# Email settings
+#
+# Default to the console backend in development so that the application
+# doesn't attempt to connect to the external SMTP server when running
+# locally or in restricted environments.  The backend can be overridden
+# via the ``EMAIL_BACKEND`` environment variable for production.
+# ``EMAIL_HOST_USER`` and ``EMAIL_HOST_PASSWORD`` can also be supplied via
+# environment variables.
+EMAIL_BACKEND = os.environ.get(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend" if DEBUG else "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp-mail.outlook.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "webappIAM@outlook.com")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "thenewpasswordisgreat!@##")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 
 # Face recognition configuration (DeepFace)
 FACE_API_ENABLED = True
