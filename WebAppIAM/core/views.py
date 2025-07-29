@@ -1302,7 +1302,7 @@ def update_profile(request):
             })
 
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL,
-                      [form.cleaned_data['email']], fail_silently=False)
+                      [form.cleaned_data['email']], fail_silently=True)
 
 
             messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
