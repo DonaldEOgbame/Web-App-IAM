@@ -950,20 +950,9 @@ def staff_dashboard(request):
     if request.user.role != 'STAFF':
         messages.error(request, "Access denied. You don't have permission to access this page.")
         return redirect('core:login')
-    
-    # Update last activity timestamp
-    request.user.last_activity = timezone.now()
-    request.user.save(update_fields=['last_activity'])
-    
-    # Get user notifications
-    notifications = Notification.objects.filter(user=request.user, read=False)[:5]
-    
-    context = {
-        'user': request.user,
-        'notifications': notifications
-    }
-    
-    return render(request, 'core/staff_dashboard.html', context)
+
+    # Reuse the main dashboard logic so staff users get full context
+    return dashboard(request)
 
 @login_required
 def admin_dashboard(request):
@@ -1229,7 +1218,11 @@ def profile_settings(request):
         'department': profile.department,
         'position': profile.position,
         'email': user.email,
-        'phone_number': profile.phone
+        'phone': profile.phone,
+        'show_risk_alerts': profile.show_risk_alerts,
+        'show_face_match': profile.show_face_match,
+        'auto_logout': profile.auto_logout,
+        'receive_email_alerts': profile.receive_email_alerts
     })
     
     context = {
@@ -1259,7 +1252,11 @@ def update_profile(request):
         user.last_name = form.cleaned_data['last_name']
         profile.department = form.cleaned_data['department']
         profile.position = form.cleaned_data['position']
-        profile.phone = form.cleaned_data.get('phone_number')
+        profile.phone = form.cleaned_data.get('phone')
+        profile.show_risk_alerts = form.cleaned_data['show_risk_alerts']
+        profile.show_face_match = form.cleaned_data['show_face_match']
+        profile.auto_logout = form.cleaned_data['auto_logout']
+        profile.receive_email_alerts = form.cleaned_data['receive_email_alerts']
 
         if form.cleaned_data['email'] != user.email:
             token = Fernet.generate_key().decode()
@@ -1388,8 +1385,13 @@ def dismiss_device_notification(request, notification_id):
     
     notification.read = True
     notification.save()
-    
-    return JsonResponse({'status': 'success'})
+
+    next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or reverse('core:notifications')
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+
+    return redirect(next_url)
 
 # --- Notification System ---
 @login_required
