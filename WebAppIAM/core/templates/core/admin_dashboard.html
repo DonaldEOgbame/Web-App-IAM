@@ -7,6 +7,7 @@
 
     <style>
         :root {
+            /* Dark mode variables */
             --bg: #0f1115;
             --bg-soft: #14171c;
             --surface: #1a1d23;
@@ -23,6 +24,16 @@
             --shadow: 0 6px 18px rgba(0,0,0,0.3);
             --transition: 180ms ease;
             --sidebar-width: 250px;
+            
+            /* Light mode variables */
+            --bg-light: #f5f7fa;
+            --bg-soft-light: #e9ecef;
+            --surface-light: #ffffff;
+            --surface-2-light: #f8f9fa;
+            --border-light: #d1d5db;
+            --text-light: #1f2937;
+            --text-dim-light: #6b7280;
+            --shadow-light: 0 6px 18px rgba(0,0,0,0.08);
         }
 
         * { box-sizing: border-box; }
@@ -33,7 +44,20 @@
             color: var(--text);
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, Cantarell, "Noto Sans", sans-serif;
             line-height: 1.5;
+            transition: background var(--transition), color var(--transition);
         }
+
+        body.light-mode {
+            --bg: var(--bg-light);
+            --bg-soft: var(--bg-soft-light);
+            --surface: var(--surface-light);
+            --surface-2: var(--surface-2-light);
+            --border: var(--border-light);
+            --text: var(--text-light);
+            --text-dim: var(--text-dim-light);
+            --shadow: var(--shadow-light);
+        }
+
         a { color: inherit; text-decoration: none; }
 
         .layout {
@@ -51,6 +75,7 @@
             top: 0;
             height: 100vh;
             overflow-y: auto;
+            transition: background var(--transition), border-color var(--transition);
         }
         .brand {
             display: flex;
@@ -122,6 +147,7 @@
             position: sticky;
             top: 0;
             z-index: 10;
+            transition: background var(--transition), border-color var(--transition);
         }
         .menu-toggle {
             display: none;
@@ -130,6 +156,28 @@
             color: var(--text);
             font-size: 1.4rem;
             cursor: pointer;
+        }
+
+        .topbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .theme-toggle {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background var(--transition), border-color var(--transition);
+        }
+        .theme-toggle:hover {
+            background: var(--surface-2);
         }
 
         .hello{
@@ -148,7 +196,6 @@
             height:40px;
             border-radius:50%;
             object-fit:cover;
-            margin-left:auto;
         }
         @keyframes shimmer{
             0%{ background-position: 0% 50%; }
@@ -164,7 +211,7 @@
 
         h1, h2, h3 {
             margin: 0 0 16px;
-            color: #fff;
+            color: var(--text);
             font-weight: 600;
         }
 
@@ -175,6 +222,7 @@
             border-radius: var(--radius);
             box-shadow: var(--shadow);
             padding: 20px;
+            transition: background var(--transition), border-color var(--transition);
         }
         .cards-grid {
             display: grid;
@@ -205,6 +253,7 @@
             border: 1px solid var(--border);
             border-radius: var(--radius);
             overflow: hidden;
+            transition: background var(--transition), border-color var(--transition);
         }
         th, td { padding: 12px 14px; text-align: left; }
         thead th {
@@ -213,16 +262,30 @@
             font-size: 0.85rem;
             font-weight: 500;
             border-bottom: 1px solid var(--border);
+            transition: background var(--transition), color var(--transition), border-color var(--transition);
         }
-        tbody tr + tr td { border-top: 1px solid var(--border); }
-        tbody tr:hover { background: rgba(255,255,255,0.02); }
+        tbody tr + tr td { border-top: 1px solid var(--border); transition: border-color var(--transition); }
+        tbody tr:hover { background: rgba(0,0,0,0.02); }
+        body.light-mode tbody tr:hover { background: rgba(0,0,0,0.03); }
 
         /* Forms */
         form {
             display: grid;
-            gap: 16px;
+            gap: 20px;
             max-width: 680px;
         }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        label {
+            font-weight: 500;
+            color: var(--text);
+        }
+
         input[type="text"], input[type="email"], input[type="password"],
         input[type="file"], select, textarea {
             width: 100%;
@@ -232,18 +295,24 @@
             padding: 10px 12px;
             border-radius: 8px;
             transition: border var(--transition), box-shadow var(--transition);
+            font-family: inherit;
+            font-size: 0.95rem;
         }
         input:focus, select:focus, textarea:focus {
             border-color: var(--primary);
             box-shadow: 0 0 0 3px var(--primary-weak);
+            outline: none;
         }
-
+        
+        .password-field {
+            position: relative;
+        }
+        
         .toggle-visibility {
             position: absolute;
-            right: 10px;
-            top: 32px;
-            width: 24px;
-            height: 24px;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
             background: transparent;
             border: none;
             color: var(--text-dim);
@@ -251,6 +320,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            width: 24px;
+            height: 24px;
         }
         .toggle-visibility svg {
             width: 20px;
@@ -266,14 +337,15 @@
             align-items: center;
             justify-content: center;
             gap: 6px;
-            padding: 8px 14px;
+            padding: 8px 12px;
             border: none;
             border-radius: 8px;
             background: var(--primary);
             color: #fff;
             font-weight: 600;
             cursor: pointer;
-            transition: opacity var(--transition), transform var(--transition);
+            transition: opacity var(--transition), transform var(--transition), background var(--transition);
+            font-size: 0.9rem;
         }
         .btn:hover { opacity: 0.95; }
         .btn:active { transform: translateY(1px); }
@@ -284,7 +356,7 @@
         }
         .btn-outline:hover { background: var(--surface-2); }
         .btn-danger { background: var(--danger); }
-        .btn-sm { padding: 4px 10px; font-size: 0.875rem; }
+        .btn-sm { padding: 6px 10px; font-size: 0.875rem; }
 
         /* Alerts */
         .alert {
@@ -312,11 +384,12 @@
             border-radius: 8px;
             background: var(--surface-2);
             color: var(--text);
+            border-left: 3px solid var(--primary);
         }
-        ul.messages li.success { border-left: 3px solid var(--success); }
-        ul.messages li.error { border-left: 3px solid var(--danger); }
-        ul.messages li.warning { border-left: 3px solid var(--warning); }
-        ul.messages li.info { border-left: 3px solid var(--primary); }
+        ul.messages li.success { border-left-color: var(--success); }
+        ul.messages li.error { border-left-color: var(--danger); }
+        ul.messages li.warning { border-left-color: var(--warning); }
+        ul.messages li.info { border-left-color: var(--primary); }
 
         /* Section switching */
         .section {
@@ -335,6 +408,43 @@
 
         .mt-16 { margin-top: 16px; }
         .mt-24 { margin-top: 24px; }
+
+        /* Checkboxes */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        
+        input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+            transition: border-color var(--transition);
+        }
+        
+        input[type="checkbox"]:checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+        
+        input[type="checkbox"]:checked::after {
+            content: "";
+            position: absolute;
+            top: 2px;
+            left: 5px;
+            width: 4px;
+            height: 8px;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+        }
 
         /* Mobile */
         @media (max-width: 960px) {
@@ -442,9 +552,16 @@
             <h1 class="hello">
                 Hello, {{ request.user.first_name|default:request.user.username }} 👋
             </h1>
-            {% if request.user.profile.profile_picture %}
-            <img class="avatar" src="{{ request.user.profile.profile_picture.url }}" alt="Profile picture">
-            {% endif %}
+            <div class="topbar-actions">
+                <div class="theme-toggle" id="themeToggle">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                </div>
+                {% if request.user.profile.profile_picture %}
+                <img class="avatar" src="{{ request.user.profile.profile_picture.url }}" alt="Profile picture">
+                {% endif %}
+            </div>
         </header>
 
         <main class="content">
@@ -620,7 +737,7 @@
                     <form method="post" action="{% url 'core:document_upload' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         {{ form.as_p }}
-                        <button class="btn btn-sm" type="submit">Upload</button>
+                        <button class="btn" type="submit">Upload</button>
                     </form>
                 </div>
             </section>
@@ -708,28 +825,6 @@
                         {{ password_form.as_p }}
                         <button class="btn" type="submit">Change Password</button>
                     </form>
-                    <script>
-                    (function(){
-                        const form = document.querySelector('section[data-view="profile"] form[action*="change_password"]');
-                        if(form){
-                            form.querySelectorAll('input[type="password"]').forEach(function(input){
-                                const btn = document.createElement('button');
-                                btn.type = 'button';
-                                btn.className = 'toggle-visibility';
-                                btn.setAttribute('aria-label','Toggle password visibility');
-                                btn.innerHTML = `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-                                input.insertAdjacentElement('afterend', btn);
-                                btn.addEventListener('click', function(){
-                                    const visible = input.type === 'text';
-                                    input.type = visible ? 'password' : 'text';
-                                    btn.innerHTML = visible
-                                        ? `<svg viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path><circle cx="12" cy="12" r="3"></circle></svg>`
-                                        : `<svg viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-3.17 4.15M1 1l22 22"></path></svg>`;
-                                });
-                            });
-                        }
-                    })();
-                    </script>
                 </div>
             </section>
 
@@ -767,6 +862,19 @@
         });
     }
 
+    // Theme toggle functionality
+    const themeToggle = document.getElementById('themeToggle');
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+    }
+    
+    themeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('light-mode');
+        const isLight = document.body.classList.contains('light-mode');
+        localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    });
+
     function getCookie(name) {
         const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
         return match ? match[2] : null;
@@ -784,6 +892,47 @@
             }).then(() => { el.style.display = 'none'; });
         });
     });
+
+    // Password visibility toggle
+    function setupPasswordToggles() {
+        const passwordForm = document.querySelector('section[data-view="profile"] form[action*="change_password"]');
+        if (!passwordForm) return;
+
+        const passwordFields = passwordForm.querySelectorAll('input[type="password"]');
+        
+        passwordFields.forEach(input => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'password-field';
+            input.parentNode.insertBefore(wrapper, input);
+            wrapper.appendChild(input);
+            
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'toggle-visibility';
+            btn.setAttribute('aria-label','Toggle password visibility');
+            btn.innerHTML = `
+                <svg viewBox="0 0 24 24">
+                    <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+            `;
+            wrapper.appendChild(btn);
+            
+            btn.addEventListener('click', function() {
+                const isPassword = input.type === 'password';
+                input.type = isPassword ? 'text' : 'password';
+                
+                btn.innerHTML = isPassword ? 
+                    `<svg viewBox="0 0 24 24">
+                        <path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a21.77 21.77 0 0 1 5.06-6.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a21.77 21.77 0 0 1-3.17 4.15M1 1l22 22"></path>
+                    </svg>` : 
+                    `<svg viewBox="0 0 24 24">
+                        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>`;
+            });
+        });
+    }
 
     // Tab behavior (SPA-like)
     const links = document.querySelectorAll('[data-section]');
@@ -805,6 +954,11 @@
             try { localStorage.setItem('active-section', section); } catch(e){}
         }
         if (sidebar.classList.contains('open')) sidebar.classList.remove('open');
+        
+        // Setup password toggles when profile section is activated
+        if (section === 'profile') {
+            setupPasswordToggles();
+        }
     }
 
     links.forEach(a => {
@@ -823,6 +977,11 @@
     } catch(e){}
     if (location.hash) initial = location.hash.slice(1);
     activate(initial);
+    
+    // Setup password toggles immediately if we're on profile section
+    if (initial === 'profile') {
+        setupPasswordToggles();
+    }
 
 })();
 </script>
