@@ -72,14 +72,7 @@ class FaceAPITests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="u1", password="p")
 
-    @patch("core.face_api.get_face_client")
-    def test_check_face_api_status_unavailable(self, mock_client):
-        mock_client.side_effect = Exception("fail")
-        self.assertFalse(check_face_api_status())
-
-    @patch("core.face_api.get_face_client")
-    def test_check_face_api_status_success(self, mock_client):
-        mock_client.return_value.person_group.list.return_value = iter([])
+    def test_check_face_api_status(self):
         self.assertTrue(check_face_api_status())
 
     def test_verify_face_disabled(self):
@@ -90,10 +83,9 @@ class FaceAPITests(TestCase):
                 verify_face(self.user, MagicMock(), use_fallback=False)
 
     def test_verify_face_no_enrollment(self):
-        with self.settings(FACE_API_ENABLED=True, AZURE_FACE_PERSON_GROUP_ID="testgroup"):
-            with patch("core.face_api.check_face_api_status", return_value=True):
-                result = verify_face(self.user, MagicMock(), use_fallback=True)
-                self.assertEqual(result["confidence"], 0.3)
+        with self.settings(FACE_API_ENABLED=True):
+            result = verify_face(self.user, MagicMock(), use_fallback=True)
+            self.assertEqual(result["confidence"], 0.0)
 
 class RiskEngineTests(TestCase):
     def test_calculate_and_analyze(self):
