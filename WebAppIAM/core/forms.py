@@ -68,6 +68,11 @@ class CustomPasswordChangeForm(PasswordChangeForm):
 
 class DocumentUploadForm(forms.ModelForm):
     file = forms.FileField(label='File to upload')
+    # Present predefined department choices instead of a free text field
+    department = forms.ChoiceField(
+        choices=UserProfile.DEPT_CHOICES,
+        required=False
+    )
     
     class Meta:
         model = Document
