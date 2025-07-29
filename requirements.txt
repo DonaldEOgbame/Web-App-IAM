@@ -1,7 +1,7 @@
 Django>=5.0,<6
 requests
-azure-cognitiveservices-vision-face
-msrest
+deepface
+opencv-python-headless
 cryptography
 webauthn
 joblib

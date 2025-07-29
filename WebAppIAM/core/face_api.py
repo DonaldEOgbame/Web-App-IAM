@@ -1,9 +1,10 @@
 import logging
+import os
 import time
 import tempfile
-from typing import List, Tuple
+from typing import Dict, List
 
-import requests
+import numpy as np
 from django.conf import settings
 from django.core.cache import cache
 
@@ -12,376 +13,246 @@ from .models import AuditLog
 logger = logging.getLogger(__name__)
 
 # ==============================
-# Exceptions
-# ==============================
-class FaceAPIError(Exception):
-    """Exception raised for errors in the Face API (CompreFace backend)."""
-    pass
-
-
-# ==============================
 # Settings helpers (with defaults)
 # ==============================
+
 def _get_cfg(name: str, default):
     return getattr(settings, name, default)
 
+# Directory where we save enrolled face images
+ENROLL_DIR = _get_cfg("FACE_ENROLL_DIR", tempfile.gettempdir())
 
-COMPRE_BASE = _get_cfg("COMPRESPACE_API_BASE", "http://localhost:8000/api").rstrip("/")
-COMPRE_KEY = _get_cfg("COMPRESPACE_API_KEY", "")
-DET_PROB_THR = float(_get_cfg("COMPRESPACE_DET_PROB_THRESHOLD", 0.85))
-RECOG_THR = float(_get_cfg("COMPRESPACE_RECOGNITION_THRESHOLD", 0.75))
+# DeepFace configuration
+DEEPFACE_MODEL = _get_cfg("DEEPFACE_MODEL_NAME", "ArcFace")
+DEEPFACE_METRIC = _get_cfg("DEEPFACE_DISTANCE_METRIC", "cosine")
+DEEPFACE_DETECTOR = _get_cfg("DEEPFACE_DETECTOR_BACKEND", "retinaface")
+DEEPFACE_THRESHOLD = float(_get_cfg("DEEPFACE_THRESHOLD", 0.40))
 
-# Video enrollment knobs
-ENROLL_VIDEO_ENABLED = bool(_get_cfg("ENROLL_VIDEO_ENABLED", True))
-ENROLL_VIDEO_SAMPLE_FPS = float(_get_cfg("ENROLL_VIDEO_SAMPLE_FPS", 3.0))
-ENROLL_VIDEO_MAX_FRAMES = int(_get_cfg("ENROLL_VIDEO_MAX_FRAMES", 30))
-ENROLL_VIDEO_TOP_K = int(_get_cfg("ENROLL_VIDEO_TOP_K", 5))
-ENROLL_FACE_MIN_SIDE = int(_get_cfg("ENROLL_FACE_MIN_SIDE", 180))
-ENROLL_SHARPNESS_MIN = float(_get_cfg("ENROLL_SHARPNESS_MIN", 80.0))
-
-REQ_TIMEOUT_HEALTH = int(_get_cfg("REQUEST_TIMEOUT_HEALTH", 5))
+# Circuit breaker / fallback settings
+FACE_API_ENABLED = bool(_get_cfg("FACE_API_ENABLED", True))
 REQ_TIMEOUT_OPS = int(_get_cfg("REQUEST_TIMEOUT_OPS", 15))
 
-FACE_API_ENABLED = bool(_get_cfg("FACE_API_ENABLED", True))
+# ==============================
+# Exceptions
+# ==============================
+
+class FaceAPIError(Exception):
+    """Exception raised for errors in the face-verification flow."""
+    pass
 
 # ==============================
-# Circuit breaker helpers
+# Health check stub (always OK)
 # ==============================
-def _record_failure():
-    count = cache.get("face_api_failure_count", 0) + 1
-    cache.set("face_api_failure_count", count, 300)
-    if count >= 3:
-        cache.set("face_api_circuit_until", time.time() + 300, 300)
 
-
-def _reset_failures():
-    cache.set("face_api_failure_count", 0, 300)
-    cache.delete("face_api_circuit_until")
-
-
-# ==============================
-# Client helper (compatibility)
-# ==============================
-def get_face_client():
-    """Return a minimal client compatible with older tests."""
-
-    class _PersonGroup:
-        def list(self):
-            # Use the CompreFace health endpoint as a lightweight check
-            r = requests.get(
-                f"{COMPRE_BASE}/v1/management/health",
-                headers=_headers(),
-                timeout=REQ_TIMEOUT_HEALTH,
-            )
-            if r.status_code >= 500:
-                raise FaceAPIError(f"Health check failed: {r.status_code}")
-            return []
-
-    class _Client:
-        def __init__(self):
-            self.person_group = _PersonGroup()
-
-    return _Client()
-
-
-# ==============================
-# CompreFace low-level helpers
-# ==============================
-def _headers() -> dict:
-    return {"x-api-key": COMPRE_KEY} if COMPRE_KEY else {}
-
-
-def _compreface_health_ok() -> bool:
-    # Try management health endpoint first (CompreFace default), fall back to a trivial GET.
-    urls = [
-        f"{COMPRE_BASE}/v1/management/health",
-        f"{COMPRE_BASE}/v1/recognition/config",
-    ]
-    for u in urls:
-        try:
-            r = requests.get(u, headers=_headers(), timeout=REQ_TIMEOUT_HEALTH)
-            if r.status_code < 500:
-                return True
-        except Exception:
-            continue
-    return False
-
-
-# ==============================
-# Public health check
-# ==============================
 def check_face_api_status() -> bool:
-    """Check if the Face (CompreFace) API is available and circuit isn't open."""
-    if not FACE_API_ENABLED:
-        return False
-
-    circuit_until = cache.get("face_api_circuit_until")
-    if circuit_until and circuit_until > time.time():
-        return False
-
-    try:
-        client = get_face_client()
-        client.person_group.list()
-        _reset_failures()
-        return True
-    except Exception:
-        logger.exception("CompreFace health check failed")
-        _record_failure()
-        return False
-
+    # Local DeepFace invocation never goes down
+    return True
 
 # ==============================
-# Video utilities (lazy OpenCV)
+# Helpers
 # ==============================
+
+def _hashed_dir(user_id: int) -> str:
+    import hashlib
+
+    h = hashlib.sha256(str(user_id).encode("utf-8")).hexdigest()
+    return os.path.join(ENROLL_DIR, h)
+
+
 def _lazy_cv2():
     try:
         import cv2  # type: ignore
         return cv2
     except Exception as e:
         raise FaceAPIError(
-            "Video enrollment requires opencv-python. Install with: pip install opencv-python"
+            "OpenCV is required for video operations. Install opencv-python-headless"
         ) from e
 
 
-def _var_laplacian(gray, cv2):
-    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
-
-
-def _jpeg_bytes(frame, cv2, quality: int = 90) -> bytes:
-    ok, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, int(quality)])
-    if not ok:
-        raise FaceAPIError("Failed to encode JPEG from video frame")
-    return buf.tobytes()
+def _lazy_deepface():
+    try:
+        from deepface import DeepFace  # type: ignore
+        return DeepFace
+    except Exception as e:
+        raise FaceAPIError(
+            "DeepFace is required for face recognition. Install dependencies"
+        ) from e
 
 
 def _is_video_bytes(first_bytes: bytes) -> bool:
-    # Rough heuristic: MP4/QuickTime contain 'ftyp' early in file.
     return b"ftyp" in (first_bytes or b"")[:64]
 
 
-def _frames_from_video_bytes(video_bytes: bytes, sample_fps: float, max_frames: int):
+def _frames_from_video_bytes(video_bytes: bytes) -> List[np.ndarray]:
     cv2 = _lazy_cv2()
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as f:
-        f.write(video_bytes)
-        path = f.name
+    path = None
+    frames: List[np.ndarray] = []
     try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+            tmp.write(video_bytes)
+            path = tmp.name
         cap = cv2.VideoCapture(path)
-        fps = cap.get(cv2.CAP_PROP_FPS) or 24.0
-        step = max(int(round(fps / max(sample_fps, 0.1))), 1)
-        kept = i = 0
-        while cap.isOpened() and kept < max_frames:
-            ok = cap.grab()
+        while cap.isOpened():
+            ok, frame = cap.read()
             if not ok:
                 break
-            if i % step == 0:
-                ok, frame = cap.retrieve()
-                if not ok:
-                    break
-                kept += 1
-                yield frame
-            i += 1
+            frames.append(frame)
+        cap.release()
     finally:
-        try:
-            cap.release()
-        except Exception:
-            pass
-        try:
-            import os
-            os.remove(path)
-        except Exception:
-            pass
+        if path:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
+    return frames
 
 
-def _coarse_quality_ok(frame, min_side: int, min_sharp: float, cv2) -> tuple[bool, float]:
-    h, w = frame.shape[:2]
-    if min(h, w) < min_side:
-        return False, 0.0
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    sharp = _var_laplacian(gray, cv2)
-    if sharp < min_sharp:
-        return False, sharp
-    return True, sharp
+def _ensure_bytes(data) -> bytes:
+    if isinstance(data, (bytes, bytearray)):
+        return bytes(data)
+    if hasattr(data, "read"):
+        return data.read()
+    raise FaceAPIError("Invalid payload: expected bytes-like object")
 
 
-# ==============================
-# High-level CompreFace flows
-# ==============================
-def _compreface_enroll_image(subject: str, img_bytes: bytes) -> None:
-    r = requests.post(
-        f"{COMPRE_BASE}/v1/recognition/faces",
-        headers=_headers(),
-        files={"file": ("enroll.jpg", img_bytes, "image/jpeg")},
-        data={"subject": subject},
-        timeout=REQ_TIMEOUT_OPS,
-    )
-    if r.status_code >= 300:
-        try:
-            j = r.json()
-        except Exception:
-            j = {}
-        raise FaceAPIError(f"Enroll failed: {r.status_code} {j}")
-
-
-def _compreface_verify_subject(subject: str, img_bytes: bytes) -> float:
-    """Returns similarity in [0,1] as confidence."""
-    r = requests.post(
-        f"{COMPRE_BASE}/v1/verification/subjects/{subject}",
-        headers=_headers(),
-        files={"file": ("verify.jpg", img_bytes, "image/jpeg")},
-        params={"det_prob_threshold": DET_PROB_THR},
-        timeout=REQ_TIMEOUT_OPS,
-    )
-    if r.status_code == 404:
-        # subject not found → treat as 0 confidence
-        return 0.0
-    if r.status_code >= 300:
-        try:
-            j = r.json()
-        except Exception:
-            j = {}
-        raise FaceAPIError(f"Verify failed: {r.status_code} {j}")
-    data = r.json() or {}
-    res = (data.get("result") or [{}])[0]
-    return float(res.get("similarity", 0.0))
-
-
-def _enroll_from_video_bytes_compreface(subject: str, video_bytes: bytes) -> int:
-    """Extract frames; enroll top-K by (similarity, sharpness)."""
+def _load_image_from_bytes(data: bytes):
     cv2 = _lazy_cv2()
-    candidates: List[Tuple[float, float, bytes]] = []  # (similarity, sharpness, jpeg)
-
-    for frame in _frames_from_video_bytes(video_bytes, ENROLL_VIDEO_SAMPLE_FPS, ENROLL_VIDEO_MAX_FRAMES):
-        ok, sharp = _coarse_quality_ok(frame, ENROLL_FACE_MIN_SIDE, ENROLL_SHARPNESS_MIN, cv2)
-        if not ok:
-            continue
-        jpg = _jpeg_bytes(frame, cv2)
-        try:
-            sim = _compreface_verify_subject(subject, jpg)
-        except Exception:
-            # Skip frame on transient errors
-            continue
-        candidates.append((sim, sharp, jpg))
-
-    if not candidates:
-        raise FaceAPIError("No suitable frames found in video")
-
-    candidates.sort(key=lambda t: (t[0], t[1]), reverse=True)
-    picked = candidates[:ENROLL_VIDEO_TOP_K]
-
-    enrolled = 0
-    for _, _, jpg in picked:
-        try:
-            _compreface_enroll_image(subject, jpg)
-            enrolled += 1
-        except Exception:
-            continue
-
-    if enrolled == 0:
-        raise FaceAPIError("Enrollment failed for all frames")
-    return enrolled
-
+    nparr = np.frombuffer(data, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("cv2.imdecode returned None")
+    return img
 
 # ==============================
 # Public API
 # ==============================
-def enroll_face(user, face_image_or_video_bytes: bytes):
-    """
-    Enroll a user's face using CompreFace.
-    Accepts image bytes or short video bytes (MP4/MOV/WebM).
-    """
+
+def enroll_face(user, face_image_bytes) -> str:
+    """Enroll a user's face. Accepts image bytes or video bytes."""
     if not FACE_API_ENABLED:
-        raise FaceAPIError("Face API is disabled")
+        raise FaceAPIError("Face enrollment is disabled")
 
-    # Health check & circuit breaker
-    if not check_face_api_status():
-        logger.error("Face API is currently unavailable")
-        raise FaceAPIError("Face API is currently unavailable. Please try again later.")
+    os.makedirs(ENROLL_DIR, exist_ok=True)
+    user_dir = _hashed_dir(user.id)
+    os.makedirs(user_dir, exist_ok=True)
 
-    raw = face_image_or_video_bytes
-    if not isinstance(raw, (bytes, bytearray)):
-        raise FaceAPIError("Invalid payload: expected bytes")
+    raw = _ensure_bytes(face_image_bytes)
 
-    # Decide video vs image
-    is_video = _is_video_bytes(raw[:64]) and ENROLL_VIDEO_ENABLED
+    saved: List[str] = []
+    try:
+        if _is_video_bytes(raw[:64]):
+            frames = _frames_from_video_bytes(raw)
+            for i, frame in enumerate(frames):
+                path = os.path.join(user_dir, f"{i}.jpg")
+                _lazy_cv2().imwrite(path, frame)
+                saved.append(path)
+        else:
+            path = os.path.join(user_dir, "0.jpg")
+            with open(path, "wb") as f:
+                f.write(raw)
+            saved.append(path)
+    except Exception as e:
+        logger.exception("Failed to save enrollment media for user %s", user.id)
+        raise FaceAPIError("Could not save enrollment media") from e
 
-    subject = str(user.id)  # Stable subject id
-    if is_video:
-        frames_enrolled = _enroll_from_video_bytes_compreface(subject, raw)
-        details = f"Video enrollment: {frames_enrolled} frames added"
-    else:
-        # Treat bytes as image
-        _compreface_enroll_image(subject, raw)
-        details = "Image enrollment completed"
-
-    # Persist ID in existing field to avoid migrations
-    setattr(user, "azure_face_id", subject)
+    setattr(user, "azure_face_id", user_dir)
     user.save(update_fields=["azure_face_id"])
 
     AuditLog.objects.create(
         user=user,
         action="FACE_ENROLLED",
-        details=details,
-        ip_address="System"
+        details=f"Enrollment stored {len(saved)} frame(s) in {user_dir}",
+        ip_address="System",
     )
-    logger.info("Face enrollment successful for user %s (%s)", user.id, details)
-    return subject
+    logger.info(
+        "Face enrollment successful for user %s → %s frames", user.id, len(saved)
+    )
+    return user_dir
 
 
-def verify_face(user, face_image_bytes: bytes, use_fallback: bool = True, max_retries: int = 2):
-    """
-    Verify a user's face against their enrolled subject using CompreFace.
-    Returns: {'is_identical': bool, 'confidence': float} (0..1), optionally {'fallback': True}
-    """
+def verify_face(user, face_image_bytes, use_fallback: bool = True, max_retries: int = 2) -> Dict:
+    """Verify a user's face against their enrolled reference using DeepFace."""
     if not FACE_API_ENABLED:
+        logger.warning("Face API is disabled, using fallback")
         if use_fallback:
-            logger.warning("Face API is disabled, using fallback authentication")
-            return {"confidence": 0.7, "fallback": True}
-        raise FaceAPIError("Face API is disabled")
+            return {"confidence": 0.0, "fallback": True}
+        raise FaceAPIError("Face verification is disabled")
 
-    if not check_face_api_status():
+    ref_dir = getattr(user, "azure_face_id", None)
+    if not ref_dir or not os.path.isdir(ref_dir):
+        logger.error("User %s has no enrolled face images", user.id)
         if use_fallback:
-            logger.warning("Face API is unavailable, using fallback authentication")
-            AuditLog.objects.create(
-                user=user,
-                action="FACE_API_UNAVAILABLE",
-                details="Face API unavailable during verification, used fallback",
-                ip_address="System"
-            )
-            return {"confidence": 0.6, "fallback": True}
-        raise FaceAPIError("Face API is currently unavailable")
+            return {"confidence": 0.0, "fallback": True}
+        raise FaceAPIError("User has no enrolled face")
 
-    if not getattr(user, "azure_face_id", None):
-        logger.error("User %s doesn't have an enrolled face", user.id)
+    ref_images = [
+        os.path.join(ref_dir, f)
+        for f in os.listdir(ref_dir)
+        if f.lower().endswith(".jpg")
+    ]
+    if not ref_images:
+        logger.error("No reference images for user %s", user.id)
         if use_fallback:
-            return {"confidence": 0.3, "fallback": True}
-        raise FaceAPIError("User doesn't have an enrolled face")
+            return {"confidence": 0.0, "fallback": True}
+        raise FaceAPIError("User has no enrolled face")
+
+    raw = _ensure_bytes(face_image_bytes)
+    try:
+        if _is_video_bytes(raw[:64]):
+            probe_frames = _frames_from_video_bytes(raw)
+        else:
+            probe_frames = [_load_image_from_bytes(raw)]
+    except Exception as e:
+        logger.exception("Failed to decode probe media")
+        raise FaceAPIError("Invalid image data") from e
 
     last_error = None
+    best_distance = None
     for attempt in range(max_retries + 1):
         try:
-            conf = _compreface_verify_subject(user.azure_face_id, face_image_bytes)
-            is_identical = conf >= RECOG_THR
+            df = _lazy_deepface()
+            for ref_path in ref_images:
+                for frame in probe_frames:
+                    res = df.verify(
+                        img1_path=ref_path,
+                        img2_path=frame,
+                        model_name=DEEPFACE_MODEL,
+                        distance_metric=DEEPFACE_METRIC,
+                        detector_backend=DEEPFACE_DETECTOR,
+                        enforce_detection=False,
+                    )
+                    distance = float(res["distance"])
+                    if best_distance is None or distance < best_distance:
+                        best_distance = distance
+            if best_distance is None:
+                raise FaceAPIError("No frames processed")
+            similarity = 1.0 - best_distance
+            is_identical = best_distance <= DEEPFACE_THRESHOLD
 
             AuditLog.objects.create(
                 user=user,
                 action="FACE_VERIFIED",
-                details=f"Face verification {'passed' if is_identical else 'failed'} (confidence: {conf:.2f})",
-                ip_address="System"
+                details=(
+                    f"verification {'passed' if is_identical else 'failed'} "
+                    f"(distance={best_distance:.4f}, similarity={similarity:.2%})"
+                ),
+                ip_address="System",
             )
-            return {"is_identical": bool(is_identical), "confidence": float(conf)}
+            return {"is_identical": is_identical, "confidence": similarity}
         except Exception as e:
             last_error = e
-            logger.warning("Face verification attempt %d failed: %s", attempt + 1, e)
+            logger.warning("DeepFace verify attempt %d failed: %s", attempt + 1, e)
+            time.sleep(0.5)
 
     AuditLog.objects.create(
         user=user,
         action="FACE_VERIFICATION_FAILED",
-        details=f"Face verification failed after {max_retries+1} attempts: {last_error}",
-        ip_address="System"
+        details=f"Failed after {max_retries + 1} attempts: {last_error}",
+        ip_address="System",
     )
-
-    if use_fallback and _get_cfg("RISK_ENGINE_BYPASS", False):
-        logger.warning("Face API failed, using fallback authentication for user %s", user.id)
-        return {"confidence": 0.5, "fallback": True}
-
+    if use_fallback:
+        logger.warning(
+            "Using fallback for user %s after repeated DeepFace failures", user.id
+        )
+        return {"confidence": 0.0, "fallback": True}
     raise FaceAPIError(f"Face verification failed: {last_error}")
