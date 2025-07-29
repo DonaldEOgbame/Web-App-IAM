@@ -916,6 +916,7 @@ def finalize_authentication(request, session):
 def dashboard(request):
     # Profile completion gate
     if not hasattr(request.user, 'profile'):
+        request.session['complete_profile_user'] = request.user.id
         return redirect('core:complete_profile')
     
     # Biometric enrollment gate
@@ -1018,6 +1019,7 @@ def admin_users(request):
 def document_list(request):
     user = request.user
     if not hasattr(user, 'profile'):
+        request.session['complete_profile_user'] = user.id
         return redirect('core:complete_profile')
     documents = Document.objects.filter(deleted=False)
 
@@ -1114,6 +1116,7 @@ def document_download(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id, deleted=False)
     user = request.user
     if not hasattr(user, 'profile'):
+        request.session['complete_profile_user'] = user.id
         return redirect('core:complete_profile')
 
     # Check access permissions
@@ -1209,6 +1212,7 @@ def profile_settings(request):
     """Display profile settings page"""
     user = request.user
     if not hasattr(user, 'profile'):
+        request.session['complete_profile_user'] = user.id
         return redirect('core:complete_profile')
     profile = user.profile
 
@@ -1243,6 +1247,7 @@ def update_profile(request):
     """Handle profile update form"""
     user = request.user
     if not hasattr(user, 'profile'):
+        request.session['complete_profile_user'] = user.id
         return redirect('core:complete_profile')
     profile = user.profile
 
