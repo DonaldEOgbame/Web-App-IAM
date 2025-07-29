@@ -587,7 +587,7 @@
             <section class="section" data-view="upload">
                 <div class="card">
                     <h2>Upload Document</h2>
-                    <form method="post" action="{% url 'core:update_profile' %}" enctype="multipart/form-data">
+                    <form method="post" action="{% url 'core:document_upload' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         {{ form.as_p }}
                         <button class="btn" type="submit">Upload</button>
