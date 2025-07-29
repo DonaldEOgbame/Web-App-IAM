@@ -88,7 +88,9 @@ class User(AbstractUser):
 
 class DeviceFingerprint(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_fingerprints')
-    device_id = models.CharField(max_length=64, unique=True)  # Hash of device characteristics
+    # Hash of device characteristics. Unique per user rather than globally to
+    # allow the same device to be registered for multiple accounts.
+    device_id = models.CharField(max_length=64)
     device_name = models.CharField(max_length=100, blank=True, null=True)  # User-friendly name
     browser = models.CharField(max_length=50, blank=True, null=True)
     operating_system = models.CharField(max_length=50, blank=True, null=True)
@@ -111,6 +113,7 @@ class DeviceFingerprint(models.Model):
             models.Index(fields=['user', 'is_trusted']),
             models.Index(fields=['device_id']),
         ]
+        unique_together = ('user', 'device_id')
     
     def __str__(self):
         name = self.device_name or f"{self.browser} on {self.operating_system}"

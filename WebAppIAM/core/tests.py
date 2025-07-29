@@ -77,6 +77,28 @@ class ModelTests(TestCase):
         fp.refresh_from_db()
         self.assertTrue(fp.is_trusted)
 
+    def test_device_fingerprint_unique_per_user(self):
+        """Devices with the same fingerprint can be associated with different users"""
+        user2 = User.objects.create_user(username="tester2", password="pass")
+
+        DeviceFingerprint.objects.create(
+            user=self.user,
+            device_id="dup",
+            browser="Chrome",
+            operating_system="Linux",
+            user_agent="agent",
+        )
+        DeviceFingerprint.objects.create(
+            user=user2,
+            device_id="dup",
+            browser="Chrome",
+            operating_system="Linux",
+            user_agent="agent",
+        )
+
+        count = DeviceFingerprint.objects.filter(device_id="dup").count()
+        self.assertEqual(count, 2)
+
     def test_behavior_profile_anomaly_checks(self):
         profile = UserBehaviorProfile.objects.create(
             user=self.user,
