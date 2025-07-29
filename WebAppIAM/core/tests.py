@@ -1,7 +1,8 @@
-from django.test import TestCase, RequestFactory
+from django.test import TestCase, RequestFactory, Client
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 from django.core.cache import cache
+from django.urls import reverse
 
 from .models import (
     User,
@@ -77,6 +78,28 @@ class ModelTests(TestCase):
         fp.refresh_from_db()
         self.assertTrue(fp.is_trusted)
 
+    def test_device_fingerprint_unique_per_user(self):
+        """Devices with the same fingerprint can be associated with different users"""
+        user2 = User.objects.create_user(username="tester2", password="pass")
+
+        DeviceFingerprint.objects.create(
+            user=self.user,
+            device_id="dup",
+            browser="Chrome",
+            operating_system="Linux",
+            user_agent="agent",
+        )
+        DeviceFingerprint.objects.create(
+            user=user2,
+            device_id="dup",
+            browser="Chrome",
+            operating_system="Linux",
+            user_agent="agent",
+        )
+
+        count = DeviceFingerprint.objects.filter(device_id="dup").count()
+        self.assertEqual(count, 2)
+
     def test_behavior_profile_anomaly_checks(self):
         profile = UserBehaviorProfile.objects.create(
             user=self.user,
@@ -150,4 +173,48 @@ class RiskEngineTests(TestCase):
         risk_engine._loaded = True
         with self.assertRaises(RuntimeError):
             risk_engine.load_models()
+
+
+class DeviceViewTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user(
+            username="admin",
+            password="pass",
+            role="ADMIN",
+            is_active=True,
+        )
+        self.staff = User.objects.create_user(
+            username="staff",
+            password="pass",
+            role="STAFF",
+            is_active=True,
+        )
+        self.admin_fp = DeviceFingerprint.objects.create(
+            user=self.admin,
+            device_id="admin_dev",
+            browser="Chrome",
+            operating_system="Linux",
+            user_agent="agent",
+        )
+        self.staff_fp = DeviceFingerprint.objects.create(
+            user=self.staff,
+            device_id="staff_dev",
+            browser="Chrome",
+            operating_system="Linux",
+            user_agent="agent",
+        )
+
+    def test_staff_only_sees_own_devices(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse("core:manage_devices"))
+        devices = list(response.context["devices"])
+        self.assertEqual(devices, [self.staff_fp])
+
+    def test_admin_sees_all_devices(self):
+        self.client.force_login(self.admin)
+        response = self.client.get(reverse("core:manage_devices"))
+        device_ids = {d.id for d in response.context["devices"]}
+        self.assertEqual(device_ids, {self.admin_fp.id, self.staff_fp.id})
+
 

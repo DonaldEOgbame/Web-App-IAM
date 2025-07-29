@@ -170,16 +170,16 @@ def create_new_device_notification(user, session, device_info):
     ).hexdigest()[:32]
     
     device_fp, created = DeviceFingerprint.objects.get_or_create(
+        user=user,
         device_id=device_hash,
         defaults={
-            'user': user,
             'browser': device_info['browser'],
             'operating_system': device_info['os'],
             'device_type': device_info['device_type'],
             'user_agent': device_info['user_agent'],
             'last_ip': session.ip_address,
-            'last_location': session.location
-        }
+            'last_location': session.location,
+        },
     )
     
     if not created:
@@ -1320,7 +1320,10 @@ def change_password(request):
 def manage_devices(request):
     """View and manage trusted devices"""
     user = request.user
-    devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
+    if user.role == 'ADMIN':
+        devices = DeviceFingerprint.objects.all().select_related('user').order_by('-last_seen')
+    else:
+        devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
     
     context = {
         'devices': devices,
