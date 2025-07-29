@@ -1245,7 +1245,6 @@ def profile_settings(request):
         'email': user.email,
         'phone': profile.phone,
         'show_risk_alerts': profile.show_risk_alerts,
-        'show_face_match': profile.show_face_match,
         'auto_logout': profile.auto_logout,
         'receive_email_alerts': profile.receive_email_alerts
     })
@@ -1280,7 +1279,6 @@ def update_profile(request):
         profile.position = form.cleaned_data['position']
         profile.phone = form.cleaned_data.get('phone')
         profile.show_risk_alerts = form.cleaned_data['show_risk_alerts']
-        profile.show_face_match = form.cleaned_data['show_face_match']
         profile.auto_logout = form.cleaned_data['auto_logout']
         profile.receive_email_alerts = form.cleaned_data['receive_email_alerts']
 
@@ -1306,7 +1304,10 @@ def update_profile(request):
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL,
                       [form.cleaned_data['email']], fail_silently=False)
 
+
             messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
+
+        user.save(update_fields=['first_name', 'last_name'])
 
         if 'profile_picture' in request.FILES:
             profile.profile_picture = request.FILES['profile_picture']

@@ -119,8 +119,8 @@ class ProfileUpdateForm(forms.ModelForm):
     
     class Meta:
         model = UserProfile
-        fields = ['department', 'position', 'phone', 'profile_picture', 
-                  'show_risk_alerts', 'show_face_match', 'auto_logout', 'receive_email_alerts']
+        fields = ['department', 'position', 'phone', 'profile_picture',
+                  'show_risk_alerts', 'auto_logout', 'receive_email_alerts']
         widgets = {
             'position': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
