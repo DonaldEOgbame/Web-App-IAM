@@ -147,14 +147,13 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', 'webappIAM@outlook.com')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', 'thenewpasswordisgreat!@##')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 
-# CompreFace
+# Face recognition configuration (DeepFace)
 FACE_API_ENABLED = True
-COMPRESPACE_API_BASE = "http://localhost:8000/api"   # or your deployed base
-COMPRESPACE_API_KEY = "ccc58c39-b114-4986-ad02-ab9fedc6c816"
-
-# Tuning (optional)
-COMPRESPACE_DET_PROB_THRESHOLD = 0.85
-COMPRESPACE_RECOGNITION_THRESHOLD = 0.75
+FACE_ENROLL_DIR = os.environ.get('FACE_ENROLL_DIR', os.path.join(BASE_DIR, 'faces'))
+DEEPFACE_MODEL_NAME = os.environ.get('DEEPFACE_MODEL_NAME', 'ArcFace')
+DEEPFACE_DISTANCE_METRIC = os.environ.get('DEEPFACE_DISTANCE_METRIC', 'cosine')
+DEEPFACE_DETECTOR_BACKEND = os.environ.get('DEEPFACE_DETECTOR_BACKEND', 'retinaface')
+DEEPFACE_THRESHOLD = float(os.environ.get('DEEPFACE_THRESHOLD', '0.40'))
 
 # Video enrollment
 ENROLL_VIDEO_ENABLED = True
@@ -182,7 +181,7 @@ RISK_FINGERPRINT_WEIGHT = 0.4
 RISK_BEHAVIOR_WEIGHT = 0.2
 
 # Feature Flags
-FACE_API_ENABLED = True  # Toggle for Face API availability
+# Face API toggled above; keep here for clarity
 RISK_ENGINE_BYPASS = False  # Maintenance mode for risk engine
 EMERGENCY_ACCESS_MODE = False  # Emergency access mode for critical situations
 
