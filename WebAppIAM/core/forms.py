@@ -76,10 +76,7 @@ class DocumentUploadForm(forms.ModelForm):
     
     class Meta:
         model = Document
-        fields = ['title', 'description', 'access_level', 'category', 'department', 'expiry_date']
-        widgets = {
-            'expiry_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
-        }
+        fields = ['title', 'description', 'access_level', 'department']
         
     def save(self, commit=True):
         # Don't save the file directly, it will be encrypted in the view
