@@ -79,6 +79,19 @@ class User(AbstractUser):
             login_time__gte=timezone.now() - timezone.timedelta(hours=24)
         ).exists()
 
+    @property
+    def biometric_enrolled(self):
+        """Return True if the user has any biometric data enrolled."""
+        return self.has_biometrics
+
+    @property
+    def is_locked(self):
+        """Return True if the user account is temporarily locked out."""
+        if self.failed_login_attempts >= settings.MAX_FAILED_LOGINS:
+            if self.last_failed_login and timezone.now() < self.last_failed_login + timezone.timedelta(minutes=settings.ACCOUNT_LOCKOUT_MINUTES):
+                return True
+        return False
+
     def require_reenrollment(self):
         """Force user to re-enroll their biometrics"""
         self.force_reenroll = True
