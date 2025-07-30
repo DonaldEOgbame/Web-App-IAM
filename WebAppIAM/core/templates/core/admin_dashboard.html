@@ -971,6 +971,7 @@
 
     // On load: show stored or hash target or dashboard
     let initial = 'dashboard';
+    if ({{ show_user_management|yesno:"true,false" }}) initial = 'users';
     if ({{ show_profile_settings|yesno:"true,false" }}) initial = 'profile';
     try {
         initial = localStorage.getItem('active-section') || initial;
