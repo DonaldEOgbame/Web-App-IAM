@@ -755,7 +755,7 @@
                                 <tr>
                                     <td>{{ log.user }}</td>
                                     <td>{{ log.action }}</td>
-                                    <td>{{ log.created_at }}</td>
+                                    <td>{{ log.timestamp }}</td>
                                     <td>{{ log.ip_address }}</td>
                                 </tr>
                             {% endfor %}
@@ -814,7 +814,15 @@
                     {% endif %}
                     <form method="post" action="{% url 'core:update_profile' %}" enctype="multipart/form-data">
                         {% csrf_token %}
-                        {{ profile_form.as_p }}
+                        <div class="profile-form-fields">
+                        {% for field in profile_form %}
+                            <div class="form-group{% if field.field.widget.input_type == 'checkbox' %} checkbox-container{% endif %}">
+                                {{ field.label_tag }} {{ field }}
+                                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                                {% for error in field.errors %}<div class="error">{{ error }}</div>{% endfor %}
+                            </div>
+                        {% endfor %}
+                        </div>
                         <button class="btn" type="submit">Update Profile</button>
                     </form>
 
@@ -831,19 +839,25 @@
             <section class="section" data-view="notifications">
                 <div class="card">
                     <h2>Notifications</h2>
-
                     {% if notifications %}
-                        <form method="post" action="{% url 'core:mark_all_notifications_read' %}">
+                        <form id="markAllReadForm" method="post" action="{% url 'core:mark_all_notifications_read' %}">
                             {% csrf_token %}
-                            <button class="btn btn-outline" type="submit">Mark all as read</button>
+                            <button class="btn btn-outline" type="submit" id="markAllReadBtn">Mark all as read</button>
                         </form>
                     {% endif %}
-
+                    <div id="notificationsList">
                     {% for n in notifications %}
-                        <div class="alert alert-warning" data-id="{{ n.id }}" role="alert">{{ n.message }} - {{ n.created_at }}</div>
+                        <div class="alert alert-warning notification-item" data-id="{{ n.id }}" role="alert">
+                            {{ n.message }} - {{ n.created_at }}
+                            <form class="dismissNotificationForm" method="post" action="{% url 'core:mark_notification_read' n.id %}" style="display:inline; margin-left:12px;">
+                                {% csrf_token %}
+                                <button class="btn btn-outline btn-sm dismiss-btn" type="submit">Dismiss</button>
+                            </form>
+                        </div>
                     {% empty %}
                         <p>No notifications.</p>
                     {% endfor %}
+                    </div>
                 </div>
             </section>
 
@@ -880,17 +894,60 @@
     }
     const csrftoken = getCookie('csrftoken');
 
-    // Mark a single notification read on click
-    document.querySelectorAll('.alert[data-id]').forEach(function (el) {
-        el.addEventListener('click', function () {
-            fetch('{% url "core:mark_notification_read" 0 %}'.replace('0', el.dataset.id), {
+    // AJAX Dismiss notification
+    document.querySelectorAll('.dismissNotificationForm').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const alertDiv = form.closest('.notification-item');
+            fetch(form.action, {
                 method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken
+                headers: { 'X-CSRFToken': csrftoken },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && alertDiv) {
+                    alertDiv.style.display = 'none';
+                    updateNotificationBadge();
                 }
-            }).then(() => { el.style.display = 'none'; });
+            });
         });
     });
+
+    // AJAX Mark all as read
+    const markAllForm = document.getElementById('markAllReadForm');
+    if (markAllForm) {
+        markAllForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch(markAllForm.action, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.querySelectorAll('.notification-item').forEach(function(el){ el.style.display = 'none'; });
+                    updateNotificationBadge();
+                }
+            });
+        });
+    }
+
+    // Update notification badge count
+    function updateNotificationBadge() {
+        fetch("{% url 'core:notifications' %}?ajax=1")
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.querySelector('[data-section="notifications"] .badge');
+                if (badge) {
+                    if (data.unread > 0) {
+                        badge.textContent = data.unread;
+                        badge.style.display = '';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            });
+    }
 
     // Password visibility toggle
     function setupPasswordToggles() {
@@ -970,14 +1027,15 @@
 
     // On load: show stored or hash target or dashboard
     let initial = 'dashboard';
-    if ({{ show_user_management|yesno:"true,false" }}) initial = 'users';
-    if ({{ show_profile_settings|yesno:"true,false" }}) initial = 'profile';
+    const showUserManagement = JSON.parse("{{ show_user_management|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+    const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+    if (showUserManagement) initial = 'users';
+    if (showProfileSettings) initial = 'profile';
     try {
         initial = localStorage.getItem('active-section') || initial;
     } catch(e){}
     if (location.hash) initial = location.hash.slice(1);
     activate(initial);
-    
     // Setup password toggles immediately if we're on profile section
     if (initial === 'profile') {
         setupPasswordToggles();

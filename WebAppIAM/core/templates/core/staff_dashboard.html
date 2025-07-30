@@ -670,7 +670,15 @@
 
                     <form method="post" action="{% url 'core:update_profile' %}" enctype="multipart/form-data">
                         {% csrf_token %}
-                        {{ profile_form.as_p }}
+                        <div class="profile-form-fields">
+                        {% for field in profile_form %}
+                            <div class="form-group{% if field.field.widget.input_type == 'checkbox' %} checkbox-container{% endif %}">
+                                {{ field.label_tag }} {{ field }}
+                                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
+                                {% for error in field.errors %}<div class="error">{{ error }}</div>{% endfor %}
+                            </div>
+                        {% endfor %}
+                        </div>
                         <button class="btn" type="submit">Update Profile</button>
                     </form>
 
@@ -689,20 +697,25 @@
             <section class="section" data-view="notifications">
                 <div class="card">
                     <h2>Notifications</h2>
+                    {% if notifications %}
+                        <form id="markAllReadForm" method="post" action="{% url 'core:mark_all_notifications_read' %}">
+                            {% csrf_token %}
+                            <button class="btn btn-outline" type="submit" id="markAllReadBtn">Mark all as read</button>
+                        </form>
+                    {% endif %}
+                    <div id="notificationsList">
                     {% for n in notifications %}
-                        <div class="alert alert-{{ n.notification_type|lower }}" data-id="{{ n.id }}">
+                        <div class="alert alert-{{ n.notification_type|lower }} notification-item" data-id="{{ n.id }}">
                             {{ n.message }} - {{ n.created_at }}
-                            {% if n.action_required %}
-                            <form method="post" action="{% url 'core:dismiss_device_notification' n.id %}" style="margin-top: 8px;">
+                            <form class="dismissNotificationForm" method="post" action="{% url 'core:mark_notification_read' n.id %}" style="display:inline; margin-left:12px;">
                                 {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.path }}#notifications">
-                                <button class="btn btn-outline" type="submit">Dismiss</button>
+                                <button class="btn btn-outline btn-sm dismiss-btn" type="submit">Dismiss</button>
                             </form>
-                            {% endif %}
                         </div>
                     {% empty %}
                         <p>No notifications.</p>
                     {% endfor %}
+                    </div>
                 </div>
             </section>
         </main>
@@ -733,14 +746,60 @@
     });
 
     const csrftoken = '{{ csrf_token }}';
-    document.querySelectorAll('.alert[data-id]').forEach(function(el){
-        el.addEventListener('click', function(){
-            fetch('{% url "core:mark_notification_read" 0 %}'.replace('0', el.dataset.id), {
-                method:'POST',
-                headers:{'X-CSRFToken': csrftoken}
-            }).then(()=>{ el.style.display='none'; });
+    // AJAX Dismiss notification
+    document.querySelectorAll('.dismissNotificationForm').forEach(function(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const alertDiv = form.closest('.notification-item');
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success' && alertDiv) {
+                    alertDiv.style.display = 'none';
+                    updateNotificationBadge();
+                }
+            });
         });
     });
+
+    // AJAX Mark all as read
+    const markAllForm = document.getElementById('markAllReadForm');
+    if (markAllForm) {
+        markAllForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch(markAllForm.action, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrftoken },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.querySelectorAll('.notification-item').forEach(function(el){ el.style.display = 'none'; });
+                    updateNotificationBadge();
+                }
+            });
+        });
+    }
+
+    // Update notification badge count
+    function updateNotificationBadge() {
+        fetch("{% url 'core:notifications' %}?ajax=1")
+            .then(response => response.json())
+            .then(data => {
+                const badge = document.querySelector('[data-section="notifications"] .badge');
+                if (badge) {
+                    if (data.unread > 0) {
+                        badge.textContent = data.unread;
+                        badge.style.display = '';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+                }
+            });
+    }
 
     // Password visibility toggle
     function setupPasswordToggles() {
@@ -811,7 +870,8 @@
     }
 
     let initial = 'dashboard';
-    if ({{ show_profile_settings|yesno:"true,false" }}) initial = 'profile';
+    const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+    if (showProfileSettings) initial = 'profile';
     try {
         initial = localStorage.getItem('staff-active-section') || initial;
     } catch(e){}
