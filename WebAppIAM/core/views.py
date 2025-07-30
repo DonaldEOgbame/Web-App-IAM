@@ -982,7 +982,7 @@ def staff_dashboard(request):
     )
     # Always show all documents for staff's department
     sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:5]
-    notifications = Notification.objects.filter(user=user).order_by('-created_at')[:10]
+    notifications = Notification.objects.filter(user=user, read=False).order_by('-created_at')[:10]
     devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
 
     context = {
@@ -1022,7 +1022,9 @@ def admin_dashboard(request):
     documents = Document.objects.filter(deleted=False)
     audit_logs = AuditLog.objects.all().order_by('-timestamp')[:100]
     devices = DeviceFingerprint.objects.all().select_related('user').order_by('-last_seen')
-    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
+    notifications = Notification.objects.filter(user=request.user, read=False).order_by('-created_at')[:10]
+    users = User.objects.all().select_related('profile')
+    pending_users = User.objects.filter(is_active=False)
     system_alerts = []
     if active_sessions > 50:  # Example threshold
         system_alerts.append({
@@ -1042,6 +1044,8 @@ def admin_dashboard(request):
         'audit_logs': audit_logs,
         'devices': devices,
         'notifications': notifications,
+        'users': users,
+        'pending_users': pending_users,
         'system_alerts': system_alerts,
         'active_tab': 'dashboard',
         'show_documents': True,
@@ -1452,7 +1456,7 @@ def dismiss_device_notification(request, notification_id):
 # --- Notification System ---
 @login_required
 def notifications_view(request):
-    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')
+    notifications = Notification.objects.filter(user=request.user, read=False).order_by('-created_at')
 
     if request.GET.get('ajax'):
         unread = notifications.filter(read=False).count()
