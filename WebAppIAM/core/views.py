@@ -1045,23 +1045,17 @@ def document_list(request):
     documents = Document.objects.filter(deleted=False)
 
     # Filter by access level
-    if user.role != 'ADMIN':
-        if hasattr(user, 'profile'):
-            documents = documents.filter(
-                Q(access_level='PUBLIC') |
-                Q(access_level='DEPARTMENT', department=user.profile.department)
-            )
-        else:
-            documents = documents.filter(access_level='PUBLIC')
+    if user.role != 'ADMIN' and hasattr(user, 'profile'):
+        documents = documents.filter(
+            Q(access_level='PRIVATE', uploaded_by=user) |
+            Q(access_level='DEPT', department=user.profile.department)
+        )
     
     # Apply search filters
     query = request.GET.get('q', '')
-    category = request.GET.get('category', '')
     
     if query:
         documents = documents.filter(Q(title__icontains=query) | Q(description__icontains=query))
-    if category:
-        documents = documents.filter(category=category)
     
     # Check download permissions
     current_session = UserSession.objects.filter(
@@ -1073,15 +1067,12 @@ def document_list(request):
         doc.can_download = (
             current_session and
             current_session.access_granted and
-            current_session.risk_level == 'LOW' and
-            not doc.is_expired()
+            current_session.risk_level == 'LOW'
         )
     
     context = {
         'documents': documents,
-        'categories': Document.CATEGORY_CHOICES,
         'query': query,
-        'selected_category': category,
         'show_documents': True
     }
     
@@ -1112,7 +1103,6 @@ def document_upload(request):
             # Handle versioning
             existing = Document.objects.filter(
                 title=doc.title,
-                category=doc.category,
                 department=doc.department,
                 deleted=False
             ).order_by('-version').first()
@@ -1149,9 +1139,6 @@ def document_download(request, doc_id):
         ):
             return HttpResponseForbidden("You don't have permission to access this document")
     
-    # Add strict expiry check first
-    if doc.is_expired():
-        return HttpResponseForbidden("Document expired")
     
     # Check session risk
     current_session = UserSession.objects.filter(

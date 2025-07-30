@@ -351,19 +351,10 @@ class AuditLog(models.Model):
         return f"{self.get_action_display()} by {user} at {self.timestamp}"
 
 class Document(models.Model):
+    # Only allow private and department scoped documents
     ACCESS_LEVEL_CHOICES = [
         ('PRIVATE', 'Private (Owner Only)'),
         ('DEPT', 'Department Access'),
-        ('ORG', 'Organization Access'),
-        ('PUBLIC', 'Public Access'),
-    ]
-    
-    CATEGORY_CHOICES = [
-        ('GENERAL', 'General'),
-        ('CONFIDENTIAL', 'Confidential'),
-        ('RESTRICTED', 'Restricted'),
-        ('SENSITIVE', 'Sensitive'),
-        ('PUBLIC', 'Public'),
     ]
     
     title = models.CharField(max_length=255)
@@ -371,7 +362,6 @@ class Document(models.Model):
     
     # Security metadata
     access_level = models.CharField(max_length=15, choices=ACCESS_LEVEL_CHOICES, default='PRIVATE')
-    category = models.CharField(max_length=15, choices=CATEGORY_CHOICES, default='GENERAL')
     department = models.CharField(max_length=100, blank=True, null=True)
     
     # File handling
@@ -401,14 +391,13 @@ class Document(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    expiry_date = models.DateTimeField(null=True, blank=True)
     deleted = models.BooleanField(default=False)
     deletion_reason = models.TextField(blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=['access_level', 'category']),
+            models.Index(fields=['access_level']),
             models.Index(fields=['department']),
         ]
         permissions = [
@@ -419,28 +408,6 @@ class Document(models.Model):
     def __str__(self):
         return f"{self.title} (v{self.version})" if self.version > 1 else self.title
 
-    def is_expired(self):
-        return self.expiry_date and self.expiry_date < timezone.now()
-
-    def get_status(self):
-        if self.deleted:
-            return "Archived"
-        if self.is_expired():
-            return "Expired"
-        if self.expiry_date:
-            delta = self.expiry_date - timezone.now()
-            if delta.days <= 7:
-                return "Expiring Soon"
-        return "Active"
-
-    def get_status_class(self):
-        status = self.get_status()
-        return {
-            "Archived": "secondary",
-            "Expired": "danger",
-            "Expiring Soon": "warning",
-            "Active": "success"
-        }.get(status, "primary")
 
 class DocumentAccessLog(models.Model):
     ACCESS_TYPES = [

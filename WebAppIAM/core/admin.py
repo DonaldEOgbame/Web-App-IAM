@@ -61,8 +61,8 @@ class AuditLogAdmin(admin.ModelAdmin):
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('title', 'access_level', 'category', 'department', 'uploaded_by', 'created_at', 'expiry_date')
-    list_filter = ('access_level', 'category', 'department', 'expiry_date')
+    list_display = ('title', 'access_level', 'department', 'uploaded_by', 'created_at')
+    list_filter = ('access_level', 'department')
     search_fields = ('title', 'description', 'department')
 
 @admin.register(DocumentAccessLog)

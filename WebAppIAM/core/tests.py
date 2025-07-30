@@ -21,43 +21,24 @@ class ModelTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="tester", password="pass")
 
-    def _create_document(self, expiry=None, deleted=False):
+    def _create_document(self, deleted=False):
         return Document.objects.create(
             title="Test Doc",
             description="",
             access_level="PRIVATE",
-            category="GENERAL",
             encrypted_file=b"data",
             original_filename="doc.txt",
             file_type="text/plain",
             file_size=100,
             encryption_key=b"key",
             uploaded_by=self.user,
-            expiry_date=expiry,
             deleted=deleted,
         )
 
-    def test_document_status_transitions(self):
+    def test_document_creation(self):
         doc = self._create_document()
-        self.assertEqual(doc.get_status(), "Active")
-        self.assertEqual(doc.get_status_class(), "success")
-
-        doc.expiry_date = timezone.now() - timezone.timedelta(days=1)
-        doc.save()
-        self.assertTrue(doc.is_expired())
-        self.assertEqual(doc.get_status(), "Expired")
-        self.assertEqual(doc.get_status_class(), "danger")
-
-        doc.expiry_date = timezone.now() + timezone.timedelta(days=2)
-        doc.deleted = False
-        doc.save()
-        self.assertEqual(doc.get_status(), "Expiring Soon")
-        self.assertEqual(doc.get_status_class(), "warning")
-
-        doc.deleted = True
-        doc.save()
-        self.assertEqual(doc.get_status(), "Archived")
-        self.assertEqual(doc.get_status_class(), "secondary")
+        self.assertEqual(doc.access_level, "PRIVATE")
+        self.assertFalse(doc.deleted)
 
     def test_device_fingerprint_usage(self):
         fp = DeviceFingerprint.objects.create(
@@ -139,7 +120,6 @@ class FormTests(TestCase):
             {
                 "title": "Doc",
                 "access_level": "PRIVATE",
-                "category": "GENERAL",
             },
             {"file": file_data},
         )
