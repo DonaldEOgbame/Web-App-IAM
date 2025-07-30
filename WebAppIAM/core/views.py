@@ -973,8 +973,31 @@ def staff_dashboard(request):
         messages.error(request, "Access denied. You don't have permission to access this page.")
         return redirect('core:login')
 
-    # Reuse the main dashboard logic so staff users get full context
-    return dashboard(request)
+    user = request.user
+    # Always filter documents by staff's department
+    documents = Document.objects.filter(
+        deleted=False,
+        access_level='DEPT',
+        department=user.profile.department
+    )
+    # Always show all documents for staff's department
+    sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:5]
+    notifications = Notification.objects.filter(user=user).order_by('-created_at')[:10]
+    devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
+
+    context = {
+        'user': user,
+        'documents': documents,
+        'sessions': sessions,
+        'notifications': notifications,
+        'devices': devices,
+        'risk_policy': RiskPolicy.objects.filter(is_active=True).first(),
+        'active_tab': 'dashboard',
+        'show_documents': True,
+        'show_device_management': True,
+        'show_notifications': True,
+    }
+    return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
 def admin_dashboard(request):
@@ -995,8 +1018,11 @@ def admin_dashboard(request):
         timestamp__gte=timezone.now() - timezone.timedelta(hours=24),
         action__in=['ACCESS_DENIED', 'LOGIN_FAIL', 'ACCOUNT_LOCK']
     ).count()
-    
-    # Get system alerts
+    high_risk_sessions = UserSession.objects.filter(risk_level='HIGH').order_by('-login_time')[:5]
+    documents = Document.objects.filter(deleted=False)
+    audit_logs = AuditLog.objects.all().order_by('-timestamp')[:100]
+    devices = DeviceFingerprint.objects.all().select_related('user').order_by('-last_seen')
+    notifications = Notification.objects.filter(user=request.user).order_by('-created_at')[:10]
     system_alerts = []
     if active_sessions > 50:  # Example threshold
         system_alerts.append({
@@ -1005,17 +1031,24 @@ def admin_dashboard(request):
             'timestamp': timezone.now(),
             'level': 'warning'
         })
-    
     context = {
         'user': request.user,
         'user_count': user_count,
         'active_sessions': active_sessions,
         'security_events': security_events,
         'recent_logins': recent_logins,
+        'high_risk_sessions': high_risk_sessions,
+        'documents': documents,
+        'audit_logs': audit_logs,
+        'devices': devices,
+        'notifications': notifications,
         'system_alerts': system_alerts,
-        'active_tab': 'dashboard'
+        'active_tab': 'dashboard',
+        'show_documents': True,
+        'show_audit_logs': True,
+        'show_device_management': True,
+        'show_notifications': True,
     }
-    
     return render(request, 'core/admin_dashboard.html', context)
 
 
@@ -1269,6 +1302,7 @@ def update_profile(request):
         profile.auto_logout = form.cleaned_data['auto_logout']
         profile.receive_email_alerts = form.cleaned_data['receive_email_alerts']
 
+        # Always update email if changed and send verification
         if form.cleaned_data['email'] != user.email:
             token = Fernet.generate_key().decode()
             expiration = timezone.now() + timedelta(hours=24)
@@ -1291,10 +1325,10 @@ def update_profile(request):
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL,
                       [form.cleaned_data['email']], fail_silently=True)
 
-
             messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
 
-        user.save(update_fields=['first_name', 'last_name'])
+        user.email = form.cleaned_data['email']
+        user.save(update_fields=['first_name', 'last_name', 'email'])
 
         if 'profile_picture' in request.FILES:
             profile.profile_picture = request.FILES['profile_picture']
@@ -1351,16 +1385,20 @@ def manage_devices(request):
 @require_POST
 def trust_device(request, device_id):
     """Mark a device as trusted"""
-    device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
+    # Allow admin to trust any device, user to trust their own
+    if request.user.role == 'ADMIN':
+        device = get_object_or_404(DeviceFingerprint, id=device_id)
+    else:
+        device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
     device.mark_as_trusted()
-    
+    # Mark device as trusted in session for authentication effect
+    request.session['trusted_device'] = device.device_id
     AuditLog.objects.create(
         user=request.user,
         action='DEVICE_TRUST',
         details=f'Device marked as trusted: {device}',
         ip_address=get_client_ip(request)
     )
-    
     messages.success(request, f'Device "{device}" has been marked as trusted.')
     return redirect('core:manage_devices')
 
@@ -1368,17 +1406,22 @@ def trust_device(request, device_id):
 @require_POST
 def remove_device(request, device_id):
     """Remove/untrust a device"""
-    device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
+    # Allow admin to remove any device, user to remove their own
+    if request.user.role == 'ADMIN':
+        device = get_object_or_404(DeviceFingerprint, id=device_id)
+    else:
+        device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
     device_name = str(device)
     device.delete()
-    
+    # Remove trusted device from session if it matches
+    if request.session.get('trusted_device') == device.device_id:
+        del request.session['trusted_device']
     AuditLog.objects.create(
         user=request.user,
         action='DEVICE_REMOVE',
         details=f'Device removed: {device_name}',
         ip_address=get_client_ip(request)
     )
-    
     messages.success(request, f'Device "{device_name}" has been removed.')
     return redirect('core:manage_devices')
 
@@ -1386,28 +1429,24 @@ def remove_device(request, device_id):
 @require_POST
 def dismiss_device_notification(request, notification_id):
     """Dismiss a device notification and optionally trust the device"""
-    notification = get_object_or_404(Notification, id=notification_id, user=request.user, notification_type='DEVICE')
-    
-    # Check if user wants to trust the device
+    notification = get_object_or_404(Notification, id=notification_id, user=request.user)
+    # Allow dismissing any notification, not just DEVICE
     trust_device_flag = request.POST.get('trust_device') == 'true'
     device_id = notification.metadata.get('device_id')
-    
     if trust_device_flag and device_id:
         try:
             device = DeviceFingerprint.objects.get(device_id=device_id, user=request.user)
             device.mark_as_trusted()
+            # Mark device as trusted in session for authentication effect
+            request.session['trusted_device'] = device_id
             messages.success(request, 'Device has been marked as trusted.')
         except DeviceFingerprint.DoesNotExist:
             pass
-    
     notification.read = True
     notification.save()
-
     next_url = request.POST.get('next') or request.META.get('HTTP_REFERER') or reverse('core:notifications')
-
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return JsonResponse({'status': 'success'})
-
     return redirect(next_url)
 
 # --- Notification System ---
@@ -1440,7 +1479,9 @@ def mark_notification_read(request, notification_id):
 @require_POST
 def mark_all_notifications_read(request):
     Notification.objects.filter(user=request.user, read=False).update(read=True)
-    return JsonResponse({'status': 'success'})
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return JsonResponse({'status': 'success'})
+    return redirect(request.META.get('HTTP_REFERER', reverse('core:notifications')))
 
 # --- Policy Management ---
 @login_required
