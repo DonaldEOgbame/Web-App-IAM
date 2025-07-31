@@ -179,34 +179,7 @@
 
         <form id="completeProfileForm" method="post" enctype="multipart/form-data">
             {% csrf_token %}
-            <p>
-                <label for="first_name">First Name</label>
-                <input type="text" name="first_name" id="first_name" required>
-            </p>
-            <p>
-                <label for="last_name">Last Name</label>
-                <input type="text" name="last_name" id="last_name" required>
-            </p>
-            <p>
-                <label for="department">Department</label>
-                <select name="department" id="department">
-                    {% for code, label in dept_choices %}
-                        <option value="{{ code }}">{{ label }}</option>
-                    {% endfor %}
-                </select>
-            </p>
-            <p>
-                <label for="position">Position</label>
-                <input type="text" name="position" id="position" required>
-            </p>
-            <p>
-                <label for="phone">Phone</label>
-                <input type="text" name="phone" id="phone">
-            </p>
-            <p>
-                <label for="profile_picture">Profile Picture</label>
-                <input type="file" name="profile_picture" id="profile_picture">
-            </p>
+            {{ form.as_p }}
             <button id="submitBtn" type="submit">Submit</button>
         </form>
     </div>
