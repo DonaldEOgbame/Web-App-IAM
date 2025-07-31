@@ -612,9 +612,7 @@
                             <td>{{ doc.title }}</td>
                             <td>{{ doc.version }}</td>
                             <td>
-                                {% if doc.can_download %}
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
-                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
