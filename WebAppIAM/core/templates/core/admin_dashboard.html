@@ -721,12 +721,13 @@
                     <h2>Documents</h2>
                     <table>
                         <thead>
-                        <tr><th>Title</th><th>Version</th><th>Actions</th></tr>
+                        <tr><th>Title</th><th>Department</th><th>Version</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                         {% for doc in documents %}
                         <tr>
                             <td>{{ doc.title }}</td>
+                            <td>{{ doc.department }}</td>
                             <td>{{ doc.version }}</td>
                             <td>
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
