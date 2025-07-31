@@ -364,12 +364,21 @@
             border-radius: 10px;
             margin-bottom: 10px;
             border: 1px solid transparent;
-            cursor: pointer;
+        }
+        .alert-info {
+            background: rgba(59, 130, 246, 0.08);
+            border-color: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
         }
         .alert-warning {
             background: rgba(251, 191, 36, 0.08);
             border-color: rgba(251, 191, 36, 0.2);
             color: #fbbf24;
+        }
+        .alert-danger {
+            background: rgba(239, 68, 68, 0.08);
+            border-color: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
         }
 
         /* Django messages list */
@@ -849,7 +858,7 @@
                     {% endif %}
                     <div id="notificationsList">
                     {% for n in notifications %}
-                        <div class="alert alert-warning notification-item" data-id="{{ n.id }}" role="alert">
+                        <div class="alert alert-{{ n.notification_type|lower }} notification-item" data-id="{{ n.id }}">
                             {{ n.message }} - {{ n.created_at }}
                             <form class="dismissNotificationForm" method="post" action="{% url 'core:mark_notification_read' n.id %}" style="display:inline; margin-left:12px;">
                                 {% csrf_token %}
