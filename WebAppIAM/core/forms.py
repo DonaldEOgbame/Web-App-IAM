@@ -83,6 +83,22 @@ class DocumentUploadForm(forms.ModelForm):
         # This is just for the form validation
         return super().save(commit=commit)
 
+
+class DocumentEditForm(forms.ModelForm):
+    """Form used to edit an existing document."""
+    file = forms.FileField(label="New file", required=False)
+    department = forms.ChoiceField(
+        choices=UserProfile.DEPT_CHOICES,
+        required=False,
+    )
+
+    class Meta:
+        model = Document
+        fields = ["title", "description", "access_level", "department"]
+
+    def save(self, commit=True):
+        return super().save(commit=commit)
+
 class ProfileCompletionForm(forms.ModelForm):
     first_name = forms.CharField(
         max_length=30,

@@ -457,6 +457,15 @@
             transform: rotate(45deg);
         }
 
+        /* Modal for document editing */
+        .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.7); backdrop-filter: blur(8px); z-index: 1000; opacity: 0; transition: opacity .3s; }
+        .modal.open { display: flex; opacity: 1; }
+        .modal-card { width: min(500px, 92vw); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 20px; position: relative; transform: scale(.95); transition: transform .3s; }
+        .modal.open .modal-card { transform: scale(1); }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .modal-title { font-size: 18px; font-weight: 600; }
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
         /* Mobile */
         @media (max-width: 960px) {
             .layout {
@@ -634,6 +643,24 @@
                 </div>
             </section>
 
+            {% if edit_form %}
+            <div id="edit-modal" class="modal{% if show_document_edit %} open{% endif %}" aria-hidden="true">
+                <div class="modal-card">
+                    <div class="modal-header">
+                        <h2 class="modal-title">Edit Document</h2>
+                    </div>
+                    <form method="post" action="{% url 'core:document_edit' edit_document.id %}" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {{ edit_form.as_p }}
+                        <div class="modal-actions">
+                            <button class="btn" type="submit">Save</button>
+                            <a href="{% url 'core:document_list' %}" class="btn btn-outline">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- USERS -->
             <section class="section" data-view="users">
                 <div class="card">
@@ -731,6 +758,7 @@
                             <td>{{ doc.version }}</td>
                             <td>
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
+                                <a class="btn btn-outline" href="{% url 'core:document_edit' doc.id %}">Edit</a>
                             </td>
                         </tr>
                         {% empty %}
@@ -1041,8 +1069,10 @@
     let initial = 'dashboard';
     const showUserManagement = JSON.parse("{{ show_user_management|yesno:'true,false'|lower }}".replace(/'/g, '"'));
     const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+    const showDocumentEdit = JSON.parse("{{ show_document_edit|yesno:'true,false'|lower }}".replace(/'/g, '"'));
     if (showUserManagement) initial = 'users';
     if (showProfileSettings) initial = 'profile';
+    if (showDocumentEdit) initial = 'documents';
     try {
         initial = localStorage.getItem('active-section') || initial;
     } catch(e){}

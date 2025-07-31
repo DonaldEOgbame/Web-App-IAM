@@ -49,6 +49,7 @@ urlpatterns = [
     path('documents/', views.document_list, name='document_list'),
     path('documents/upload/', views.document_upload, name='document_upload'),
     path('documents/download/<int:doc_id>/', views.document_download, name='document_download'),
+    path('documents/edit/<int:doc_id>/', views.document_edit, name='document_edit'),
     path('documents/purge/<int:doc_id>/', views.purge_document, name='purge_document'),
     path('documents/validate_checksum/<int:doc_id>/', views.validate_checksum, name='validate_checksum'),
 

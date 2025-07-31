@@ -49,7 +49,8 @@ from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
 from .forms import (
     RegistrationForm, LoginForm, FaceEnrollForm, FingerprintReRegisterForm,
     RiskPolicyForm, ReportSubmissionForm, CustomPasswordChangeForm,
-    DocumentUploadForm, ProfileCompletionForm, ProfileUpdateForm, PasswordResetForm, PasswordResetConfirmForm
+    DocumentUploadForm, DocumentEditForm, ProfileCompletionForm,
+    ProfileUpdateForm, PasswordResetForm, PasswordResetConfirmForm
 )
 
 # ✅ Official py-webauthn (v2.6.0) imports for registration verify
@@ -1213,6 +1214,62 @@ def document_download(request, doc_id):
     except (IOError, InvalidToken) as e:
         logger.error(f"Document download failed: {str(e)}")
         return HttpResponseBadRequest("Failed to download document")
+
+
+@login_required
+@user_passes_test(is_admin)
+def document_edit(request, doc_id):
+    """Edit an existing document by creating a new version."""
+    existing = get_object_or_404(Document, id=doc_id, deleted=False)
+
+    if request.method == "POST":
+        form = DocumentEditForm(request.POST, request.FILES)
+        if form.is_valid():
+            new_doc = form.save(commit=False)
+            new_doc.uploaded_by = request.user
+
+            if request.FILES.get("file"):
+                file_data = request.FILES["file"].read()
+                encrypted_data = encrypt_file(file_data, request.user)
+                new_doc.encrypted_file = encrypted_data
+                new_doc.original_filename = request.FILES["file"].name
+                new_doc.file_type = request.FILES["file"].content_type
+                new_doc.file_size = request.FILES["file"].size
+                new_doc.encryption_key = get_fernet_key(request.user)
+            else:
+                new_doc.encrypted_file = existing.encrypted_file
+                new_doc.original_filename = existing.original_filename
+                new_doc.file_type = existing.file_type
+                new_doc.file_size = existing.file_size
+                new_doc.encryption_key = existing.encryption_key
+
+            new_doc.version = existing.version + 1
+            new_doc.parent = existing
+            existing.deleted = True
+            existing.save()
+            new_doc.save()
+
+            DocumentAccessLog.objects.create(
+                user=request.user,
+                document=new_doc,
+                access_type="EDIT",
+                was_successful=True,
+                ip_address=get_client_ip(request),
+            )
+
+            return redirect("core:document_list")
+
+    form = DocumentEditForm(instance=existing, initial={"department": existing.department})
+    documents = Document.objects.filter(deleted=False)
+    context = {
+        "documents": documents,
+        "query": "",
+        "show_documents": True,
+        "edit_form": form,
+        "edit_document": existing,
+        "show_document_edit": True,
+    }
+    return render(request, "core/admin_dashboard.html", context)
 
 
 @login_required
