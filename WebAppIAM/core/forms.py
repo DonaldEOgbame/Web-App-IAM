@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm
-from .models import User, RiskPolicy, Document, UserProfile
+from .models import User, RiskPolicy
 
 class RegistrationForm(forms.ModelForm):
     password1 = forms.CharField(
@@ -66,62 +66,6 @@ class ReportSubmissionForm(forms.Form):
 class CustomPasswordChangeForm(PasswordChangeForm):
     pass
 
-class DocumentUploadForm(forms.ModelForm):
-    file = forms.FileField(label='File to upload')
-    # Present predefined department choices instead of a free text field
-    department = forms.ChoiceField(
-        choices=UserProfile.DEPT_CHOICES,
-        required=False
-    )
-    
-    class Meta:
-        model = Document
-        fields = ['title', 'description', 'access_level', 'department']
-        
-    def save(self, commit=True):
-        # Don't save the file directly, it will be encrypted in the view
-        # This is just for the form validation
-        return super().save(commit=commit)
-
-class ProfileCompletionForm(forms.ModelForm):
-    first_name = forms.CharField(
-        max_length=30,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'})
-    )
-    last_name = forms.CharField(
-        max_length=30,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'})
-    )
-    
-    class Meta:
-        model = UserProfile
-        fields = ['department', 'position', 'phone', 'profile_picture']
-        widgets = {
-            'position': forms.TextInput(attrs={'class': 'form-control'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1 (555) 555-5555'}),
-        }
-
-class ProfileUpdateForm(forms.ModelForm):
-    first_name = forms.CharField(
-        max_length=30,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'First Name'})
-    )
-    last_name = forms.CharField(
-        max_length=30,
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'})
-    )
-    email = forms.EmailField(
-        widget=forms.EmailInput(attrs={'class': 'form-control'})
-    )
-    
-    class Meta:
-        model = UserProfile
-        fields = ['department', 'position', 'phone', 'profile_picture',
-                  'show_risk_alerts', 'auto_logout', 'receive_email_alerts']
-        widgets = {
-            'position': forms.TextInput(attrs={'class': 'form-control'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control'}),
-        }
 
 class PasswordResetForm(forms.Form):
     email = forms.EmailField(

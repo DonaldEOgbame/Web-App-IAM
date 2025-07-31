@@ -12,7 +12,7 @@ from .models import (
     WebAuthnCredential,
     UserSession,
 )
-from .forms import RegistrationForm, DocumentUploadForm
+from .forms import RegistrationForm
 from .views import encrypt_file, decrypt_file, rate_limit
 from . import risk_engine
 
@@ -114,16 +114,6 @@ class FormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("password2", form.errors)
 
-    def test_document_upload_form_valid(self):
-        file_data = SimpleUploadedFile("file.txt", b"data", content_type="text/plain")
-        form = DocumentUploadForm(
-            {
-                "title": "Doc",
-                "access_level": "PRIVATE",
-            },
-            {"file": file_data},
-        )
-        self.assertTrue(form.is_valid())
 
 
 class UtilityTests(TestCase):

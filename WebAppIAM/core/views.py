@@ -49,7 +49,7 @@ from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
 from .forms import (
     RegistrationForm, LoginForm, FaceEnrollForm, FingerprintReRegisterForm,
     RiskPolicyForm, ReportSubmissionForm, CustomPasswordChangeForm,
-    DocumentUploadForm, ProfileCompletionForm, ProfileUpdateForm, PasswordResetForm, PasswordResetConfirmForm
+    PasswordResetForm, PasswordResetConfirmForm
 )
 
 # ✅ Official py-webauthn (v2.6.0) imports for registration verify
@@ -338,30 +338,36 @@ def complete_profile(request):
     user = get_object_or_404(User, id=user_id)
     
     if request.method == 'POST':
-        form = ProfileCompletionForm(request.POST)
-        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-        if form.is_valid():
+        first_name = request.POST.get('first_name')
+        last_name = request.POST.get('last_name')
+        department = request.POST.get('department')
+        position = request.POST.get('position')
+        phone = request.POST.get('phone')
+        profile_picture = request.FILES.get('profile_picture')
+
+        if first_name and last_name and department and position:
             profile = UserProfile.objects.create(
                 user=user,
-                department=form.cleaned_data['department'],
-                position=form.cleaned_data['position']
+                full_name=f"{first_name} {last_name}",
+                department=department,
+                position=position,
+                phone=phone,
+                profile_picture=profile_picture,
+                profile_completed=True,
             )
-            # Update user's name fields
-            user.first_name = form.cleaned_data['first_name']
-            user.last_name = form.cleaned_data['last_name']
+            user.first_name = first_name
+            user.last_name = last_name
             user.save()
-            
+
             if 'pending_user_id' in request.session:
                 del request.session['pending_user_id']
             if 'complete_profile_user' in request.session:
                 del request.session['complete_profile_user']
             return render(request, 'core/pending_approval.html', {'user': user})
-    else:
-        form = ProfileCompletionForm()
-    
+
     return render(request, 'core/complete_profile.html', {
-        'form': form,
         'user': user,
+        'dept_choices': UserProfile.DEPT_CHOICES,
     })
 
 def register_biometrics(request):
@@ -1121,42 +1127,47 @@ def document_list(request):
 @user_passes_test(is_admin)
 def document_upload(request):
     if request.method == 'POST':
-        form = DocumentUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            doc = form.save(commit=False)
-            doc.uploaded_by = request.user
+        title = request.POST.get('title')
+        description = request.POST.get('description', '')
+        access_level = request.POST.get('access_level', 'PRIVATE')
+        department = request.POST.get('department') or None
+        uploaded_file = request.FILES.get('file')
 
-            # Encrypt file with user-specific key
-            file_data = request.FILES['file'].read()
+        if title and uploaded_file:
+            doc = Document(
+                title=title,
+                description=description,
+                access_level=access_level,
+                department=department,
+                uploaded_by=request.user,
+            )
+
+            file_data = uploaded_file.read()
             encrypted_data = encrypt_file(file_data, request.user)
 
-            # Persist encrypted file data and metadata
             doc.encrypted_file = encrypted_data
-            doc.original_filename = request.FILES['file'].name
-            doc.file_type = request.FILES['file'].content_type
-            doc.file_size = request.FILES['file'].size
+            doc.original_filename = uploaded_file.name
+            doc.file_type = uploaded_file.content_type
+            doc.file_size = uploaded_file.size
             doc.encryption_key = get_fernet_key(request.user)
-            
-            # Handle versioning
+
             existing = Document.objects.filter(
                 title=doc.title,
                 department=doc.department,
                 deleted=False
             ).order_by('-version').first()
-            
+
             if existing:
                 doc.version = existing.version + 1
                 existing.deleted = True
                 existing.save()
-            
+
             doc.save()
             return redirect('core:document_list')
-    else:
-        form = DocumentUploadForm()
-    
+
     return render(request, 'core/admin_dashboard.html', {
-        'form': form,
-        'show_document_upload': True
+        'show_document_upload': True,
+        'dept_choices': UserProfile.DEPT_CHOICES,
     })
 
 @login_required
@@ -1261,25 +1272,13 @@ def profile_settings(request):
         return redirect('core:complete_profile')
     profile = user.profile
 
-    form = ProfileUpdateForm(initial={
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'department': profile.department,
-        'position': profile.position,
-        'email': user.email,
-        'phone': profile.phone,
-        'show_risk_alerts': profile.show_risk_alerts,
-        'auto_logout': profile.auto_logout,
-        'receive_email_alerts': profile.receive_email_alerts
-    })
-    
     context = {
         'profile': profile,
-        'profile_form': form,
         'password_form': CustomPasswordChangeForm(user=user),
         'face_form': FaceEnrollForm(),
         'user': user,
-        'show_profile_settings': True
+        'show_profile_settings': True,
+        'dept_choices': UserProfile.DEPT_CHOICES,
     }
     
     template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
@@ -1295,22 +1294,31 @@ def update_profile(request):
         return redirect('core:complete_profile')
     profile = user.profile
 
-    form = ProfileUpdateForm(request.POST, request.FILES)
-    if form.is_valid():
-        user.first_name = form.cleaned_data['first_name']
-        user.last_name = form.cleaned_data['last_name']
-        profile.department = form.cleaned_data['department']
-        profile.position = form.cleaned_data['position']
-        profile.phone = form.cleaned_data.get('phone')
-        profile.show_risk_alerts = form.cleaned_data['show_risk_alerts']
-        profile.auto_logout = form.cleaned_data['auto_logout']
-        profile.receive_email_alerts = form.cleaned_data['receive_email_alerts']
+    first_name = request.POST.get('first_name')
+    last_name = request.POST.get('last_name')
+    email = request.POST.get('email')
+    department = request.POST.get('department')
+    position = request.POST.get('position')
+    phone = request.POST.get('phone')
+    show_risk_alerts = bool(request.POST.get('show_risk_alerts'))
+    auto_logout = bool(request.POST.get('auto_logout'))
+    receive_email_alerts = bool(request.POST.get('receive_email_alerts'))
+    profile_picture = request.FILES.get('profile_picture')
 
-        # Always update email if changed and send verification
-        if form.cleaned_data['email'] != user.email:
+    if first_name and last_name and email and department and position:
+        user.first_name = first_name
+        user.last_name = last_name
+        profile.department = department
+        profile.position = position
+        profile.phone = phone
+        profile.show_risk_alerts = show_risk_alerts
+        profile.auto_logout = auto_logout
+        profile.receive_email_alerts = receive_email_alerts
+
+        if email != user.email:
             token = Fernet.generate_key().decode()
             expiration = timezone.now() + timedelta(hours=24)
-            request.session['pending_email_update'] = form.cleaned_data['email']
+            request.session['pending_email_update'] = email
             user.email_verification_token = token
             user.email_verification_expiration = expiration
             user.save()
@@ -1323,19 +1331,19 @@ def update_profile(request):
             message = render_to_string('emails/verify_email_update.html', {
                 'user': user,
                 'verify_link': verify_url,
-                'new_email': form.cleaned_data['email']
+                'new_email': email
             })
 
             send_mail(subject, message, settings.DEFAULT_FROM_EMAIL,
-                      [form.cleaned_data['email']], fail_silently=True)
+                      [email], fail_silently=True)
 
-            messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
+            messages.info(request, f"Verification email sent to {email}. Please verify to complete the email change.")
 
-        user.email = form.cleaned_data['email']
+        user.email = email
         user.save(update_fields=['first_name', 'last_name', 'email'])
 
-        if 'profile_picture' in request.FILES:
-            profile.profile_picture = request.FILES['profile_picture']
+        if profile_picture:
+            profile.profile_picture = profile_picture
 
         profile.save()
 
