@@ -746,7 +746,33 @@
                     <h2>Upload Document</h2>
                     <form method="post" action="{% url 'core:document_upload' %}" enctype="multipart/form-data">
                         {% csrf_token %}
-                        {{ form.as_p }}
+                        <div class="form-group">
+                            <label for="title">Title</label>
+                            <input type="text" id="title" name="title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="description">Description</label>
+                            <textarea id="description" name="description"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="access_level">Access Level</label>
+                            <select id="access_level" name="access_level">
+                                <option value="PRIVATE">Private (Owner Only)</option>
+                                <option value="DEPT">Department Access</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="department">Department</label>
+                            <select id="department" name="department">
+                                {% for code, label in dept_choices %}
+                                    <option value="{{ code }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="file">File</label>
+                            <input type="file" id="file" name="file" required>
+                        </div>
                         <button class="btn" type="submit">Upload</button>
                     </form>
                 </div>
@@ -826,13 +852,56 @@
                     <form method="post" action="{% url 'core:update_profile' %}" enctype="multipart/form-data">
                         {% csrf_token %}
                         <div class="profile-form-fields">
-                        {% for field in profile_form %}
-                            <div class="form-group{% if field.field.widget.input_type == 'checkbox' %} checkbox-container{% endif %}">
-                                {{ field.label_tag }} {{ field }}
-                                {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
-                                {% for error in field.errors %}<div class="error">{{ error }}</div>{% endfor %}
+                            <div class="form-group">
+                                <label for="first_name">First Name</label>
+                                <input type="text" name="first_name" id="first_name" value="{{ user.first_name }}" required>
                             </div>
-                        {% endfor %}
+                            <div class="form-group">
+                                <label for="last_name">Last Name</label>
+                                <input type="text" name="last_name" id="last_name" value="{{ user.last_name }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="email">Email</label>
+                                <input type="email" name="email" id="email" value="{{ user.email }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="department">Department</label>
+                                <select name="department" id="department">
+                                    {% for code, label in dept_choices %}
+                                        <option value="{{ code }}" {% if profile.department == code %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="position">Position</label>
+                                <input type="text" name="position" id="position" value="{{ profile.position }}" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="phone">Phone</label>
+                                <input type="text" name="phone" id="phone" value="{{ profile.phone }}">
+                            </div>
+                            <div class="form-group">
+                                <label for="profile_picture">Profile Picture</label>
+                                <input type="file" name="profile_picture" id="profile_picture">
+                            </div>
+                            <div class="form-group checkbox-container">
+                                <label>
+                                    <input type="checkbox" name="show_risk_alerts" {% if profile.show_risk_alerts %}checked{% endif %}>
+                                    Show risk alerts
+                                </label>
+                            </div>
+                            <div class="form-group checkbox-container">
+                                <label>
+                                    <input type="checkbox" name="auto_logout" {% if profile.auto_logout %}checked{% endif %}>
+                                    Auto logout
+                                </label>
+                            </div>
+                            <div class="form-group checkbox-container">
+                                <label>
+                                    <input type="checkbox" name="receive_email_alerts" {% if profile.receive_email_alerts %}checked{% endif %}>
+                                    Receive email alerts
+                                </label>
+                            </div>
                         </div>
                         <button class="btn" type="submit">Update Profile</button>
                     </form>
