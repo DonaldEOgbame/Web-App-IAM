@@ -635,13 +635,14 @@
                     <h2>Trusted Devices</h2>
                     <table>
                         <thead>
-                        <tr><th>Device</th><th>Last Seen</th><th>Actions</th></tr>
+                        <tr><th>Device</th><th>Last Seen</th><th>Status</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                         {% for d in devices %}
                         <tr>
                             <td>{{ d.browser }} on {{ d.operating_system }}</td>
                             <td>{{ d.last_seen }}</td>
+                            <td>{% if d.is_trusted %}Trusted{% else %}Untrusted{% endif %}</td>
                             <td style="white-space: nowrap;">
                                 {% if not d.is_trusted %}
                                 <form method="post" action="{% url 'core:trust_device' d.id %}" style="display:inline;">
@@ -656,7 +657,7 @@
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="3">No devices found.</td></tr>
+                        <tr><td colspan="4">No devices found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
