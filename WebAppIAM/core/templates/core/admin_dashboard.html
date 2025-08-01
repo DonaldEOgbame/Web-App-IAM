@@ -1066,7 +1066,7 @@
     });
 
     // On load: show stored or hash target or dashboard
-    let initial = 'dashboard';
+    let initial = '{{ active_tab|default:"dashboard" }}';
     const showUserManagement = JSON.parse("{{ show_user_management|yesno:'true,false'|lower }}".replace(/'/g, '"'));
     const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
     const showDocumentEdit = JSON.parse("{{ show_document_edit|yesno:'true,false'|lower }}".replace(/'/g, '"'));

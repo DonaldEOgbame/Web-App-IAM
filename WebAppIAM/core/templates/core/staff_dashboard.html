@@ -870,7 +870,7 @@
         }
     }
 
-    let initial = 'dashboard';
+    let initial = '{{ active_tab|default:"dashboard" }}';
     const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
     if (showProfileSettings) initial = 'profile';
     try {
