@@ -1022,7 +1022,8 @@ def admin_dashboard(request):
     high_risk_sessions = UserSession.objects.filter(risk_level='HIGH').order_by('-login_time')[:5]
     documents = Document.objects.filter(deleted=False)
     audit_logs = AuditLog.objects.all().order_by('-timestamp')[:100]
-    devices = DeviceFingerprint.objects.all().select_related('user').order_by('-last_seen')
+    # Only show devices belonging to the admin's account
+    devices = DeviceFingerprint.objects.filter(user=request.user).order_by('-last_seen')
     notifications = Notification.objects.filter(user=request.user, read=False).order_by('-created_at')[:10]
     users = User.objects.all().select_related('profile')
     pending_users = User.objects.filter(is_active=False)
@@ -1429,10 +1430,8 @@ def change_password(request):
 def manage_devices(request):
     """View and manage trusted devices"""
     user = request.user
-    if user.role == 'ADMIN':
-        devices = DeviceFingerprint.objects.all().select_related('user').order_by('-last_seen')
-    else:
-        devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
+    # Only show devices belonging to the current user
+    devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
     
     context = {
         'devices': devices,
@@ -1446,11 +1445,8 @@ def manage_devices(request):
 @require_POST
 def trust_device(request, device_id):
     """Mark a device as trusted"""
-    # Allow admin to trust any device, user to trust their own
-    if request.user.role == 'ADMIN':
-        device = get_object_or_404(DeviceFingerprint, id=device_id)
-    else:
-        device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
+    # Ensure users can only trust their own devices
+    device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
     device.mark_as_trusted()
     # Mark device as trusted in session for authentication effect
     request.session['trusted_device'] = device.device_id
@@ -1467,11 +1463,8 @@ def trust_device(request, device_id):
 @require_POST
 def remove_device(request, device_id):
     """Remove/untrust a device"""
-    # Allow admin to remove any device, user to remove their own
-    if request.user.role == 'ADMIN':
-        device = get_object_or_404(DeviceFingerprint, id=device_id)
-    else:
-        device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
+    # Users may only remove their own devices
+    device = get_object_or_404(DeviceFingerprint, id=device_id, user=request.user)
     device_name = str(device)
     device.delete()
     # Remove trusted device from session if it matches
