@@ -13,7 +13,7 @@ from .models import User, Document
 class DocumentEditTests(TestCase):
     def setUp(self):
         self.client = Client()
-        self.admin = User.objects.create_user(username="admin", password="pass", role="ADMIN")
+        self.admin = User.objects.create_user(username="admin", password="pass", role="ADMIN", email="admin@example.com")
         self.client.force_login(self.admin)
         self.doc = Document.objects.create(
             title="Doc",

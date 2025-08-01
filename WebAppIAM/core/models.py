@@ -42,6 +42,7 @@ class User(AbstractUser):
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='STAFF')
     azure_face_id = models.CharField(max_length=100, blank=True, null=True)
     last_activity = models.DateTimeField(null=True, blank=True)
+    email = models.EmailField(unique=True, blank=True)
     email_verified = models.BooleanField(default=False)
     email_verification_token = models.CharField(max_length=255, blank=True, null=True)
     email_verification_expiration = models.DateTimeField(blank=True, null=True)
