@@ -191,10 +191,10 @@ class DeviceViewTests(TestCase):
         devices = list(response.context["devices"])
         self.assertEqual(devices, [self.staff_fp])
 
-    def test_admin_sees_all_devices(self):
+    def test_admin_only_sees_own_devices(self):
         self.client.force_login(self.admin)
         response = self.client.get(reverse("core:manage_devices"))
-        device_ids = {d.id for d in response.context["devices"]}
-        self.assertEqual(device_ids, {self.admin_fp.id, self.staff_fp.id})
+        devices = list(response.context["devices"])
+        self.assertEqual(devices, [self.admin_fp])
 
 
