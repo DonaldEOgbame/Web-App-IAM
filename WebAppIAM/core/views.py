@@ -1714,6 +1714,28 @@ def unlock_user(request, user_id):
     return redirect('core:admin_dashboard')
 
 
+@login_required
+@user_passes_test(is_admin)
+@require_POST
+def allow_high_risk_session(request, session_id):
+    """Allow access for a previously denied high or medium risk session."""
+    session = get_object_or_404(UserSession, id=session_id)
+    session.access_granted = True
+    session.flagged_reason = ''
+    session.save(update_fields=['access_granted', 'flagged_reason'])
+
+    AuditLog.objects.create(
+        user=request.user,
+        affected_user=session.user,
+        action='ACCESS_GRANTED',
+        details=f'Admin override for session {session.id}',
+        ip_address=get_client_ip(request)
+    )
+
+    messages.success(request, 'Session access granted.')
+    return redirect('core:admin_dashboard')
+
+
 # --- Password Reset ---
 def password_reset_request(request):
     if request.method == 'POST':

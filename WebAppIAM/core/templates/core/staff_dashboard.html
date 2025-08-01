@@ -603,7 +603,7 @@
                 <div class="card">
                     <h2>Documents</h2>
                     <p class="mt-16" style="color:var(--text-dim); font-size:0.98rem;">Browse, search, and download documents. Each document includes a title, department, and description for context.</p>
-                    <form method="get" action="" style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+                    <form method="get" action="{% url 'core:document_list' %}" style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
                         <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search documents..." style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-soft); color:var(--text);">
                         <button class="btn btn-outline" type="submit">Search</button>
                     </form>
