@@ -1291,6 +1291,12 @@ def document_edit(request, doc_id):
         "edit_document": existing,
         "show_document_edit": True,
     }
+    if request.headers.get("x-requested-with") == "XMLHttpRequest":
+        # Render only the modal for AJAX
+        from django.template.loader import render_to_string
+        modal_html = render_to_string("core/partials/document_edit_modal.html", context, request=request)
+        from django.http import HttpResponse
+        return HttpResponse(modal_html)
     return render(request, "core/admin_dashboard.html", context)
 
 
@@ -1425,6 +1431,13 @@ def update_profile(request):
             ip_address=get_client_ip(request)
         )
 
+        # Notify user of profile update
+        Notification.objects.create(
+            user=user,
+            message="Your profile information was updated.",
+            notification_type='INFO'
+        )
+
     return redirect('core:profile_settings')
 
 @login_required
@@ -1440,6 +1453,13 @@ def change_password(request):
             action='PASSWORD_CHANGE',
             details='Password changed',
             ip_address=get_client_ip(request)
+        )
+        # Notify user of password change
+        Notification.objects.create(
+            user=user,
+            message="Your password was changed successfully.",
+            notification_type='INFO',
+            action_required=False
         )
         messages.success(request, 'Password updated successfully.')
     else:
@@ -1478,6 +1498,13 @@ def trust_device(request, device_id):
         ip_address=get_client_ip(request)
     )
     messages.success(request, f'Device "{device}" has been marked as trusted.')
+    # Notify user of device trust
+    Notification.objects.create(
+        user=request.user,
+        message=f'Device "{device}" has been marked as trusted.',
+        notification_type='DEVICE',
+        action_required=False
+    )
     return redirect('core:manage_devices')
 
 @login_required
@@ -1498,6 +1525,13 @@ def remove_device(request, device_id):
         ip_address=get_client_ip(request)
     )
     messages.success(request, f'Device "{device_name}" has been removed.')
+    # Notify user of device removal
+    Notification.objects.create(
+        user=request.user,
+        message=f'Device "{device_name}" has been removed from your account.',
+        notification_type='DEVICE',
+        action_required=False
+    )
     return redirect('core:manage_devices')
 
 @login_required
@@ -1666,6 +1700,13 @@ def lock_user(request, user_id):
         details=f'Account locked for {user.username}',
         ip_address=get_client_ip(request)
     )
+    # Notify affected user
+    Notification.objects.create(
+        user=user,
+        message="Your account has been locked by an administrator.",
+        notification_type='WARNING',
+        action_required=True
+    )
     return redirect('core:admin_dashboard')
 
 @login_required
@@ -1684,6 +1725,13 @@ def unlock_user(request, user_id):
         action='ACCOUNT_UNLOCK',
         details=f'Account unlocked for {user.username}',
         ip_address=get_client_ip(request)
+    )
+    # Notify affected user
+    Notification.objects.create(
+        user=user,
+        message="Your account has been unlocked by an administrator.",
+        notification_type='INFO',
+        action_required=False
     )
     return redirect('core:admin_dashboard')
 
@@ -1753,7 +1801,13 @@ def password_reset_confirm(request, user_id, token):
                 details='Password reset via email link',
                 ip_address=get_client_ip(request)
             )
-            
+            # Notify user of password reset
+            Notification.objects.create(
+                user=user,
+                message="Your password was reset via email link.",
+                notification_type='INFO',
+                action_required=False
+            )
             return redirect('core:login')
     else:
         form = PasswordResetConfirmForm()
