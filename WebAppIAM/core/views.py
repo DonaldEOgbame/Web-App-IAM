@@ -1535,7 +1535,8 @@ def notifications_view(request):
 
     context = {
         'notifications': notifications,
-        'show_notifications': True
+        'show_notifications': True,
+        'active_tab': 'notifications',
     }
 
     if request.user.role == 'ADMIN':
