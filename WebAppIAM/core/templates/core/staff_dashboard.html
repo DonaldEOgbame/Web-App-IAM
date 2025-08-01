@@ -618,11 +618,7 @@
                             <td>{{ doc.department }}</td>
                             <td>{{ doc.description|default:"—" }}</td>
                             <td>
-                                {% if doc.can_download %}
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
-                                {% else %}
-                                <span class="btn btn-outline" style="opacity:0.5;pointer-events:none;">Download</span>
-                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
