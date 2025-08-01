@@ -804,6 +804,10 @@
                             <td>
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
                                 <a class="btn btn-outline" href="{% url 'core:document_edit' doc.id %}">Edit</a>
+                                <form method="post" action="{% url 'core:purge_document' doc.id %}" style="display:inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this document?');">Delete</button>
+                                </form>
                             </td>
                         </tr>
                         {% empty %}

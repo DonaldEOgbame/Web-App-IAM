@@ -53,6 +53,7 @@ class User(AbstractUser):
     emergency_token_hash = models.CharField(max_length=255, blank=True, null=True)
     emergency_token_expiry = models.DateTimeField(blank=True, null=True)
     emergency_token_used = models.BooleanField(default=False)  # Add this field for single-use enforcement
+    admin_high_risk_override = models.BooleanField(default=False)  # Admin can allow next high-risk login
 
     class Meta:
         permissions = [

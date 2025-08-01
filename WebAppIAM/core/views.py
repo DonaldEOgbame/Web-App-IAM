@@ -633,6 +633,29 @@ def login(request):
                     request.session['pending_auth_user_id'] = user.id
                     request.session['pending_auth_session_id'] = session_obj.id
 
+                    # --- Always create or update DeviceFingerprint on login ---
+                    from .views import get_device_info
+                    device_info = get_device_info(request)
+                    import hashlib
+                    device_hash = hashlib.sha256(
+                        f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
+                    ).hexdigest()[:32]
+                    from .models import DeviceFingerprint
+                    device_fp, created = DeviceFingerprint.objects.get_or_create(
+                        user=user,
+                        device_id=device_hash,
+                        defaults={
+                            'browser': device_info['browser'],
+                            'operating_system': device_info['os'],
+                            'device_type': device_info['device_type'],
+                            'user_agent': device_info['user_agent'],
+                            'last_ip': get_client_ip(request),
+                        },
+                    )
+                    if not created:
+                        device_fp.update_usage(get_client_ip(request))
+                    # --- End DeviceFingerprint creation ---
+
                     next_url = reverse('core:admin_dashboard') if user.role == 'ADMIN' else reverse('core:staff_dashboard')
 
                     if is_ajax:
@@ -928,29 +951,53 @@ def finalize_authentication(request, session):
     else:
         session.risk_level = 'HIGH'
     
-    # Apply risk policy
-    active_policy = RiskPolicy.objects.filter(is_active=True).first()
-    if active_policy:
-        risk_level = session.risk_level
-        action = getattr(active_policy, f"{risk_level.lower()}_risk_action")
-        
-        if action == "DENY":
-            session.access_granted = False
-            session.flagged_reason = f"{risk_level} risk session - access denied by policy"
-        elif action == "CHALLENGE":
-            session.access_granted = True
-            # Send verification notification
-            Notification.objects.create(
+
+    # Admin override: allow access if override is set, then clear it (single-use)
+    if getattr(user, 'admin_high_risk_override', False):
+        session.access_granted = True
+        session.flagged_reason = 'Admin override: high risk bypassed'
+        user.admin_high_risk_override = False
+        user.save(update_fields=["admin_high_risk_override"])
+
+        # Mark the current device as trusted (create if needed)
+        if session.device_fingerprint:
+            device, created = DeviceFingerprint.objects.get_or_create(
                 user=user,
-                message=f'{risk_level.lower()}-risk login detected. Please verify your identity.',
-                action_required=True,
-                notification_type='RISK'
+                device_id=session.device_fingerprint,
+                defaults={
+                    'browser': device_info.get('browser', ''),
+                    'operating_system': device_info.get('os', ''),
+                    'device_type': device_info.get('device_type', 'Desktop'),
+                    'user_agent': device_info.get('user_agent', ''),
+                    'last_ip': session.ip_address,
+                    'last_location': session.location,
+                },
             )
-        else:
-            session.access_granted = True
+            if not device.is_trusted:
+                device.mark_as_trusted()
     else:
-        session.access_granted = session.risk_level != 'HIGH'
-    
+        # Apply risk policy
+        active_policy = RiskPolicy.objects.filter(is_active=True).first()
+        if active_policy:
+            risk_level = session.risk_level
+            action = getattr(active_policy, f"{risk_level.lower()}_risk_action")
+            
+            if action == "DENY":
+                session.access_granted = False
+                session.flagged_reason = f"{risk_level} risk session - access denied by policy"
+            elif action == "CHALLENGE":
+                session.access_granted = True
+                # Send verification notification
+                Notification.objects.create(
+                    user=user,
+                    message=f'{risk_level.lower()}-risk login detected. Please verify your identity.',
+                    action_required=True,
+                    notification_type='RISK'
+                )
+            else:
+                session.access_granted = True
+        else:
+            session.access_granted = session.risk_level != 'HIGH'
     session.save()
     
     # Handle new device notifications and profile updates
@@ -1740,7 +1787,12 @@ def allow_high_risk_session(request, session_id):
     session = get_object_or_404(UserSession, id=session_id)
     session.access_granted = True
     session.flagged_reason = ''
+
     session.save(update_fields=['access_granted', 'flagged_reason'])
+
+    # Set admin override for next login
+    session.user.admin_high_risk_override = True
+    session.user.save(update_fields=["admin_high_risk_override"])
 
     AuditLog.objects.create(
         user=request.user,
