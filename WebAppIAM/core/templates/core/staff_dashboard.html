@@ -602,18 +602,27 @@
             <section class="section" data-view="documents">
                 <div class="card">
                     <h2>Documents</h2>
+                    <p class="mt-16" style="color:var(--text-dim); font-size:0.98rem;">Browse, search, and download documents. Each document includes a title, department, and description for context.</p>
+                    <form method="get" action="" style="margin-bottom: 16px; display: flex; gap: 8px; align-items: center;">
+                        <input type="text" name="q" value="{{ query|default:'' }}" placeholder="Search documents..." style="flex:1; padding:8px 10px; border-radius:6px; border:1px solid var(--border); background:var(--bg-soft); color:var(--text);">
+                        <button class="btn btn-outline" type="submit">Search</button>
+                    </form>
                     <table>
                         <thead>
-                        <tr><th>Title</th><th>Department</th><th>Version</th><th>Actions</th></tr>
+                        <tr><th>Title</th><th>Department</th><th>Description</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                         {% for doc in documents %}
                         <tr>
                             <td>{{ doc.title }}</td>
                             <td>{{ doc.department }}</td>
-                            <td>{{ doc.version }}</td>
+                            <td>{{ doc.description|default:"—" }}</td>
                             <td>
+                                {% if doc.can_download %}
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
+                                {% else %}
+                                <span class="btn btn-outline" style="opacity:0.5;pointer-events:none;">Download</span>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
