@@ -70,7 +70,7 @@ class MiddlewareTests(TestCase):
 
 class FaceAPITests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="u1", password="p")
+        self.user = User.objects.create_user(username="u1", password="p", email="u1@example.com")
 
     def test_check_face_api_status(self):
         self.assertTrue(check_face_api_status())

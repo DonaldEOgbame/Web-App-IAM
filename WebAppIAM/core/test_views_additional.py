@@ -193,7 +193,7 @@ class RegistrationFlowTests(TestCase):
 class LoginTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.user = User.objects.create_user(username="baz", password="pass", role="ADMIN")
+        self.user = User.objects.create_user(username="baz", password="pass", role="ADMIN", email="baz@example.com")
 
     @patch("core.views.render", return_value=HttpResponse("ok"))
     @patch("core.views.LoginForm")
