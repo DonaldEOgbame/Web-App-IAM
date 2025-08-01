@@ -90,6 +90,33 @@ class FinalizeAuthenticationTests(TestCase):
         self.assertFalse(result.access_granted)
         self.assertIn("denied", result.flagged_reason)
 
+    @patch("core.views.hasattr", side_effect=lambda obj, attr: False if attr=='profile' else builtin_hasattr(obj, attr))
+    @patch("core.views.create_new_device_notification")
+    @patch("core.views.DeviceFingerprint.objects.filter")
+    @patch("core.views.RiskPolicy.objects.filter")
+    @patch("core.views.calculate_risk_score", return_value=0.5)
+    @patch("core.views.analyze_behavior_anomaly", return_value=0.0)
+    def test_finalize_trusted_device_lowers_risk(self, mock_anom, mock_score, mock_risk, mock_dev, mock_notify, mock_hasattr):
+        mock_risk.return_value.first.return_value = None
+        mock_dev.return_value.first.return_value = SimpleNamespace(is_trusted=True)
+        session = SimpleNamespace(
+            user=self.user,
+            user_agent="UA",
+            device_fingerprint=None,
+            face_match_score=None,
+            fingerprint_verified=False,
+            behavior_anomaly_score=None,
+            risk_score=None,
+            risk_level=None,
+            access_granted=None,
+            flagged_reason="",
+            save=lambda: None,
+        )
+        request = self.factory.get("/", HTTP_USER_AGENT="UA", REMOTE_ADDR="1.1.1.1")
+        result = finalize_authentication(request, session)
+        self.assertTrue(result.access_granted)
+        self.assertLess(result.risk_score, 0.5)
+
 class HealthServiceTests(TestCase):
     @patch("core.health.check_database", return_value=True)
     @patch("core.health.check_face_api_status", return_value=True)
