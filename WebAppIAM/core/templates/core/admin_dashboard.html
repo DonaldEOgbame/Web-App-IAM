@@ -658,7 +658,7 @@
                 <div class="card mt-24">
                     <h3>High‑risk Sessions</h3>
                     <table>
-                        <thead><tr><th>User</th><th>Risk Score</th><th>Reason</th><th>Last Seen</th></tr></thead>
+                        <thead><tr><th>User</th><th>Risk Score</th><th>Reason</th><th>Last Seen</th><th>Actions</th></tr></thead>
                         <tbody>
                         {% for s in high_risk_sessions %}
                             <tr>
@@ -666,9 +666,15 @@
                                 <td style="color:var(--danger)">{{ s.risk_score }}</td>
                                 <td>{{ s.reason }}</td>
                                 <td>{{ s.last_seen }}</td>
+                                <td>
+                                    <form method="post" action="{% url 'core:allow_high_risk_session' s.id %}" style="display:inline;">
+                                        {% csrf_token %}
+                                        <button class="btn btn-outline" type="submit">Allow Access</button>
+                                    </form>
+                                </td>
                             </tr>
                         {% empty %}
-                            <tr><td colspan="4">None 🎉</td></tr>
+                            <tr><td colspan="5">None 🎉</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
