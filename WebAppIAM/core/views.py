@@ -1135,6 +1135,8 @@ def admin_dashboard(request):
         'users': users,
         'pending_users': pending_users,
         'system_alerts': system_alerts,
+        'form': DocumentUploadForm(),
+        'show_document_upload': True,
         'active_tab': 'dashboard',
         'show_documents': True,
         'show_audit_logs': True,
