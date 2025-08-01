@@ -698,7 +698,16 @@ def logout(request):
         details='User logged out',
         ip_address=get_client_ip(request)
     )
-    
+
+    # Mark the current UserSession as ended
+    session = UserSession.objects.filter(
+        user=request.user,
+        logout_time__isnull=True
+    ).order_by('-login_time').first()
+    if session:
+        session.logout_time = timezone.now()
+        session.save(update_fields=['logout_time'])
+
     django_logout(request)  # Replace auth_logout
     messages.success(request, 'You have been logged out successfully.')
     return redirect('core:login')
@@ -1632,6 +1641,9 @@ def export_audit_logs(request):
 @require_POST
 def lock_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
+    if (user.role == 'ADMIN' or user.is_superuser) and not request.user.is_superuser:
+        messages.error(request, "You don't have permission to lock another admin.")
+        return redirect('core:admin_dashboard')
     user.is_active = False
     user.save()
     AuditLog.objects.create(
@@ -1648,6 +1660,9 @@ def lock_user(request, user_id):
 @require_POST
 def unlock_user(request, user_id):
     user = get_object_or_404(User, id=user_id)
+    if (user.role == 'ADMIN' or user.is_superuser) and not request.user.is_superuser:
+        messages.error(request, "You don't have permission to unlock this admin.")
+        return redirect('core:admin_dashboard')
     user.is_active = True
     user.save()
     AuditLog.objects.create(
