@@ -834,22 +834,35 @@
                         </tbody>
                     </table>
                 </div>
+            </section>
+
+            <!-- AUDIT LOGS -->
+            <section class="section" data-view="audit">
+                <div class="card mt-24">
+                    <h3>Audit Logs</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>User</th>
+                                    <th>Action</th>
+                                    <th>Timestamp</th>
+                                    <th>IP Address</th>
+                                </tr>
                             </thead>
                             <tbody>
-                            {% for log in audit_logs %}
-                                <tr>
-                                    <td>{{ log.user }}</td>
-                                    <td>{{ log.action }}</td>
-                                    <td>{{ log.timestamp }}</td>
-                                    <td>{{ log.ip_address }}</td>
-                                </tr>
-                            {% endfor %}
+                                {% for log in audit_logs %}
+                                    <tr>
+                                        <td>{{ log.user }}</td>
+                                        <td>{{ log.action }}</td>
+                                        <td>{{ log.timestamp }}</td>
+                                        <td>{{ log.ip_address }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="4">No audit logs.</td></tr>
+                                {% endfor %}
                             </tbody>
                         </table>
-                    {% else %}
-                        <p>No audit logs.</p>
-                    {% endif %}
-                </div>
+                    </div>
             </section>
 
             <!-- DEVICES -->
