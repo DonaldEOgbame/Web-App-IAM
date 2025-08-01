@@ -854,7 +854,7 @@
                         </svg>
                         <span>Click to upload documents</span>
                     </div>
-                    <form id="uploadForm" method="post" enctype="multipart/form-data" style="display:none;">
+                    <form id="uploadForm" method="post" action="{% url 'core:document_upload' %}" enctype="multipart/form-data" style="display:none;">
                         {% csrf_token %}
                         {{ form.as_p }}
                         <button class="btn" type="submit">Upload</button>
