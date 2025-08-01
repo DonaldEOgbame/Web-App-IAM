@@ -862,23 +862,33 @@ def finalize_authentication(request, session):
     
     # Check if this is a known device
     known_device = DeviceFingerprint.objects.filter(
-        user=user, 
+        user=user,
         device_id=device_hash
     ).first()
-    
+
     if behavior_profile.typical_device and behavior_profile.typical_device != session.user_agent:
         device_anomaly = 1
         is_new_device = True
     elif not behavior_profile.typical_device or not known_device:
         # First time login or truly new device
+        device_anomaly = 1
         is_new_device = True
     elif known_device and not known_device.is_trusted:
         # Known but untrusted device
+        device_anomaly = 1
         is_new_device = True
+    else:
+        # Known trusted device lowers anomaly
+        device_anomaly = 0
     
     if behavior_profile.typical_device_fingerprint and session.device_fingerprint != behavior_profile.typical_device_fingerprint:
         fingerprint_anomaly = 1
-    
+
+    # expose anomalies on the session for ML models
+    session.time_anomaly = time_anomaly
+    session.device_anomaly = device_anomaly
+    session.location_anomaly = getattr(session, 'location_anomaly', 0)
+
     session.behavior_anomaly_score = analyze_behavior_anomaly(session) or (
         (time_anomaly + device_anomaly + fingerprint_anomaly) / 3
     )
@@ -889,6 +899,8 @@ def finalize_authentication(request, session):
         fingerprint_verified=session.fingerprint_verified,
         behavior_anomaly=session.behavior_anomaly_score
     )
+    if known_device and known_device.is_trusted:
+        session.risk_score = max(session.risk_score - 0.1, 0)
     
     # Determine risk level
     if session.risk_score < 0.3:

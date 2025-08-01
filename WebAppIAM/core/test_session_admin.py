@@ -15,7 +15,8 @@ class LogoutSessionTests(TestCase):
         )
 
     def test_logout_sets_logout_time(self):
-        self.client.get(reverse("core:logout"))
+        with self.settings(ALLOWED_HOSTS=['testserver']):
+            self.client.get(reverse("core:logout"))
         self.session.refresh_from_db()
         self.assertIsNotNone(self.session.logout_time)
 
@@ -32,6 +33,7 @@ class AdminLockTests(TestCase):
         superuser = User.objects.create_superuser(username="sup", password="p", email="s@x.com")
         admin = User.objects.create_user(username="a", password="p", role="ADMIN", is_active=True)
         self.client.force_login(superuser)
-        self.client.post(reverse("core:admin_lock_user", args=[admin.id]))
+        with self.settings(ALLOWED_HOSTS=['testserver']):
+            self.client.post(reverse("core:admin_lock_user", args=[admin.id]))
         admin.refresh_from_db()
         self.assertFalse(admin.is_active)
