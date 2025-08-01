@@ -1207,37 +1207,52 @@ def document_upload(request):
             doc.uploaded_by = request.user
 
             # Encrypt file with user-specific key
-            file_data = request.FILES['file'].read()
-            encrypted_data = encrypt_file(file_data, request.user)
+            file_field = request.FILES.get('file')
+            if not file_field:
+                form.add_error('file', 'File is required.')
+            else:
+                file_data = file_field.read()
+                encrypted_data = encrypt_file(file_data, request.user)
 
-            # Persist encrypted file data and metadata
-            doc.encrypted_file = encrypted_data
-            doc.original_filename = request.FILES['file'].name
-            doc.file_type = request.FILES['file'].content_type
-            doc.file_size = request.FILES['file'].size
-            doc.encryption_key = get_fernet_key(request.user)
-            
-            # Handle versioning
-            existing = Document.objects.filter(
-                title=doc.title,
-                department=doc.department,
-                deleted=False
-            ).order_by('-version').first()
-            
-            if existing:
-                doc.version = existing.version + 1
-                existing.deleted = True
-                existing.save()
-            
-            doc.save()
-            return redirect('core:document_list')
+                # Persist encrypted file data and metadata
+                doc.encrypted_file = encrypted_data
+                doc.original_filename = file_field.name
+                doc.file_type = file_field.content_type
+                doc.file_size = file_field.size
+                doc.encryption_key = get_fernet_key(request.user)
+
+                # Handle versioning
+                existing = Document.objects.filter(
+                    title=doc.title,
+                    department=doc.department,
+                    deleted=False
+                ).order_by('-version').first()
+
+                if existing:
+                    doc.version = existing.version + 1
+                    existing.deleted = True
+                    existing.save()
+
+                doc.save()
+                messages.success(request, 'Document uploaded successfully.')
+                return redirect('core:document_list')
+        else:
+            # Log form errors for debugging
+            logger.warning(f"Document upload form invalid: {form.errors}")
+            messages.error(request, 'There was an error uploading the document. Please check the form and try again.')
     else:
         form = DocumentUploadForm()
+
+    # If POST and not redirected, show a fallback error
+    if request.method == 'POST' and not form.is_valid():
+        messages.error(request, 'Document was not saved. Please check all required fields and try again.')
+        logger.error(f"Document upload failed. POST data: {request.POST}, FILES: {request.FILES}, errors: {form.errors}")
 
     return render(request, 'core/admin_dashboard.html', {
         'form': form,
         'show_document_upload': True,
-        'active_tab': 'upload'
+        'active_tab': 'upload',
+        'form_errors': form.errors if form.errors else None
     })
 
 @login_required
