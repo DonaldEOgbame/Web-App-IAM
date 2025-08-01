@@ -1133,7 +1133,8 @@ def document_list(request):
     context = {
         'documents': documents,
         'query': query,
-        'show_documents': True
+        'show_documents': True,
+        'active_tab': 'documents'
     }
     
     if user.role == 'ADMIN':
@@ -1176,10 +1177,11 @@ def document_upload(request):
             return redirect('core:document_list')
     else:
         form = DocumentUploadForm()
-    
+
     return render(request, 'core/admin_dashboard.html', {
         'form': form,
-        'show_document_upload': True
+        'show_document_upload': True,
+        'active_tab': 'upload'
     })
 
 @login_required
@@ -1290,6 +1292,7 @@ def document_edit(request, doc_id):
         "edit_form": form,
         "edit_document": existing,
         "show_document_edit": True,
+        "active_tab": "documents",
     }
     if request.headers.get("x-requested-with") == "XMLHttpRequest":
         # Render only the modal for AJAX
