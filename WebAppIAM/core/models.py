@@ -243,6 +243,16 @@ class UserSession(models.Model):
             return self.logout_time - self.login_time
         return timezone.now() - self.login_time
 
+    @property
+    def last_seen(self):
+        """Return the last time this session was active."""
+        return self.logout_time or self.login_time
+
+    @property
+    def reason(self):
+        """Expose flagged_reason for templates expecting `reason`."""
+        return self.flagged_reason
+
 class RiskPolicy(models.Model):
     ACTIONS = [
         ('ALLOW', 'Allow access'),

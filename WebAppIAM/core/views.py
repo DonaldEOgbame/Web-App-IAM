@@ -237,6 +237,24 @@ def create_new_device_notification(user, session, device_info):
         }
     )
 
+
+def get_latest_high_risk_sessions(limit=5):
+    """Return unique high-risk sessions per user."""
+    sessions = (
+        UserSession.objects.filter(risk_level='HIGH', access_granted=False)
+        .order_by('-login_time')
+    )
+    unique = []
+    seen = set()
+    for s in sessions:
+        if s.user_id in seen:
+            continue
+        seen.add(s.user_id)
+        unique.append(s)
+        if limit and len(unique) >= limit:
+            break
+    return unique
+
 # --- Helper functions ---
 def is_admin(user):
     """Check if the user is an administrator."""
@@ -979,7 +997,7 @@ def dashboard(request):
     
     if user.role == 'ADMIN':
         pending_users = User.objects.filter(is_active=False)
-        high_risk_sessions = UserSession.objects.filter(risk_level='HIGH').order_by('-login_time')[:5]
+        high_risk_sessions = get_latest_high_risk_sessions()
         context.update({
             'pending_users': pending_users,
             'high_risk_sessions': high_risk_sessions
@@ -1040,7 +1058,7 @@ def admin_dashboard(request):
         timestamp__gte=timezone.now() - timezone.timedelta(hours=24),
         action__in=['ACCESS_DENIED', 'LOGIN_FAIL', 'ACCOUNT_LOCK']
     ).count()
-    high_risk_sessions = UserSession.objects.filter(risk_level='HIGH').order_by('-login_time')[:5]
+    high_risk_sessions = get_latest_high_risk_sessions()
     documents = Document.objects.filter(deleted=False)
     audit_logs = AuditLog.objects.all().order_by('-timestamp')[:100]
     # Only show devices belonging to the admin's account

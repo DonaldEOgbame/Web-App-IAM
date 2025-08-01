@@ -658,12 +658,12 @@
                 <div class="card mt-24">
                     <h3>High‑risk Sessions</h3>
                     <table>
-                        <thead><tr><th>User</th><th>Risk Score</th><th>Reason</th><th>Last Seen</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>User</th><th>Risk Level</th><th>Reason</th><th>Last Seen</th><th>Actions</th></tr></thead>
                         <tbody>
                         {% for s in high_risk_sessions %}
                             <tr>
                                 <td>{{ s.user.username }}</td>
-                                <td style="color:var(--danger)">{{ s.risk_score }}</td>
+                                <td style="color:var(--danger)">{{ s.risk_level }}</td>
                                 <td>{{ s.reason }}</td>
                                 <td>{{ s.last_seen }}</td>
                                 <td>
@@ -819,12 +819,12 @@
                 <div class="card mt-24">
                     <h3>High‑risk Sessions</h3>
                     <table>
-                        <thead><tr><th>User</th><th>Risk Score</th><th>Reason</th><th>Last Seen</th><th>Actions</th></tr></thead>
+                        <thead><tr><th>User</th><th>Risk Level</th><th>Reason</th><th>Last Seen</th><th>Actions</th></tr></thead>
                         <tbody>
                         {% for s in high_risk_sessions %}
                             <tr>
                                 <td>{{ s.user.username }}</td>
-                                <td style="color:var(--danger)">{{ s.risk_score }}</td>
+                                <td style="color:var(--danger)">{{ s.risk_level }}</td>
                                 <td>{{ s.reason }}</td>
                                 <td>{{ s.last_seen }}</td>
                                 <td>
