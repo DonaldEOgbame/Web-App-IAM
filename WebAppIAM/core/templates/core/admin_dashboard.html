@@ -243,6 +243,30 @@
             font-weight: 700;
         }
 
+        .upload-prompt {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 40px;
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: background var(--transition), border-color var(--transition);
+        }
+        .upload-prompt:hover {
+            background: var(--surface-2);
+            border-color: var(--primary);
+        }
+        .upload-prompt svg {
+            width: 64px;
+            height: 64px;
+            stroke: var(--primary);
+            stroke-width: 2;
+            fill: none;
+        }
+
         /* Tables */
         table {
             width: 100%;
@@ -821,9 +845,16 @@
             <!-- UPLOAD -->
             <section class="section" data-view="upload">
                 {% if show_document_upload %}
-                <div class="card mt-24">
-                    <h3>Upload Document</h3>
-                    <form method="post" enctype="multipart/form-data">
+                <div class="card mt-24" id="uploadSection">
+                    <div id="uploadPrompt" class="upload-prompt">
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        <span>Click to upload documents</span>
+                    </div>
+                    <form id="uploadForm" method="post" enctype="multipart/form-data" style="display:none;">
                         {% csrf_token %}
                         {{ form.as_p }}
                         <button class="btn" type="submit">Upload</button>
@@ -1069,6 +1100,16 @@
                     }
                 }
             });
+    }
+
+    // Upload prompt toggle
+    const uploadPrompt = document.getElementById('uploadPrompt');
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadPrompt && uploadForm) {
+        uploadPrompt.addEventListener('click', () => {
+            uploadPrompt.style.display = 'none';
+            uploadForm.style.display = 'grid';
+        });
     }
 
     // Password visibility toggle
