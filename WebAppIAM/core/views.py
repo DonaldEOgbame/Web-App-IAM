@@ -29,6 +29,7 @@ from webauthn.helpers.structs import RegistrationCredential, AuthenticatorAttest
 from webauthn.helpers.exceptions import InvalidRegistrationResponse
 from webauthn.helpers import bytes_to_base64url, base64url_to_bytes
 import os
+import numpy as np  # <-- added for keystroke anomaly computations
 
 from .models import (
     User, UserProfile, UserBehaviorProfile, WebAuthnCredential,
@@ -43,7 +44,6 @@ from .webauthn_utils import (
     verify_authentication_response,
     options_to_json,
 )
-from webauthn.helpers import bytes_to_base64url, base64url_to_bytes
 from .face_api import verify_face, enroll_face, FaceAPIError
 from .risk_engine import calculate_risk_score, analyze_behavior_anomaly
 from .forms import (
@@ -282,6 +282,81 @@ def log_security_event(request, event_type, details, success=False):
         logger.info(log_message)
     else:
         logger.warning(log_message)
+
+# ---------------- Keystroke anomaly helper (NEW) ----------------
+def _extract_keystroke_stats(event_data):
+    """
+    event_data: list of dicts with 'down' and 'up' (timestamps in ms)
+    Returns (mean_hold_ms, mean_flight_ms) or (np.nan, np.nan) if insufficient.
+    """
+    if not event_data:
+        return np.nan, np.nan
+    holds, flights = [], []
+    last_up = None
+    for ev in event_data:
+        try:
+            down = ev.get("down")
+            up = ev.get("up")
+            if down is not None and up is not None and up >= down:
+                holds.append(float(up) - float(down))
+            if last_up is not None and down is not None:
+                flights.append(float(down) - float(last_up))
+            if up is not None:
+                last_up = float(up)
+        except Exception:
+            continue
+    h = float(np.mean(holds)) if len(holds) >= 3 else np.nan
+    f = float(np.mean(flights)) if len(flights) >= 3 else np.nan
+    return h, f
+
+
+def _compute_keystroke_anomaly(user, this_session_id=None, min_history=5):
+    """
+    Compute a 0..1 anomaly from keystroke dynamics.
+    - Builds a user baseline (mean/std) from recent rows (excludes current session).
+    - Compares current session's mean hold/flight to baseline via z-distance.
+    - Returns 0.5 (neutral) if history is too short or data is missing.
+    """
+    try:
+        qs = KeystrokeDynamics.objects.filter(user=user).order_by('-created_at')
+        if this_session_id:
+            qs = qs.exclude(session_id=this_session_id)
+        history = list(qs[:50])  # cap
+        if len(history) < min_history:
+            return 0.5
+
+        H, F = [], []
+        for row in history:
+            h, f = _extract_keystroke_stats(row.event_data or [])
+            if np.isfinite(h): H.append(h)
+            if np.isfinite(f): F.append(f)
+        if len(H) < min_history or len(F) < min_history:
+            return 0.5
+
+        h_mu, h_sigma = float(np.mean(H)), float(np.std(H) + 1e-6)
+        f_mu, f_sigma = float(np.mean(F)), float(np.std(F) + 1e-6)
+
+        # Current session sample (prefer same-session row if present; else most recent)
+        cur = None
+        if this_session_id:
+            cur = KeystrokeDynamics.objects.filter(user=user, session_id=this_session_id).order_by('-created_at').first()
+        if not cur:
+            cur = KeystrokeDynamics.objects.filter(user=user).order_by('-created_at').first()
+        if not cur:
+            return 0.5
+
+        h_cur, f_cur = _extract_keystroke_stats(cur.event_data or [])
+        if not (np.isfinite(h_cur) and np.isfinite(f_cur)):
+            return 0.5
+
+        z = np.sqrt(((h_cur - h_mu) / h_sigma) ** 2 + ((f_cur - f_mu) / f_sigma) ** 2)
+        # Map distance → [0,1]: 0σ→0, 2σ→~0.63, 3σ→~0.78, 4σ→~0.86, asymptote to 1
+        anomaly = float(1.0 - np.exp(-z / 2.0))
+        return max(0.0, min(1.0, anomaly))
+    except Exception as e:
+        logger.warning(f"Keystroke anomaly computation failed: {e}")
+        return 0.5
+# ----------------------------------------------------------------
 
 # --- Account Lifecycle Views ---
 @login_required
@@ -634,7 +709,7 @@ def login(request):
                     request.session['pending_auth_session_id'] = session_obj.id
 
                     # --- Always create or update DeviceFingerprint on login ---
-                    from .views import get_device_info
+                    # Get device info and create/update DeviceFingerprint
                     device_info = get_device_info(request)
                     import hashlib
                     device_hash = hashlib.sha256(
@@ -933,12 +1008,21 @@ def finalize_authentication(request, session):
     session.behavior_anomaly_score = analyze_behavior_anomaly(session) or (
         (time_anomaly + device_anomaly + fingerprint_anomaly) / 3
     )
-    
-    # Calculate risk score
+
+    # --- NEW: compute keystroke anomaly for this session and store for observability
+    try:
+        keystroke_anomaly = _compute_keystroke_anomaly(user, this_session_id=session.session_key)
+    except Exception as e:
+        logger.warning(f"Keystroke anomaly error: {e}")
+        keystroke_anomaly = 0.5
+    session.keystroke_anomaly = keystroke_anomaly  # field on model optional; if not present, it's just an attribute
+
+    # Calculate risk score (now with 4th feature: keystroke_anomaly)
     session.risk_score = calculate_risk_score(
         face_match=session.face_match_score or 0,
         fingerprint_verified=session.fingerprint_verified,
-        behavior_anomaly=session.behavior_anomaly_score
+        behavior_anomaly=session.behavior_anomaly_score,
+        keystroke_anomaly=keystroke_anomaly,
     )
     if known_device and known_device.is_trusted:
         session.risk_score = max(session.risk_score - 0.1, 0)

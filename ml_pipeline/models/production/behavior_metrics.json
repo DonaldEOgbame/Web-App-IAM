@@ -1,6 +1,6 @@
 {
-  "n_train": 800000,
-  "n_test": 200000,
+  "n_train": 400000,
+  "n_test": 100000,
   "features": [
     "time_anomaly",
     "device_anomaly",
@@ -17,11 +17,16 @@
       "model__learning_rate": 0.08483428982440717,
       "model__l2_regularization": 1e-06
     },
-    "best_cv_mae": 0.03998783755462176
+    "best_cv_mae": 0.040080667516092607
   },
   "test": {
-    "test_MAE": 0.040027548920468156,
-    "test_RMSE": 0.050166113984429855,
-    "test_R2": 0.8861667718335757
+    "test_MAE": 0.040089044294901885,
+    "test_RMSE": 0.050205218718668794,
+    "test_R2": 0.919710527440421
+  },
+  "calibration": {
+    "applied": true,
+    "method": "isotonic_holdout",
+    "holdout_frac": 0.1
   }
 }

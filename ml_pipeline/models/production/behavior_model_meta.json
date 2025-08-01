@@ -1,5 +1,5 @@
 {
-  "version": "20250725_154256",
+  "version": "20250801_232615",
   "task": "regression",
   "expected_features": [
     "time_anomaly",
@@ -11,6 +11,11 @@
   ],
   "thresholds": {},
   "random_state": 42,
-  "train_rows": 800000,
-  "test_rows": 200000
+  "train_rows": 400000,
+  "test_rows": 100000,
+  "calibration": {
+    "applied": true,
+    "method": "isotonic_holdout",
+    "holdout_frac": 0.1
+  }
 }

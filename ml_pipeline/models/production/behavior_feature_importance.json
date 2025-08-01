@@ -1,0 +1,8 @@
+{
+  "time_anomaly": 0.01710033806906299,
+  "device_anomaly": 1.3166134745332478,
+  "location_anomaly": 0.06856070810603014,
+  "action_entropy": 0.0056553757687381355,
+  "ip_risk": 0.04631693523384128,
+  "session_duration": 0.0036044625175840617
+}

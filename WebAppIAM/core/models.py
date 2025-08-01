@@ -11,8 +11,8 @@ class Notification(models.Model):
         ('RISK', 'Security Risk'),
         ('EXPIRY', 'Document Expiry'),
         ('APPROVAL', 'Approval Required'),
-        ('DEVICE', 'New Device Login'),  # Add this
-        ('LOCATION', 'Unusual Location'),  # Add this for future use
+        ('DEVICE', 'New Device Login'),
+        ('LOCATION', 'Unusual Location'),
     ]
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
@@ -52,8 +52,8 @@ class User(AbstractUser):
     last_failed_login = models.DateTimeField(null=True, blank=True)
     emergency_token_hash = models.CharField(max_length=255, blank=True, null=True)
     emergency_token_expiry = models.DateTimeField(blank=True, null=True)
-    emergency_token_used = models.BooleanField(default=False)  # Add this field for single-use enforcement
-    admin_high_risk_override = models.BooleanField(default=False)  # Admin can allow next high-risk login
+    emergency_token_used = models.BooleanField(default=False)  # single-use enforcement
+    admin_high_risk_override = models.BooleanField(default=False)  # allow next high-risk login
 
     class Meta:
         permissions = [
@@ -82,7 +82,6 @@ class User(AbstractUser):
 
     @property
     def biometric_enrolled(self):
-        """Return True if the user has any biometric data enrolled."""
         return self.has_biometrics
 
     @property
@@ -102,10 +101,8 @@ class User(AbstractUser):
 
 class DeviceFingerprint(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='device_fingerprints')
-    # Hash of device characteristics. Unique per user rather than globally to
-    # allow the same device to be registered for multiple accounts.
     device_id = models.CharField(max_length=64)
-    device_name = models.CharField(max_length=100, blank=True, null=True)  # User-friendly name
+    device_name = models.CharField(max_length=100, blank=True, null=True)
     browser = models.CharField(max_length=50, blank=True, null=True)
     operating_system = models.CharField(max_length=50, blank=True, null=True)
     device_type = models.CharField(max_length=20, default='Desktop')  # Desktop, Mobile, Tablet
@@ -134,12 +131,10 @@ class DeviceFingerprint(models.Model):
         return f"{name} ({self.device_type}) - {self.user.username}"
     
     def mark_as_trusted(self):
-        """Mark this device as trusted by the user"""
         self.is_trusted = True
         self.save()
     
     def update_usage(self, ip_address=None, location=None):
-        """Update device usage statistics"""
         self.times_used += 1
         self.last_seen = timezone.now()
         if ip_address:
@@ -203,29 +198,52 @@ class UserSession(models.Model):
     ip_address = models.GenericIPAddressField()
     user_agent = models.TextField()
     device_fingerprint = models.CharField(max_length=255, blank=True, null=True)
+
     login_time = models.DateTimeField(auto_now_add=True)
     logout_time = models.DateTimeField(null=True, blank=True)
+
+    # --- Signals & model inputs (persisted) ---
     face_match_score = models.FloatField(
-        null=True, 
-        blank=True, 
+        null=True, blank=True,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
     )
     fingerprint_verified = models.BooleanField(default=False)
+
+    # Behavior model features recorded for observability
+    time_anomaly = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    device_anomaly = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    location_anomaly = models.FloatField(
+        default=0.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+    # Human-readable location label remains here:
+    location = models.CharField(max_length=100, blank=True, null=True)
+
+    # NEW: keystroke anomaly persisted
+    keystroke_anomaly = models.FloatField(
+        default=0.5,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
+    )
+
+    # Model outputs
     behavior_anomaly_score = models.FloatField(
-        null=True, 
-        blank=True,
+        null=True, blank=True,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
     )
     risk_score = models.FloatField(
-        null=True, 
-        blank=True, 
+        null=True, blank=True,
         validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
     )
     risk_level = models.CharField(max_length=10, choices=RISK_LEVELS, default='LOW')
     access_granted = models.BooleanField(default=False)
     flagged_reason = models.TextField(blank=True, null=True)
     forced_logout = models.BooleanField(default=False)
-    location = models.CharField(max_length=100, blank=True, null=True)
     is_mobile = models.BooleanField(default=False)
 
     class Meta:
@@ -233,6 +251,7 @@ class UserSession(models.Model):
         indexes = [
             models.Index(fields=['user', 'risk_level']),
             models.Index(fields=['login_time']),
+            models.Index(fields=['user', 'login_time']),
         ]
 
     def __str__(self):
@@ -246,12 +265,10 @@ class UserSession(models.Model):
 
     @property
     def last_seen(self):
-        """Return the last time this session was active."""
         return self.logout_time or self.login_time
 
     @property
     def reason(self):
-        """Expose flagged_reason for templates expecting `reason`."""
         return self.flagged_reason
 
 class RiskPolicy(models.Model):
@@ -304,7 +321,7 @@ class AuditLog(models.Model):
         ('LOGIN_SUCCESS', 'Successful Login'),
         ('LOGIN_FAIL', 'Failed Login'),
         ('FACE_ENROLL', 'Face Enrollment'),
-        ('FACE_ENROLLED', 'Face Enrollment'),  # Add this
+        ('FACE_ENROLLED', 'Face Enrollment'),
         ('FINGERPRINT_ENROLL', 'Fingerprint Enrollment'),
         ('RISK_EVAL', 'Risk Evaluation'),
         ('ACCESS_GRANTED', 'Access Granted'),
@@ -315,7 +332,7 @@ class AuditLog(models.Model):
         ('DOC_DOWNLOAD', 'Document Download'),
         ('DOC_DELETE', 'Document Deletion'),
         ('DOC_RESTORE', 'Document Restore'),
-        ('DOCUMENT_CREATED', 'Document Created'),  # Add this
+        ('DOCUMENT_CREATED', 'Document Created'),
         ('DOCUMENT_PURGE', 'Document Purged'),
         ('DOCUMENT_RESTORE', 'Document Restored'),
         ('POLICY_UPDATE', 'Policy Update'),
@@ -325,10 +342,10 @@ class AuditLog(models.Model):
         ('LOGOUT', 'User Logout'),
         ('EMAIL_CHANGE', 'Email Changed'),
         ('PASSWORD_RESET', 'Password Reset'),
-        ('DEVICE_NEW', 'New Device Detected'),  # Add this
-        ('DEVICE_TRUST', 'Device Trusted'),  # Add this
-        ('DEVICE_REMOVE', 'Device Removed'),  # Add this
-        ('LOCATION_NEW', 'New Location Detected'),  # Add this for future use
+        ('DEVICE_NEW', 'New Device Detected'),
+        ('DEVICE_TRUST', 'Device Trusted'),
+        ('DEVICE_REMOVE', 'Device Removed'),
+        ('LOCATION_NEW', 'New Location Detected'),
     ]
     
     user = models.ForeignKey(
@@ -362,7 +379,6 @@ class AuditLog(models.Model):
         return f"{self.get_action_display()} by {user} at {self.timestamp}"
 
 class Document(models.Model):
-    # Only allow private and department scoped documents
     ACCESS_LEVEL_CHOICES = [
         ('PRIVATE', 'Private (Owner Only)'),
         ('DEPT', 'Department Access'),
@@ -371,18 +387,15 @@ class Document(models.Model):
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     
-    # Security metadata
     access_level = models.CharField(max_length=15, choices=ACCESS_LEVEL_CHOICES, default='PRIVATE')
     department = models.CharField(max_length=100, blank=True, null=True)
     
-    # File handling
-    encrypted_file = models.BinaryField()  # Stores encrypted file content
+    encrypted_file = models.BinaryField()
     original_filename = models.CharField(max_length=255)
     file_type = models.CharField(max_length=50)
     file_size = models.PositiveIntegerField()
-    encryption_key = models.BinaryField()  # Encrypted encryption key
+    encryption_key = models.BinaryField()
     
-    # Versioning
     version = models.PositiveIntegerField(default=1)
     parent = models.ForeignKey(
         'self', 
@@ -392,7 +405,6 @@ class Document(models.Model):
         related_name='versions'
     )
     
-    # Lifecycle
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.SET_NULL, 
@@ -418,7 +430,6 @@ class Document(models.Model):
 
     def __str__(self):
         return f"{self.title} (v{self.version})" if self.version > 1 else self.title
-
 
 class DocumentAccessLog(models.Model):
     ACCESS_TYPES = [
@@ -483,48 +494,28 @@ class UserBehaviorProfile(models.Model):
         return f"Behavior profile for {self.user.username}"
     
     def check_time_anomaly(self, login_time):
-        """
-        Check if login time is outside typical pattern
-        Returns anomaly score between 0 and 1
-        """
+        """Check if login time is outside typical pattern; returns 0..1"""
         if not self.typical_login_time:
             return 0.0
-        
-        from datetime import datetime, time
-        import math
-        
-        # Convert login_time to time object if it's a datetime
+        from datetime import datetime
+        # Convert login_time to time if it's a datetime
         if isinstance(login_time, datetime):
             login_time = login_time.time()
-            
-        # Calculate minutes difference
         login_minutes = login_time.hour * 60 + login_time.minute
         typical_minutes = self.typical_login_time.hour * 60 + self.typical_login_time.minute
-        
-        # Handle time wrapping around midnight
         diff = min(
             abs(login_minutes - typical_minutes),
             abs(login_minutes - typical_minutes + 1440),
             abs(login_minutes - typical_minutes - 1440)
         )
-        
-        # Normalize based on variance, capped at 1.0
         return min(1.0, diff / (self.login_time_variance * 2))
     
     def check_location_anomaly(self, location):
-        """Check if location is outside typical pattern"""
         if not self.typical_location or not location:
             return 0.0
-        
-        if self.typical_location == location:
-            return 0.0
-        return 1.0  # Simple binary check for now
+        return 0.0 if self.typical_location == location else 1.0
     
     def check_device_anomaly(self, device):
-        """Check if device is outside typical pattern"""
         if not self.typical_device or not device:
             return 0.0
-        
-        if self.typical_device == device:
-            return 0.0
-        return 0.8  # New device is suspicious but not definitive
+        return 0.0 if self.typical_device == device else 0.8

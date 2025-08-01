@@ -4,6 +4,7 @@ import joblib
 import numpy as np
 import logging
 import threading
+from typing import Optional
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -17,14 +18,16 @@ ML_MODELS_DIR = getattr(
     ),
 )
 
-# Lazy globals
-# Exposed globals for tests to patch
+# Lazy globals (exposed for tests to patch)
 risk_model = None
 risk_meta = {}
 behavior_model = None
 behavior_meta = {}
 _loaded = False
 _lock = threading.Lock()
+
+# Neutral default when keystrokes are unavailable or insufficient
+KEYSTROKE_NEUTRAL = 0.5
 
 
 def _load_models():
@@ -38,19 +41,23 @@ def _load_models():
             risk_path = os.path.join(ML_MODELS_DIR, "risk_model.pkl")
             risk_meta_path = os.path.join(ML_MODELS_DIR, "risk_model_meta.json")
             risk_model = joblib.load(risk_path)
-            risk_meta = json.loads(open(risk_meta_path, "r").read())
+            with open(risk_meta_path, "r") as f:
+                risk_meta = json.load(f)
             logger.info("Loaded risk model v%s", risk_meta.get("version"))
         except Exception as e:
             logger.error("Risk model loading failed: %s", e)
+            risk_model, risk_meta = None, {}
 
         try:
             behavior_path = os.path.join(ML_MODELS_DIR, "behavior_model.pkl")
             behavior_meta_path = os.path.join(ML_MODELS_DIR, "behavior_model_meta.json")
             behavior_model = joblib.load(behavior_path)
-            behavior_meta = json.loads(open(behavior_meta_path, "r").read())
+            with open(behavior_meta_path, "r") as f:
+                behavior_meta = json.load(f)
             logger.info("Loaded behavior model v%s", behavior_meta.get("version"))
         except Exception as e:
             logger.error("Behavior model loading failed: %s", e)
+            behavior_model, behavior_meta = None, {}
 
         _loaded = True
 
@@ -64,10 +71,8 @@ def load_models():
         If either the risk or behavior model failed to load.
     """
     _load_models()
-
     if risk_model is None or behavior_model is None:
         raise RuntimeError("ML models not loaded")
-
     return risk_model, behavior_model
 
 
@@ -80,33 +85,57 @@ def _assert_schema(n_cols: int, meta: dict):
         raise ValueError(f"Feature count mismatch: got {n_cols}, expected {len(expected)}")
 
 
+def _safe01(x: Optional[float], default: float = 0.0) -> float:
+    try:
+        v = float(x)
+        if np.isnan(v) or np.isinf(v):
+            return default
+        return float(np.clip(v, 0.0, 1.0))
+    except Exception:
+        return default
+
+
 def calculate_risk_score(face_match: float,
                          fingerprint_verified: bool,
-                         behavior_anomaly: float) -> float:
+                         behavior_anomaly: float,
+                         keystroke_anomaly: Optional[float] = None) -> float:
     """
     Returns probability-like risk score in [0, 1].
-    Falls back to rule-based if model unavailable.
+    Accepts 4 inputs (face_match, fingerprint_verified, behavior_anomaly, keystroke_anomaly).
+    Falls back to rule-based if model unavailable or inference fails.
+
+    Notes
+    -----
+    - If keystroke_anomaly is None or invalid, uses neutral 0.5.
+    - Strictly checks feature count against model meta's `expected_features`.
     """
+    # Normalize inputs
+    fm = _safe01(face_match, 0.0)
+    fp = float(bool(fingerprint_verified))
+    ba = _safe01(behavior_anomaly, 0.5)
+    ka = _safe01(keystroke_anomaly, KEYSTROKE_NEUTRAL)
+
     try:
-        risk_model, _ = load_models()
+        rm, _ = load_models()
     except RuntimeError:
         logger.warning("Risk model unavailable, falling back to rule-based score.")
-        return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
-    feats = np.array([[face_match, float(fingerprint_verified), behavior_anomaly]], dtype=float)
+        return _rule_risk(fm, fp, ba, ka)
 
-    if risk_model is None:
+    feats = np.array([[fm, fp, ba, ka]], dtype=float)
+
+    if rm is None:
         logger.warning("Risk model unavailable, falling back to rule-based score.")
-        return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
+        return _rule_risk(fm, fp, ba, ka)
 
     try:
         _assert_schema(feats.shape[1], risk_meta)
-        if hasattr(risk_model, "predict_proba"):
-            return float(risk_model.predict_proba(feats)[0, 1])
-        # Regressor fallback
-        return float(np.clip(risk_model.predict(feats)[0], 0.0, 1.0))
+        if hasattr(rm, "predict_proba"):
+            return float(rm.predict_proba(feats)[0, 1])
+        # Regressor fallback (shouldn't happen with classifier)
+        return float(np.clip(rm.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
         logger.exception("Risk model inference failed, fallback to rule: %s", e)
-        return _rule_risk(face_match, fingerprint_verified, behavior_anomaly)
+        return _rule_risk(fm, fp, ba, ka)
 
 
 def analyze_behavior_anomaly(session) -> float:
@@ -114,47 +143,57 @@ def analyze_behavior_anomaly(session) -> float:
     Returns behavior anomaly score in [0, 1].
     Falls back to rule-based if model unavailable.
     """
+    # Gather features from the session with safe defaults
+    feats = np.array([[
+        _safe01(getattr(session, 'time_anomaly', 0.0), 0.0),
+        _safe01(getattr(session, 'device_anomaly', 0.0), 0.0),
+        _safe01(getattr(session, 'location_anomaly', 0.0), 0.0),
+        _safe01(getattr(session, 'action_entropy', 0.5), 0.5),
+        _safe01(getattr(session, 'ip_risk', 0.1), 0.1),
+        float(getattr(session, 'session_duration', 300.0)),
+    ]], dtype=float)
+
     try:
-        _, behavior_model = load_models()
+        _, bm = load_models()
     except RuntimeError:
         logger.warning("Behavior model unavailable, using rule fallback.")
         return _rule_behavior(session)
-    feats = np.array([[
-        getattr(session, 'time_anomaly', 0.0),
-        getattr(session, 'device_anomaly', 0.0),
-        getattr(session, 'location_anomaly', 0.0),
-        getattr(session, 'action_entropy', 0.5),
-        getattr(session, 'ip_risk', 0.1),
-        getattr(session, 'session_duration', 300.0),
-    ]], dtype=float)
 
-    if behavior_model is None:
+    if bm is None:
         logger.warning("Behavior model unavailable, using rule fallback.")
         return _rule_behavior(session)
 
     try:
         _assert_schema(feats.shape[1], behavior_meta)
-        if hasattr(behavior_model, "predict_proba"):
-            return float(behavior_model.predict_proba(feats)[0, 1])
-        # Regressor fallback
-        return float(np.clip(behavior_model.predict(feats)[0], 0.0, 1.0))
+        if hasattr(bm, "predict_proba"):
+            return float(bm.predict_proba(feats)[0, 1])
+        # Regressor (expected): clip to [0,1]
+        return float(np.clip(bm.predict(feats)[0], 0.0, 1.0))
     except Exception as e:
         logger.exception("Behavior model inference failed, fallback to rule: %s", e)
         return _rule_behavior(session)
 
 
-# ---------------- Rule-based fallbacks (keep your existing ones or these) ----------------
-def _rule_risk(face_match, fingerprint_verified, behavior_anomaly):
+# ---------------- Rule-based fallbacks ----------------
+def _rule_risk(face_match: float, fingerprint_verified: float,
+               behavior_anomaly: float, keystroke_anomaly: float) -> float:
+    """
+    Simple weighted rule:
+      - lower face_match => higher risk
+      - unverified fp => higher risk
+      - higher behavior/keystroke anomalies => higher risk
+    """
     return float(np.clip(
-        0.4 * (1 - face_match) +
-        0.3 * (1 - float(fingerprint_verified)) +
-        0.3 * behavior_anomaly,
+        0.30 * (1.0 - face_match) +
+        0.25 * (1.0 - float(fingerprint_verified)) +
+        0.25 * behavior_anomaly +
+        0.20 * keystroke_anomaly,
         0.0, 1.0
     ))
 
 
-def _rule_behavior(session):
-    t = float(getattr(session, 'time_anomaly', 0.0))        # assume already 0..1
-    d = float(getattr(session, 'device_anomaly', 0.0))      # 0/1
-    l = float(getattr(session, 'location_anomaly', 0.0))    # 0..1
+def _rule_behavior(session) -> float:
+    t = _safe01(getattr(session, 'time_anomaly', 0.0), 0.0)        # 0..1
+    d = _safe01(getattr(session, 'device_anomaly', 0.0), 0.0)      # 0/1
+    l = _safe01(getattr(session, 'location_anomaly', 0.0), 0.0)    # 0..1
     return float(np.clip(0.3 * t + 0.4 * d + 0.3 * l, 0.0, 1.0))

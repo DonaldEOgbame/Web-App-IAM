@@ -22,24 +22,39 @@ from sklearn.metrics import (
     average_precision_score,
     roc_auc_score,
     f1_score,
-    precision_recall_curve
+    precision_recall_curve,
 )
 from sklearn.model_selection import KFold, RandomizedSearchCV
 from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.utils import check_random_state
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.inspection import permutation_importance
 from joblib import dump
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
-# ---- Exact, ordered features also used in production
-RISK_FEATURES: List[str] = ["face_match", "fingerprint_verified", "behavior_anomaly"]
+# ---- Exact, ordered features also used in production (UPDATED)
+RISK_FEATURES: List[str] = [
+    "face_match",
+    "fingerprint_verified",
+    "behavior_anomaly",
+    "keystroke_anomaly",
+]
 TARGET = "risk_label"
 
 
-def save_meta(save_dir: Path, n_train: int, n_test: int, random_state: int,
-              low: float, high: float):
+def save_meta(
+    save_dir: Path,
+    n_train: int,
+    n_test: int,
+    random_state: int,
+    low: float,
+    high: float,
+    calibrated: bool,
+    calib_method: str,
+):
     meta = {
         "version": time.strftime("%Y%m%d_%H%M%S"),
         "task": "binary_classification",
@@ -47,23 +62,23 @@ def save_meta(save_dir: Path, n_train: int, n_test: int, random_state: int,
         "thresholds": {"low": low, "high": high},
         "random_state": random_state,
         "train_rows": int(n_train),
-        "test_rows": int(n_test)
+        "test_rows": int(n_test),
+        "calibration": {
+            "applied": bool(calibrated),
+            "method": calib_method if calibrated else None,
+        },
     }
     (save_dir / "risk_model_meta.json").write_text(json.dumps(meta, indent=2))
 
 
-def find_thresholds(y_true, y_score, low_target_fp_rate=0.02, high_target_fp_rate=0.10):
+def find_thresholds(
+    y_true, y_score, low_target_fp_rate: float = 0.02, high_target_fp_rate: float = 0.10
+):
     """
     Heuristic: choose two probability cutoffs for LOW/MEDIUM/HIGH based on target FP rates.
     You can replace with business-cost curve optimization later.
     """
-    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
-    # thresholds are len-1 vs precision/recall len, so pad
-    thresholds = np.append(thresholds, 1.0)
-
-    # Map FP rate by computing confusion on a grid:
-    # For speed we estimate using prevalence & PR curve. You can make it exact if needed.
-    # We'll just pick percentiles as a quick heuristic:
+    # Quantile-based heuristic over scores (fast & stable on synthetic data)
     low = float(np.quantile(y_score, 1 - high_target_fp_rate))   # lower barrier
     high = float(np.quantile(y_score, 1 - low_target_fp_rate))   # higher barrier
     low = max(0.0, min(1.0, low))
@@ -71,6 +86,10 @@ def find_thresholds(y_true, y_score, low_target_fp_rate=0.02, high_target_fp_rat
     if high < low:
         high, low = low, high
     return low, high
+
+
+def _bool_arg(v: str) -> bool:
+    return str(v).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
 def main():
@@ -82,7 +101,14 @@ def main():
     ap.add_argument("--n_iter", type=int, default=15)   # fast
     ap.add_argument("--random_state", type=int, default=42)
     ap.add_argument("--save_dir", default="ml_pipeline/models/production")
+    ap.add_argument("--calibrate", default="true",
+                    help="true/false: apply isotonic calibration with CV")
+    ap.add_argument("--save_feature_importance", default="true",
+                    help="true/false: save permutation feature importance")
     args = ap.parse_args()
+
+    do_calibrate = _bool_arg(args.calibrate)
+    do_importance = _bool_arg(args.save_feature_importance)
 
     rng = check_random_state(args.random_state)
     save_dir = Path(args.save_dir)
@@ -95,11 +121,25 @@ def main():
         df = pd.read_csv(args.data)
 
     assert args.target in df.columns, f"{args.target} missing"
+
+    # Ensure all expected features are present. If 'keystroke_anomaly' is missing (older data),
+    # create it with neutral value 0.5 so training still runs.
     for f in RISK_FEATURES:
         if f not in df.columns:
-            raise ValueError(f"Missing feature: {f}")
+            if f == "keystroke_anomaly":
+                df[f] = 0.5
+            else:
+                raise ValueError(f"Missing feature: {f}")
+
+    # Strongly recommend keystroke_anomaly ∈ [0,1]. Clip just in case.
+    df["keystroke_anomaly"] = df["keystroke_anomaly"].astype(float).clip(0.0, 1.0)
 
     y = df[args.target].astype(int)
+
+    # Fill NaNs: for keystroke_anomaly use neutral 0.5 explicitly; others -> median in pipeline
+    if df["keystroke_anomaly"].isna().any():
+        df.loc[df["keystroke_anomaly"].isna(), "keystroke_anomaly"] = 0.5
+
     X = df[RISK_FEATURES].astype(float)
 
     # ---- Simple random split (no group/time here for brevity)
@@ -113,12 +153,12 @@ def main():
     X_test, y_test = X.iloc[test_idx], y.iloc[test_idx]
 
     # ---- Pipeline
-    pipe = Pipeline([
+    base_pipe = Pipeline([
         ("imp", SimpleImputer(strategy="median")),
         ("model", HistGradientBoostingClassifier(
             random_state=args.random_state,
             early_stopping=True
-        ))
+        )),
     ])
 
     param_dist = {
@@ -131,7 +171,7 @@ def main():
 
     cv = KFold(n_splits=args.n_splits, shuffle=True, random_state=args.random_state)
     search = RandomizedSearchCV(
-        pipe,
+        base_pipe,
         param_distributions=param_dist,
         n_iter=args.n_iter,
         cv=cv,
@@ -139,19 +179,35 @@ def main():
         n_jobs=1,
         pre_dispatch=1,
         random_state=args.random_state,
-        verbose=2
+        verbose=2,
     )
     search.fit(X_train, y_train)
     best = search.best_estimator_
 
-    # ---- Evaluate
-    best.fit(X_train, y_train)
-    if hasattr(best, "predict_proba"):
-        y_score = best.predict_proba(X_test)[:, 1]
+    # ---- Optional: probability calibration (isotonic with internal CV on training folds)
+    calibrated = False
+    calib_method = None
+    if do_calibrate:
+        # Handle sklearn API change: estimator (>=1.4) vs base_estimator (<1.4)
+        try:
+            calib = CalibratedClassifierCV(estimator=best, method="isotonic", cv=3)  # sklearn >= 1.4
+        except TypeError:
+            calib = CalibratedClassifierCV(base_estimator=best, method="isotonic", cv=3)  # sklearn < 1.4
+        calib.fit(X_train, y_train)
+        model = calib
+        calibrated = True
+        calib_method = "isotonic_cv3"
     else:
-        y_score = best.decision_function(X_test)
-        # normalize to [0, 1]
-        y_score = (y_score - y_score.min()) / (y_score.max() - y_score.min() + 1e-9)
+        best.fit(X_train, y_train)
+        model = best
+
+    # ---- Evaluate
+    if hasattr(model, "predict_proba"):
+        y_score = model.predict_proba(X_test)[:, 1]
+    else:
+        # Fallback for non-probabilistic estimators
+        y_raw = model.decision_function(X_test)
+        y_score = (y_raw - y_raw.min()) / (y_raw.max() - y_raw.min() + 1e-9)
 
     ap_score = float(average_precision_score(y_test, y_score))
     roc_score = float(roc_auc_score(y_test, y_score))
@@ -169,28 +225,57 @@ def main():
         "features": RISK_FEATURES,
         "cv": {
             "best_params": search.best_params_,
-            "best_cv_ap": float(search.best_score_)
+            "best_cv_ap": float(search.best_score_),
         },
         "test": {
             "average_precision": ap_score,
             "roc_auc": roc_score,
             "f1_at_0p5": f1,
             "low_threshold": low_thr,
-            "high_threshold": high_thr
-        }
+            "high_threshold": high_thr,
+        },
+        "calibration": {
+            "applied": calibrated,
+            "method": calib_method,
+        },
     }
     print(json.dumps(report, indent=2))
 
     # ---- Save artifacts
-    dump(best, save_dir / "risk_model.pkl")
-    save_meta(save_dir, len(X_train), len(X_test), args.random_state,
-              low=low_thr, high=high_thr)
+    dump(model, save_dir / "risk_model.pkl")
+    save_meta(
+        save_dir,
+        len(X_train),
+        len(X_test),
+        args.random_state,
+        low=low_thr,
+        high=high_thr,
+        calibrated=calibrated,
+        calib_method=calib_method,
+    )
     (save_dir / "risk_metrics.json").write_text(json.dumps(report, indent=2))
 
     # Save predictions for sanity checks
     pd.DataFrame({"y_true": y_test, "y_score": y_score}).to_csv(
         save_dir / "risk_predictions.csv", index=False
     )
+
+    # Optional: permutation importance on test split (post-fit)
+    if do_importance:
+        try:
+            pi = permutation_importance(
+                model, X_test, y_test,
+                n_repeats=5, random_state=args.random_state, scoring="roc_auc"
+            )
+            importances = dict(zip(RISK_FEATURES, pi.importances_mean.tolist()))
+            (save_dir / "risk_feature_importance.json").write_text(
+                json.dumps(importances, indent=2)
+            )
+        except Exception as e:
+            # Non-fatal
+            (save_dir / "risk_feature_importance.json").write_text(
+                json.dumps({"error": f"permutation_importance_failed: {e}"}, indent=2)
+            )
 
 
 if __name__ == "__main__":
