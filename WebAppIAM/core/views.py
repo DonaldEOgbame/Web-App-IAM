@@ -893,12 +893,19 @@ def verify_biometrics(request):
             return redirect('core:login')
 
     # GET: render login with biometric prompt
-    return render(request, 'core/login.html', {
-        'user': user,
-        'session_id': session_id,
-        'show_biometric_verification': True,
-        'webauthn_enabled': settings.WEBAUTHN_ENABLED,
-    })
+    try:
+        return render(request, 'core/login.html', {
+            'user': user,
+            'session_id': session_id,
+            'show_biometric_verification': True,
+            'webauthn_enabled': settings.WEBAUTHN_ENABLED,
+        })
+    except Exception as e:
+        logger.exception("Error rendering biometric login page")
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'message': 'Server error during biometric verification'}, status=500)
+        messages.error(request, 'Server error during biometric verification.')
+        return redirect('core:login')
 
 @require_http_methods(['POST'])
 def webauthn_authentication_options(request):
