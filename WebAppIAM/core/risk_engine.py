@@ -9,12 +9,12 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Path to deployed artifacts
+# Path to deployed artifacts (robust path resolution)
 ML_MODELS_DIR = getattr(
     settings,
     "ML_MODELS_DIR",
     os.path.abspath(
-        os.path.join(settings.BASE_DIR, "..", "ml_pipeline", "models", "production")
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "ml_pipeline", "models", "production")
     ),
 )
 
@@ -37,9 +37,17 @@ def _load_models():
     with _lock:
         if _loaded:
             return
+
+        # Risk model
         try:
             risk_path = os.path.join(ML_MODELS_DIR, "risk_model.pkl")
             risk_meta_path = os.path.join(ML_MODELS_DIR, "risk_model_meta.json")
+            if not os.path.exists(risk_path):
+                logger.error(f"Risk model file not found: {risk_path}")
+                raise FileNotFoundError(f"Risk model file not found: {risk_path}")
+            if not os.path.exists(risk_meta_path):
+                logger.error(f"Risk model meta file not found: {risk_meta_path}")
+                raise FileNotFoundError(f"Risk model meta file not found: {risk_meta_path}")
             risk_model = joblib.load(risk_path)
             with open(risk_meta_path, "r") as f:
                 risk_meta = json.load(f)
@@ -48,9 +56,16 @@ def _load_models():
             logger.error("Risk model loading failed: %s", e)
             risk_model, risk_meta = None, {}
 
+        # Behavior model
         try:
             behavior_path = os.path.join(ML_MODELS_DIR, "behavior_model.pkl")
             behavior_meta_path = os.path.join(ML_MODELS_DIR, "behavior_model_meta.json")
+            if not os.path.exists(behavior_path):
+                logger.error(f"Behavior model file not found: {behavior_path}")
+                raise FileNotFoundError(f"Behavior model file not found: {behavior_path}")
+            if not os.path.exists(behavior_meta_path):
+                logger.error(f"Behavior model meta file not found: {behavior_meta_path}")
+                raise FileNotFoundError(f"Behavior model meta file not found: {behavior_meta_path}")
             behavior_model = joblib.load(behavior_path)
             with open(behavior_meta_path, "r") as f:
                 behavior_meta = json.load(f)
