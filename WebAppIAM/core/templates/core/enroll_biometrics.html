@@ -517,16 +517,10 @@ qs('#btn-continue').addEventListener('click', async ()=>{
     fd.append('face_data', state.face.blob, 'face.jpg');
     const faceRes = await fetch(urls.faceUpload || '', {
       method:'POST', credentials:'same-origin',
-      headers:{
-        'X-CSRFToken': CSRF,
-        'X-Requested-With': 'XMLHttpRequest'
-      },
+      headers:{ 'X-CSRFToken': CSRF },
       body: fd
     });
-    const ct = faceRes.headers.get('content-type') || '';
-    const faceJson = ct.includes('application/json')
-      ? await faceRes.json().catch(() => ({}))
-      : {};
+    const faceJson = await faceRes.json().catch(()=> ({}));
     if(!faceRes.ok || (faceJson.status && faceJson.status==='error')){
       throw new Error(faceJson.message || `Face upload failed (HTTP ${faceRes.status})`);
     }
