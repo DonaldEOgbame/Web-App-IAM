@@ -1,7 +1,12 @@
 import os
+import sys
+project_root = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))) )
+if project_root not in sys.path:
+    sys.path.append(project_root)
 import json
 import joblib
 import numpy as np
+import pandas as pd
 import logging
 import threading
 from typing import Optional
@@ -10,12 +15,8 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 # Path to deployed artifacts (robust path resolution)
-ML_MODELS_DIR = getattr(
-    settings,
-    "ML_MODELS_DIR",
-    os.path.abspath(
-        os.path.join(os.path.dirname(__file__), "..", "..", "..", "ml_pipeline", "models", "production")
-    ),
+ML_MODELS_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "ml_pipeline", "models", "production")
 )
 
 # Lazy globals (exposed for tests to patch)
@@ -136,7 +137,10 @@ def calculate_risk_score(face_match: float,
         logger.warning("Risk model unavailable, falling back to rule-based score.")
         return _rule_risk(fm, fp, ba, ka)
 
-    feats = np.array([[fm, fp, ba, ka]], dtype=float)
+    feats = pd.DataFrame(
+        [[fm, fp, ba, ka]],
+        columns=risk_meta.get("expected_features", ["face_match", "fingerprint_verified", "behavior_anomaly", "keystroke_anomaly"])
+    )
 
     if rm is None:
         logger.warning("Risk model unavailable, falling back to rule-based score.")
@@ -159,14 +163,19 @@ def analyze_behavior_anomaly(session) -> float:
     Falls back to rule-based if model unavailable.
     """
     # Gather features from the session with safe defaults
-    feats = np.array([[
-        _safe01(getattr(session, 'time_anomaly', 0.0), 0.0),
-        _safe01(getattr(session, 'device_anomaly', 0.0), 0.0),
-        _safe01(getattr(session, 'location_anomaly', 0.0), 0.0),
-        _safe01(getattr(session, 'action_entropy', 0.5), 0.5),
-        _safe01(getattr(session, 'ip_risk', 0.1), 0.1),
-        float(getattr(session, 'session_duration', 300.0)),
-    ]], dtype=float)
+    feats = pd.DataFrame(
+        [[
+            _safe01(getattr(session, 'time_anomaly', 0.0), 0.0),
+            _safe01(getattr(session, 'device_anomaly', 0.0), 0.0),
+            _safe01(getattr(session, 'location_anomaly', 0.0), 0.0),
+            _safe01(getattr(session, 'action_entropy', 0.5), 0.5),
+            _safe01(getattr(session, 'ip_risk', 0.1), 0.1),
+            float(getattr(session, 'session_duration', 300.0)),
+        ]],
+        columns=behavior_meta.get("expected_features", [
+            "time_anomaly", "device_anomaly", "location_anomaly", "action_entropy", "ip_risk", "session_duration"
+        ])
+    )
 
     try:
         _, bm = load_models()
