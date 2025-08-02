@@ -371,6 +371,11 @@
             transition: opacity var(--transition), transform var(--transition), background var(--transition);
             font-size: 0.9rem;
         }
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
 
         #btn_1{
             display: flex;
@@ -750,7 +755,7 @@
                             <th>Email</th>
                             <th>Status</th>
                             <th>Biometric</th>
-                            <th>Access Levels</th>
+                            <th>Access Level</th>
                             <th>Last Login</th>
                             <th>Actions</th>
                         </tr>
@@ -768,6 +773,7 @@
                             <td>{{ u.profile.get_access_level_display }}</td>
                             <td>{{ u.last_login|default:"—" }}</td>
                             <td style="white-space:nowrap;">
+                                <div class="action-buttons">
                                 {% if not u.is_active %}
                                 <form method="post" action="{% url 'core:admin_activate_user' u.pk %}" style="display:inline;">
                                     {% csrf_token %}
@@ -799,6 +805,7 @@
                                     {% csrf_token %}
                                     <button class="btn btn-outline btn-sm{% if u.profile.access_level == 3 %} current{% endif %}" type="submit"{% if u.profile.access_level == 3 %} disabled{% endif %}>L3</button>
                                 </form>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
