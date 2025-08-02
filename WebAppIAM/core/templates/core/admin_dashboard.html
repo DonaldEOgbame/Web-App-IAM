@@ -1193,6 +1193,11 @@
     const sections = document.querySelectorAll('[data-view]');
 
     function activate(section) {
+        const validSections = Array.from(sections).map(s => s.dataset.view);
+        if (!section || !validSections.includes(section)) {
+            section = 'dashboard';
+            try { localStorage.removeItem('active-section'); } catch(e){}
+        }
         sections.forEach(s => {
             if (s.dataset.view === section) {
                 s.classList.add('active');
@@ -1203,12 +1208,10 @@
         links.forEach(a => {
             a.classList.toggle('active', a.dataset.section === section);
         });
-        if (section) {
-            history.replaceState(null, '', '#' + section);
-            try { localStorage.setItem('active-section', section); } catch(e){}
-        }
+        history.replaceState(null, '', '#' + section);
+        try { localStorage.setItem('active-section', section); } catch(e){}
         if (sidebar.classList.contains('open')) sidebar.classList.remove('open');
-        
+
         // Setup password toggles when profile section is activated
         if (section === 'profile') {
             setupPasswordToggles();

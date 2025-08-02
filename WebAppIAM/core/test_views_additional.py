@@ -6,6 +6,7 @@ from django.http import HttpResponse
 from unittest.mock import patch, MagicMock
 from builtins import hasattr as builtin_hasattr
 import os
+import json
 import django
 from django.core.management import call_command
 
@@ -187,8 +188,8 @@ class RegistrationFlowTests(TestCase):
         request.session = {}
         request._messages = MagicMock()
         resp = register_biometrics(request)
-        self.assertEqual(resp.content, b"redir")
-        self.assertTrue(request._messages.add.called)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(json.loads(resp.content), {"status": "error", "message": "down"})
 
 class LoginTests(TestCase):
     def setUp(self):
