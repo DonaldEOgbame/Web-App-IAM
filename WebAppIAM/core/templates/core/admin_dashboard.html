@@ -1223,22 +1223,29 @@
         });
     });
 
-    // On load: show stored or hash target or dashboard
-    let initial = '{{ active_tab|default:"dashboard" }}';
-    const showUserManagement = JSON.parse("{{ show_user_management|yesno:'true,false'|lower }}".replace(/'/g, '"'));
-    const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
-    const showDocumentEdit = JSON.parse("{{ show_document_edit|yesno:'true,false'|lower }}".replace(/'/g, '"'));
-    if (showUserManagement) initial = 'users';
-    if (showProfileSettings) initial = 'profile';
-    if (showDocumentEdit) initial = 'documents';
-    try {
-        initial = localStorage.getItem('active-section') || initial;
-    } catch(e){}
-    if (location.hash) initial = location.hash.slice(1);
-    activate(initial);
-    // Setup password toggles immediately if we're on profile section
-    if (initial === 'profile') {
-        setupPasswordToggles();
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam) {
+        activate(tabParam);
+        try { localStorage.setItem('active-section', tabParam); } catch (e) {}
+    } else {
+        // On load: show stored or hash target or dashboard
+        let initial = '{{ active_tab|default:"dashboard" }}';
+        const showUserManagement = JSON.parse("{{ show_user_management|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+        const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+        const showDocumentEdit = JSON.parse("{{ show_document_edit|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+        if (showUserManagement) initial = 'users';
+        if (showProfileSettings) initial = 'profile';
+        if (showDocumentEdit) initial = 'documents';
+        try {
+            initial = localStorage.getItem('active-section') || initial;
+        } catch(e){}
+        if (location.hash) initial = location.hash.slice(1);
+        activate(initial);
+        // Setup password toggles immediately if we're on profile section
+        if (initial === 'profile') {
+            setupPasswordToggles();
+        }
     }
 
 })();

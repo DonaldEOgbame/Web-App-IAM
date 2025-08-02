@@ -6,7 +6,12 @@ import hashlib
 from datetime import datetime, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
-from django.contrib.auth import authenticate, login as django_login, logout as django_logout
+from django.contrib.auth import (
+    authenticate,
+    login as django_login,
+    logout as django_logout,
+    update_session_auth_hash,
+)
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest, HttpResponseForbidden
@@ -358,6 +363,73 @@ def _compute_keystroke_anomaly(user, this_session_id=None, min_history=5):
         return 0.5
 # ----------------------------------------------------------------
 
+
+def build_dashboard_context(request):
+    """Build the full context required for the dashboard template."""
+    user = request.user
+
+    # Basic counts and recent activity
+    user_count = User.objects.filter(is_active=True).count()
+    active_sessions = UserSession.objects.filter(logout_time__isnull=True).count()
+    security_events = AuditLog.objects.filter(
+        timestamp__gte=timezone.now() - timezone.timedelta(hours=24),
+        action__in=["ACCESS_DENIED", "LOGIN_FAIL", "ACCOUNT_LOCK"],
+    ).count()
+    recent_logins = (
+        UserSession.objects.select_related("user").order_by("-login_time")[:5]
+    )
+
+    # Data tables
+    users = User.objects.all().select_related("profile")
+    pending_users = User.objects.filter(is_active=False)
+
+    if user.role == "ADMIN":
+        documents = Document.objects.filter(deleted=False)
+        upload_form = DocumentUploadForm()
+    else:
+        documents = Document.objects.filter(
+            deleted=False,
+            access_level="DEPT",
+            department=user.profile.department,
+            required_access_level__gte=user.profile.access_level,
+        )
+        upload_form = None
+
+    devices = DeviceFingerprint.objects.filter(user=user).order_by("-last_seen")
+    notifications = Notification.objects.filter(user=user, read=False).order_by(
+        "-created_at"
+    )
+
+    profile_form = ProfileUpdateForm(
+        instance=user.profile,
+        initial={
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "email": user.email,
+        },
+    )
+    password_form = CustomPasswordChangeForm(user=user)
+
+    return {
+        "user": user,
+        "user_count": user_count,
+        "active_sessions": active_sessions,
+        "security_events": security_events,
+        "recent_logins": recent_logins,
+        "users": users,
+        "pending_users": pending_users,
+        "devices": devices,
+        "documents": documents,
+        "notifications": notifications,
+        "profile_form": profile_form,
+        "password_form": password_form,
+        "form": upload_form,
+        "show_user_management": user.role == "ADMIN",
+        "show_profile_settings": True,
+        "show_document_edit": False,
+        "show_document_upload": user.role == "ADMIN",
+    }
+
 # --- Account Lifecycle Views ---
 @login_required
 @user_passes_test(is_admin)
@@ -420,8 +492,8 @@ def activate_user(request, user_id):
         [user.email],
         fail_silently=True,
     )
-
-    return redirect('core:admin_dashboard')
+    messages.success(request, f'User "{user.username}" activated successfully.')
+    return redirect(reverse('core:admin_dashboard') + '?tab=users')
 
 
 def complete_profile(request):
@@ -1144,31 +1216,8 @@ def staff_dashboard(request):
         messages.error(request, "Access denied. You don't have permission to access this page.")
         return redirect('core:login')
 
-    user = request.user
-    # Always filter documents by staff's department
-    documents = Document.objects.filter(
-        deleted=False,
-        access_level='DEPT',
-        department=user.profile.department,
-        required_access_level__gte=user.profile.access_level,
-    )
-    # Always show all documents for staff's department
-    sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:5]
-    notifications = Notification.objects.filter(user=user, read=False).order_by('-created_at')[:10]
-    devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
-
-    context = {
-        'user': user,
-        'documents': documents,
-        'sessions': sessions,
-        'notifications': notifications,
-        'devices': devices,
-        'risk_policy': RiskPolicy.objects.filter(is_active=True).first(),
-        'active_tab': 'dashboard',
-        'show_documents': True,
-        'show_device_management': True,
-        'show_notifications': True,
-    }
+    context = build_dashboard_context(request)
+    context['active_tab'] = request.GET.get('tab', 'dashboard')
     return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
@@ -1177,57 +1226,13 @@ def admin_dashboard(request):
     if request.user.role != 'ADMIN':
         messages.error(request, "Access denied. You don't have permission to access this page.")
         return redirect('core:login')
-    
+
     # Update last activity timestamp
     request.user.last_activity = timezone.now()
     request.user.save(update_fields=['last_activity'])
-    
-    # Get basic stats for the dashboard
-    user_count = User.objects.filter(is_active=True).count()
-    active_sessions = UserSession.objects.filter(logout_time__isnull=True).count()
-    recent_logins = UserSession.objects.select_related('user').order_by('-login_time')[:5]
-    security_events = AuditLog.objects.filter(
-        timestamp__gte=timezone.now() - timezone.timedelta(hours=24),
-        action__in=['ACCESS_DENIED', 'LOGIN_FAIL', 'ACCOUNT_LOCK']
-    ).count()
-    high_risk_sessions = get_latest_high_risk_sessions()
-    documents = Document.objects.filter(deleted=False)
-    audit_logs = AuditLog.objects.all().order_by('-timestamp')[:100]
-    # Only show devices belonging to the admin's account
-    devices = DeviceFingerprint.objects.filter(user=request.user).order_by('-last_seen')
-    notifications = Notification.objects.filter(user=request.user, read=False).order_by('-created_at')[:10]
-    users = User.objects.all().select_related('profile')
-    pending_users = User.objects.filter(is_active=False)
-    system_alerts = []
-    if active_sessions > 50:  # Example threshold
-        system_alerts.append({
-            'title': 'High number of active sessions',
-            'message': f'There are currently {active_sessions} active sessions.',
-            'timestamp': timezone.now(),
-            'level': 'warning'
-        })
-    context = {
-        'user': request.user,
-        'user_count': user_count,
-        'active_sessions': active_sessions,
-        'security_events': security_events,
-        'recent_logins': recent_logins,
-        'high_risk_sessions': high_risk_sessions,
-        'documents': documents,
-        'audit_logs': audit_logs,
-        'devices': devices,
-        'notifications': notifications,
-        'users': users,
-        'pending_users': pending_users,
-        'system_alerts': system_alerts,
-        'form': DocumentUploadForm(),
-        'show_document_upload': True,
-        'active_tab': 'dashboard',
-        'show_documents': True,
-        'show_audit_logs': True,
-        'show_device_management': True,
-        'show_notifications': True,
-    }
+
+    context = build_dashboard_context(request)
+    context['active_tab'] = request.GET.get('tab', 'dashboard')
     return render(request, 'core/admin_dashboard.html', context)
 
 
@@ -1474,7 +1479,8 @@ def purge_document(request, doc_id):
         details=f'Purged document "{document.title}"',
         ip_address=get_client_ip(request)
     )
-    return redirect('core:document_list')
+    messages.success(request, f'Document "{document.title}" purged.')
+    return redirect(reverse('core:admin_dashboard') + '?tab=documents')
 
 @login_required
 @require_POST
@@ -1490,35 +1496,19 @@ def validate_checksum(request, doc_id):
 # --- Profile Management ---
 @login_required
 def profile_settings(request):
-    """Display profile settings page"""
+    """Display dashboard with profile settings"""
     user = request.user
-    if not hasattr(user, 'profile'):
-        request.session['complete_profile_user'] = user.id
-        return redirect('core:complete_profile')
-    profile = user.profile
+    if not hasattr(user, "profile"):
+        request.session["complete_profile_user"] = user.id
+        return redirect("core:complete_profile")
 
-    form = ProfileUpdateForm(initial={
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'department': profile.department,
-        'position': profile.position,
-        'email': user.email,
-        'phone': profile.phone,
-        'show_risk_alerts': profile.show_risk_alerts,
-        'auto_logout': profile.auto_logout,
-        'receive_email_alerts': profile.receive_email_alerts
-    })
-    
-    context = {
-        'profile': profile,
-        'profile_form': form,
-        'password_form': CustomPasswordChangeForm(user=user),
-        'face_form': FaceEnrollForm(),
-        'user': user,
-        'show_profile_settings': True
-    }
-    
-    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
+    context = build_dashboard_context(request)
+    context["active_tab"] = request.GET.get("tab", "dashboard")
+    template = (
+        "core/admin_dashboard.html"
+        if user.role == "ADMIN"
+        else "core/staff_dashboard.html"
+    )
     return render(request, template, context)
 
 @login_required
@@ -1571,7 +1561,15 @@ def update_profile(request):
             notification_type='INFO'
         )
 
-    return redirect('core:profile_settings')
+        messages.success(request, 'Profile updated successfully.')
+        return redirect(reverse('core:profile_settings') + '?tab=profile')
+
+    messages.error(request, 'Profile update failed. Please correct the errors below.')
+    context = build_dashboard_context(request)
+    context['profile_form'] = form
+    context['active_tab'] = 'profile'
+    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
+    return render(request, template, context)
 
 @login_required
 @require_POST
@@ -1580,7 +1578,8 @@ def change_password(request):
     user = request.user
     form = CustomPasswordChangeForm(user, request.POST)
     if form.is_valid():
-        form.save()
+        user = form.save()
+        update_session_auth_hash(request, user)
         AuditLog.objects.create(
             user=user,
             action='PASSWORD_CHANGE',
@@ -1595,9 +1594,14 @@ def change_password(request):
             action_required=False
         )
         messages.success(request, 'Password updated successfully.')
-    else:
-        messages.error(request, 'Password change failed.')
-    return redirect('core:profile_settings')
+        return redirect(reverse('core:profile_settings') + '?tab=profile')
+
+    messages.error(request, 'Password change failed.')
+    context = build_dashboard_context(request)
+    context['password_form'] = form
+    context['active_tab'] = 'profile'
+    template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
+    return render(request, template, context)
 
 # --- Device Management ---
 @login_required
@@ -1638,7 +1642,8 @@ def trust_device(request, device_id):
         notification_type='DEVICE',
         action_required=False
     )
-    return redirect('core:manage_devices')
+    dashboard = 'core:admin_dashboard' if request.user.role == 'ADMIN' else 'core:staff_dashboard'
+    return redirect(reverse(dashboard) + '?tab=devices')
 
 @login_required
 @require_POST
@@ -1665,7 +1670,8 @@ def remove_device(request, device_id):
         notification_type='DEVICE',
         action_required=False
     )
-    return redirect('core:manage_devices')
+    dashboard = 'core:admin_dashboard' if request.user.role == 'ADMIN' else 'core:staff_dashboard'
+    return redirect(reverse(dashboard) + '?tab=devices')
 
 @login_required
 @require_POST

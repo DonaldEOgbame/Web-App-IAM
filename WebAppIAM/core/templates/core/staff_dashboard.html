@@ -882,16 +882,6 @@
             setupPasswordToggles();
         }
     }
-
-    let initial = '{{ active_tab|default:"dashboard" }}';
-    const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
-    if (showProfileSettings) initial = 'profile';
-    try {
-        initial = localStorage.getItem('staff-active-section') || initial;
-    } catch(e){}
-    if (location.hash) initial = location.hash.slice(1);
-    activate(initial);
-
     links.forEach(a => {
         a.addEventListener('click', e => {
             e.preventDefault();
@@ -899,10 +889,25 @@
             activate(section);
         });
     });
-    
-    // Setup password toggles immediately if we're on profile section
-    if (initial === 'profile') {
-        setupPasswordToggles();
+
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get('tab');
+    if (tabParam) {
+        activate(tabParam);
+        try { localStorage.setItem('staff-active-section', tabParam); } catch (e) {}
+    } else {
+        let initial = '{{ active_tab|default:"dashboard" }}';
+        const showProfileSettings = JSON.parse("{{ show_profile_settings|yesno:'true,false'|lower }}".replace(/'/g, '"'));
+        if (showProfileSettings) initial = 'profile';
+        try {
+            initial = localStorage.getItem('staff-active-section') || initial;
+        } catch(e){}
+        if (location.hash) initial = location.hash.slice(1);
+        activate(initial);
+        // Setup password toggles immediately if we're on profile section
+        if (initial === 'profile') {
+            setupPasswordToggles();
+        }
     }
 })();
 </script>
