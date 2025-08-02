@@ -37,6 +37,7 @@ urlpatterns = [
     path('admin/users/activate/<int:user_id>/', views.activate_user, name='admin_activate_user'),
     path('admin/users/lock/<int:user_id>/', views.lock_user, name='admin_lock_user'),
     path('admin/users/unlock/<int:user_id>/', views.unlock_user, name='admin_unlock_user'),
+    path('admin/users/access/<int:user_id>/<int:level>/', views.set_access_level, name='admin_set_access_level'),
     path('admin/sessions/allow/<int:session_id>/', views.allow_high_risk_session, name='allow_high_risk_session'),
 
 

@@ -259,20 +259,26 @@ class AccessLevelTests(TestCase):
         self.client.force_login(self.level1)
         response = self.client.get(reverse("core:document_list"))
         self.assertContains(response, "Doc L1")
-        self.assertNotContains(response, "Doc L3")
+        self.assertContains(response, "Doc L3")
 
         self.client.force_login(self.level3)
         response = self.client.get(reverse("core:document_list"))
-        self.assertContains(response, "Doc L1")
+        self.assertNotContains(response, "Doc L1")
         self.assertContains(response, "Doc L3")
 
     def test_document_download_requires_access_level(self):
-        self.client.force_login(self.level1)
-        resp = self.client.get(reverse("core:document_download", args=[self.doc_l3.id]))
+        self.client.force_login(self.level3)
+        resp = self.client.get(reverse("core:document_download", args=[self.doc_l1.id]))
         self.assertEqual(resp.status_code, 403)
 
-        self.client.force_login(self.level3)
-        resp = self.client.get(reverse("core:document_download", args=[self.doc_l3.id]))
+        self.client.force_login(self.level1)
+        resp = self.client.get(reverse("core:document_download", args=[self.doc_l1.id]))
         self.assertEqual(resp.status_code, 200)
+
+    def test_admin_can_update_access_level(self):
+        self.client.force_login(self.admin)
+        self.client.post(reverse("core:admin_set_access_level", args=[self.level1.id, 3]))
+        self.level1.profile.refresh_from_db()
+        self.assertEqual(self.level1.profile.access_level, 3)
 
 
