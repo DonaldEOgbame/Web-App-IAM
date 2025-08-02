@@ -145,11 +145,35 @@ class ProfileUpdateForm(forms.ModelForm):
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if User.objects.filter(email=email).exclude(pk=self.instance.user.pk).exists():
+        user_instance = getattr(self.instance, 'user', None)
+        user_pk = user_instance.pk if user_instance else None
+        if User.objects.filter(email=email).exclude(pk=user_pk).exists():
             raise forms.ValidationError("A user with that email already exists.")
         return email
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+        user = profile.user
+        # Save user fields
+        user.first_name = self.cleaned_data.get('first_name')
+        user.last_name = self.cleaned_data.get('last_name')
+        user.email = self.cleaned_data.get('email')
+        # Save profile fields
+        profile.department = self.cleaned_data.get('department')
+        profile.position = self.cleaned_data.get('position')
+        profile.phone = self.cleaned_data.get('phone')
+        profile.profile_picture = self.cleaned_data.get('profile_picture')
+        profile.show_risk_alerts = self.cleaned_data.get('show_risk_alerts')
+        profile.auto_logout = self.cleaned_data.get('auto_logout')
+        profile.receive_email_alerts = self.cleaned_data.get('receive_email_alerts')
+        if commit:
+            user.save()
+            profile.save()
+            self.save_m2m()
+        return profile
 
 class PasswordResetForm(forms.Form):
     email = forms.EmailField(

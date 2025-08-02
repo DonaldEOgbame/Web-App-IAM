@@ -1523,18 +1523,9 @@ def update_profile(request):
         request.session['complete_profile_user'] = user.id
         return redirect('core:complete_profile')
     profile = user.profile
-
-    form = ProfileUpdateForm(request.POST, request.FILES)
+    form = ProfileUpdateForm(request.POST, request.FILES, instance=profile)
     if form.is_valid():
-        user.first_name = form.cleaned_data['first_name']
-        user.last_name = form.cleaned_data['last_name']
-        profile.department = form.cleaned_data['department']
-        profile.position = form.cleaned_data['position']
-        profile.phone = form.cleaned_data.get('phone')
-        profile.show_risk_alerts = form.cleaned_data['show_risk_alerts']
-        profile.auto_logout = form.cleaned_data['auto_logout']
-        profile.receive_email_alerts = form.cleaned_data['receive_email_alerts']
-
+        updated_profile = form.save()
         # Always update email if changed and send verification
         if form.cleaned_data['email'] != user.email:
             token = Fernet.generate_key().decode()
@@ -1560,14 +1551,6 @@ def update_profile(request):
 
             messages.info(request, f"Verification email sent to {form.cleaned_data['email']}. Please verify to complete the email change.")
 
-        user.email = form.cleaned_data['email']
-        user.save(update_fields=['first_name', 'last_name', 'email'])
-
-        if 'profile_picture' in request.FILES:
-            profile.profile_picture = request.FILES['profile_picture']
-
-        profile.save()
-
         AuditLog.objects.create(
             user=user,
             action='PROFILE_UPDATE',
@@ -1575,7 +1558,6 @@ def update_profile(request):
             ip_address=get_client_ip(request)
         )
 
-        # Notify user of profile update
         Notification.objects.create(
             user=user,
             message="Your profile information was updated.",

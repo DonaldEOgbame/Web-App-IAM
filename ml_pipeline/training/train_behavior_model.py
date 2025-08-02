@@ -13,7 +13,7 @@ import json
 import time
 import warnings
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -24,9 +24,11 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.utils import check_random_state
-from sklearn.isotonic import IsotonicRegression
 from sklearn.inspection import permutation_importance
 from joblib import dump
+
+# >>> import the calibration wrapper from a real module (pickle-safe)
+from ml_pipeline.common.calibration import CalibratedRegressor
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -35,7 +37,6 @@ BEHAVIOR_FEATURES: List[str] = [
     "time_anomaly", "device_anomaly", "location_anomaly",
     "action_entropy", "ip_risk", "session_duration"
 ]
-
 TARGET = "behavior_anomaly_score"
 
 
@@ -45,7 +46,7 @@ def save_meta(save_dir: Path, n_train: int, n_test: int, random_state: int,
         "version": time.strftime("%Y%m%d_%H%M%S"),
         "task": "regression",
         "expected_features": BEHAVIOR_FEATURES,
-        "thresholds": {},  # not used for regression
+        "thresholds": {},
         "random_state": random_state,
         "train_rows": int(n_train),
         "test_rows": int(n_test),
@@ -63,57 +64,12 @@ def rmse(y_true, y_pred):
 
 
 def metrics_dict(y_true, y_pred, prefix=""):
-    # Clip to [0,1] for meaningful comparison (target is defined on [0,1])
     y_pred_c = np.clip(y_pred, 0.0, 1.0)
     return {
         f"{prefix}MAE": float(mean_absolute_error(y_true, y_pred_c)),
         f"{prefix}RMSE": rmse(y_true, y_pred_c),
         f"{prefix}R2": float(r2_score(y_true, y_pred_c)),
     }
-
-
-class CalibratedRegressor:
-    """
-    Lightweight wrapper that applies isotonic regression to the *outputs* of a base regressor.
-    - Fits base regressor on (X_train_fit, y_train_fit).
-    - Uses a small holdout from train to fit isotonic: map base.predict(X_cal) -> y_cal in [0,1].
-    - At predict-time: y = iso( base.predict(X) ), clipped to [0,1].
-    Saved via joblib alongside the base estimator and isotonic model.
-    """
-    def __init__(self, base_estimator, holdout_frac: float = 0.1, random_state: int = 42):
-        self.base = base_estimator
-        self.holdout_frac = float(holdout_frac)
-        self.random_state = int(random_state)
-        self.iso_: Optional[IsotonicRegression] = None
-
-    def fit(self, X, y):
-        rng = check_random_state(self.random_state)
-        n = len(X)
-        idx = np.arange(n)
-        rng.shuffle(idx)
-        n_cal = max(500, int(self.holdout_frac * n))  # ensure minimum size
-        cal_idx = idx[:n_cal]
-        fit_idx = idx[n_cal:]
-
-        X_fit, y_fit = X.iloc[fit_idx], y.iloc[fit_idx]
-        X_cal, y_cal = X.iloc[cal_idx], y.iloc[cal_idx]
-
-        self.base.fit(X_fit, y_fit)
-        base_cal = self.base.predict(X_cal)
-        # Ensure ranges are within [0,1] before isotonic fit
-        base_cal = np.clip(base_cal, 0.0, 1.0)
-        y_cal = np.clip(y_cal, 0.0, 1.0)
-
-        self.iso_ = IsotonicRegression(out_of_bounds="clip")
-        self.iso_.fit(base_cal, y_cal)
-        return self
-
-    def predict(self, X):
-        y_hat = self.base.predict(X)
-        y_hat = np.clip(y_hat, 0.0, 1.0)
-        if self.iso_ is not None:
-            y_hat = self.iso_.predict(y_hat)
-        return np.clip(y_hat, 0.0, 1.0)
 
 
 def main():
@@ -125,8 +81,10 @@ def main():
     ap.add_argument("--n_iter", type=int, default=15)   # fast
     ap.add_argument("--random_state", type=int, default=42)
     ap.add_argument("--save_dir", default="ml_pipeline/models/production")
-    ap.add_argument("--calibrate", default="true", help="true/false: apply isotonic calibration on a small holdout")
-    ap.add_argument("--save_feature_importance", default="true", help="true/false: save permutation feature importance")
+    ap.add_argument("--calibrate", default="true",
+                    help="true/false: apply isotonic calibration on a small holdout")
+    ap.add_argument("--save_feature_importance", default="true",
+                    help="true/false: save permutation feature importance")
     args = ap.parse_args()
 
     def _bool_arg(v: str) -> bool:
@@ -150,11 +108,10 @@ def main():
         if f not in df.columns:
             raise ValueError(f"Missing feature: {f}")
 
-    # Defensive typing
     X_full = df[BEHAVIOR_FEATURES].astype(float)
     y_full = df[args.target].astype(float).clip(0.0, 1.0)
 
-    # ---- Simple random split (no group/time constraint here)
+    # ---- Simple random split
     idx = np.arange(len(df))
     rng.shuffle(idx)
     n_test = int(len(df) * args.test_size)
@@ -164,7 +121,7 @@ def main():
     X_train, y_train = X_full.iloc[train_idx], y_full.iloc[train_idx]
     X_test, y_test = X_full.iloc[test_idx], y_full.iloc[test_idx]
 
-    # ---- Pipeline (same model, robust imputation)
+    # ---- Pipeline
     base_pipe = Pipeline([
         ("imp", SimpleImputer(strategy="median")),
         ("model", HistGradientBoostingRegressor(
@@ -196,7 +153,7 @@ def main():
     search.fit(X_train, y_train)
     best = search.best_estimator_
 
-    # ---- Fit final model (with optional isotonic output calibration on a small holdout)
+    # ---- Final model (+ optional isotonic output calibration)
     calib_info = {"holdout_frac": 0.1} if do_calibrate else None
     if do_calibrate:
         model = CalibratedRegressor(best, holdout_frac=0.10, random_state=args.random_state)
@@ -205,10 +162,8 @@ def main():
         best.fit(X_train, y_train)
         model = best
 
-    # ---- Evaluate on the test set
+    # ---- Evaluate
     y_pred = model.predict(X_test)
-    test_metrics = metrics_dict(y_test, y_pred, prefix="test_")
-
     report = {
         "n_train": int(len(X_train)),
         "n_test": int(len(X_test)),
@@ -217,7 +172,7 @@ def main():
             "best_params": search.best_params_,
             "best_cv_mae": float(-search.best_score_)
         },
-        "test": test_metrics,
+        "test": metrics_dict(y_test, y_pred, prefix="test_"),
         "calibration": {
             "applied": bool(do_calibrate),
             "method": "isotonic_holdout" if do_calibrate else None,
@@ -232,12 +187,12 @@ def main():
               calibrated=bool(do_calibrate), calib_info=calib_info)
     (save_dir / "behavior_metrics.json").write_text(json.dumps(report, indent=2))
 
-    # Save predictions for sanity checks
+    # Predictions for sanity checks
     pd.DataFrame({"y_true": y_test, "y_pred": np.clip(y_pred, 0.0, 1.0)}).to_csv(
         save_dir / "behavior_predictions.csv", index=False
     )
 
-    # Optional: permutation importance on test split (post-fit)
+    # Optional: permutation importance (works with wrapper because it exposes predict)
     if do_importance:
         try:
             pi = permutation_importance(
