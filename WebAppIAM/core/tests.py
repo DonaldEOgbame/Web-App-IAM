@@ -7,13 +7,14 @@ from django.urls import reverse
 from .models import (
     User,
     Document,
+    UserProfile,
     DeviceFingerprint,
     UserBehaviorProfile,
     WebAuthnCredential,
     UserSession,
 )
 from .forms import RegistrationForm, DocumentUploadForm
-from .views import encrypt_file, decrypt_file, rate_limit
+from .views import encrypt_file, decrypt_file, rate_limit, get_fernet_key
 from . import risk_engine
 
 
@@ -120,6 +121,7 @@ class FormTests(TestCase):
             {
                 "title": "Doc",
                 "access_level": "PRIVATE",
+                "required_access_level": 1,
             },
             {"file": file_data},
         )
@@ -198,5 +200,79 @@ class DeviceViewTests(TestCase):
         response = self.client.get(reverse("core:manage_devices"))
         devices = list(response.context["devices"])
         self.assertEqual(devices, [self.admin_fp])
+
+
+class AccessLevelTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.admin = User.objects.create_user(
+            username="admin2",
+            password="pass",
+            email="admin2@example.com",
+            role="ADMIN",
+        )
+        self.level1 = User.objects.create_user(
+            username="level1",
+            password="pass",
+            email="level1@example.com",
+            role="STAFF",
+        )
+        self.level3 = User.objects.create_user(
+            username="level3",
+            password="pass",
+            email="level3@example.com",
+            role="STAFF",
+        )
+        UserProfile.objects.create(user=self.admin, department="IT", position="Admin", access_level=3)
+        UserProfile.objects.create(user=self.level1, department="IT", position="Staff", access_level=1)
+        UserProfile.objects.create(user=self.level3, department="IT", position="Staff", access_level=3)
+
+        key = get_fernet_key(self.admin)
+        self.doc_l1 = Document.objects.create(
+            title="Doc L1",
+            description="",
+            access_level="DEPT",
+            required_access_level=1,
+            department="IT",
+            encrypted_file=encrypt_file(b"data1", self.admin),
+            original_filename="l1.txt",
+            file_type="text/plain",
+            file_size=10,
+            encryption_key=key,
+            uploaded_by=self.admin,
+        )
+        self.doc_l3 = Document.objects.create(
+            title="Doc L3",
+            description="",
+            access_level="DEPT",
+            required_access_level=3,
+            department="IT",
+            encrypted_file=encrypt_file(b"data3", self.admin),
+            original_filename="l3.txt",
+            file_type="text/plain",
+            file_size=10,
+            encryption_key=key,
+            uploaded_by=self.admin,
+        )
+
+    def test_document_list_filters_by_access_level(self):
+        self.client.force_login(self.level1)
+        response = self.client.get(reverse("core:document_list"))
+        self.assertContains(response, "Doc L1")
+        self.assertNotContains(response, "Doc L3")
+
+        self.client.force_login(self.level3)
+        response = self.client.get(reverse("core:document_list"))
+        self.assertContains(response, "Doc L1")
+        self.assertContains(response, "Doc L3")
+
+    def test_document_download_requires_access_level(self):
+        self.client.force_login(self.level1)
+        resp = self.client.get(reverse("core:document_download", args=[self.doc_l3.id]))
+        self.assertEqual(resp.status_code, 403)
+
+        self.client.force_login(self.level3)
+        resp = self.client.get(reverse("core:document_download", args=[self.doc_l3.id]))
+        self.assertEqual(resp.status_code, 200)
 
 
