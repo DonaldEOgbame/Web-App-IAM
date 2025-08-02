@@ -47,7 +47,7 @@ class User(AbstractUser):
     ]
     
     role = models.CharField(max_length=10, choices=ROLE_CHOICES, default='STAFF')
-    azure_face_id = models.CharField(max_length=100, blank=True, null=True)
+    azure_face_id = models.CharField(max_length=255, blank=True, null=True)
     last_activity = models.DateTimeField(null=True, blank=True)
     email = models.EmailField(unique=True, blank=True)
     email_verified = models.BooleanField(default=False)
@@ -76,8 +76,8 @@ class User(AbstractUser):
 
     @property
     def has_biometrics(self):
-        """Check if user has enrolled either face data or WebAuthn credentials"""
-        return bool(self.face_data) or self.webauthn_credentials.exists()
+        """Check if user has enrolled face data or WebAuthn credentials"""
+        return bool(self.face_data or self.azure_face_id) or self.webauthn_credentials.exists()
 
     @property
     def is_high_risk(self):
@@ -104,6 +104,7 @@ class User(AbstractUser):
         """Force user to re-enroll their biometrics"""
         self.force_reenroll = True
         self.face_data = None
+        self.azure_face_id = None
         self.webauthn_credentials.all().delete()
         self.save()
 
