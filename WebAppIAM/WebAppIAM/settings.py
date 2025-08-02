@@ -209,3 +209,10 @@ CSRF_EXEMPT_PATHS = [
     '/core/webauthn/auth/',  # WebAuthn authentication endpoints
     '/core/health/'  # Health check endpoint
 ]
+
+# Machine Learning models directory
+# Allows override via environment variable for flexible deployments.
+ML_MODELS_DIR = os.environ.get(
+    "ML_MODELS_DIR",
+    os.path.join(BASE_DIR, "ml_pipeline", "models", "production")
+)
