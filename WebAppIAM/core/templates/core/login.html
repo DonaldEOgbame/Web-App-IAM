@@ -580,17 +580,24 @@
         fd.append('face_data', blob, 'face.jpg');
         
         const res = await fetch(ENDPOINTS.faceUpload, {
-          method: 'POST', 
-          credentials: 'same-origin', 
-          headers: { 'X-CSRFToken': getCSRF() },
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'X-CSRFToken': getCSRF(),
+            'X-Requested-With': 'XMLHttpRequest'
+          },
           body: fd
         });
-        
-        const data = await res.json();
+
+        const ct = res.headers.get('content-type') || '';
+        const data = ct.includes('application/json')
+          ? await res.json()
+          : {};
         if(data.status === 'ok' || data.status === 'success'){
           window.location.href = data.next || '/';
         } else {
-          throw new Error(data.message || 'Verification failed');
+          const msg = data.message || (res.ok ? 'Verification failed' : `HTTP ${res.status}`);
+          throw new Error(msg);
         }
       } catch(err) {
         console.error('Face Verification Error:', err);
