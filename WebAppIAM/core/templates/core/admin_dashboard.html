@@ -386,6 +386,12 @@
             border: 1px solid var(--border);
         }
         .btn-outline:hover { background: var(--surface-2); }
+        .btn-outline.current:disabled {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+            opacity: 1;
+        }
         .btn-danger { background: var(--danger); }
         .btn-sm { padding: 6px 10px; font-size: 0.875rem; }
 
@@ -744,7 +750,7 @@
                             <th>Email</th>
                             <th>Status</th>
                             <th>Biometric</th>
-                            <th>Access Level</th>
+                            <th>Access Levels</th>
                             <th>Last Login</th>
                             <th>Actions</th>
                         </tr>
@@ -781,17 +787,17 @@
                                     <button class="btn btn-outline" type="submit">Lock</button>
                                 </form>
                                 {% endif %}
-                                <form method="post" action="{% url 'core:admin_set_access_level' u.pk 1 %}" style="display:inline;">
+                                <form method="post" action="{% url 'core:admin_set_access_level' u.pk 1 %}" style="display:inline; margin:0 2px;">
                                     {% csrf_token %}
-                                    <button class="btn btn-outline" type="submit"{% if u.profile.access_level == 1 %} disabled{% endif %}>L1</button>
+                                    <button class="btn btn-outline btn-sm{% if u.profile.access_level == 1 %} current{% endif %}" type="submit"{% if u.profile.access_level == 1 %} disabled{% endif %}>L1</button>
                                 </form>
-                                <form method="post" action="{% url 'core:admin_set_access_level' u.pk 2 %}" style="display:inline;">
+                                <form method="post" action="{% url 'core:admin_set_access_level' u.pk 2 %}" style="display:inline; margin:0 2px;">
                                     {% csrf_token %}
-                                    <button class="btn btn-outline" type="submit"{% if u.profile.access_level == 2 %} disabled{% endif %}>L2</button>
+                                    <button class="btn btn-outline btn-sm{% if u.profile.access_level == 2 %} current{% endif %}" type="submit"{% if u.profile.access_level == 2 %} disabled{% endif %}>L2</button>
                                 </form>
-                                <form method="post" action="{% url 'core:admin_set_access_level' u.pk 3 %}" style="display:inline;">
+                                <form method="post" action="{% url 'core:admin_set_access_level' u.pk 3 %}" style="display:inline; margin:0 2px;">
                                     {% csrf_token %}
-                                    <button class="btn btn-outline" type="submit"{% if u.profile.access_level == 3 %} disabled{% endif %}>L3</button>
+                                    <button class="btn btn-outline btn-sm{% if u.profile.access_level == 3 %} current{% endif %}" type="submit"{% if u.profile.access_level == 3 %} disabled{% endif %}>L3</button>
                                 </form>
                             </td>
                         </tr>

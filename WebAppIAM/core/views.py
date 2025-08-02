@@ -1886,6 +1886,12 @@ def set_access_level(request, user_id, level):
         return HttpResponseBadRequest('Invalid access level')
     target.profile.access_level = level
     target.profile.save(update_fields=['access_level'])
+    Notification.objects.create(
+        user=target,
+        message=f"Your access level has been updated to {target.profile.get_access_level_display()} by an administrator.",
+        notification_type='INFO',
+        action_required=False
+    )
     messages.success(request, f'Updated access level for {target.username}.')
     return redirect('core:admin_dashboard')
 
