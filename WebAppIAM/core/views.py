@@ -1150,7 +1150,7 @@ def staff_dashboard(request):
         deleted=False,
         access_level='DEPT',
         department=user.profile.department,
-        required_access_level__lte=user.profile.access_level,
+        required_access_level__gte=user.profile.access_level,
     )
     # Always show all documents for staff's department
     sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:5]
@@ -1261,7 +1261,7 @@ def document_list(request):
         documents = documents.filter(
             Q(access_level='PRIVATE', uploaded_by=user) |
             Q(access_level='DEPT', department=user.profile.department),
-            required_access_level__lte=user.profile.access_level,
+            required_access_level__gte=user.profile.access_level,
         )
     
     # Apply search filters
@@ -1357,7 +1357,7 @@ def document_download(request, doc_id):
             not hasattr(user, 'profile') or doc.department != user.profile.department
         ):
             return HttpResponseForbidden("You don't have permission to access this document")
-        if doc.required_access_level > user.profile.access_level:
+        if doc.required_access_level < user.profile.access_level:
             return HttpResponseForbidden("You don't have permission to access this document")
     
     
@@ -1391,7 +1391,7 @@ def document_edit(request, doc_id):
     """Edit an existing document by creating a new version."""
     existing = get_object_or_404(Document, id=doc_id, deleted=False)
 
-    if request.user.role != 'ADMIN' and existing.required_access_level > request.user.profile.access_level:
+    if request.user.role != 'ADMIN' and existing.required_access_level < request.user.profile.access_level:
         return HttpResponseForbidden("You don't have permission to edit this document")
 
     if request.method == "POST":
@@ -1866,6 +1866,27 @@ def unlock_user(request, user_id):
         notification_type='INFO',
         action_required=False
     )
+    return redirect('core:admin_dashboard')
+
+
+@login_required
+@user_passes_test(is_admin)
+@require_POST
+def set_access_level(request, user_id, level):
+    """Update a user's access level"""
+    target = get_object_or_404(User, id=user_id)
+    if not hasattr(target, 'profile'):
+        messages.error(request, 'User profile not found.')
+        return redirect('core:admin_dashboard')
+    try:
+        level = int(level)
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest('Invalid access level')
+    if level not in [1, 2, 3]:
+        return HttpResponseBadRequest('Invalid access level')
+    target.profile.access_level = level
+    target.profile.save(update_fields=['access_level'])
+    messages.success(request, f'Updated access level for {target.username}.')
     return redirect('core:admin_dashboard')
 
 
