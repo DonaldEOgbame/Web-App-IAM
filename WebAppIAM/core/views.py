@@ -29,17 +29,16 @@ from webauthn.helpers.structs import RegistrationCredential, AuthenticatorAttest
 from webauthn.helpers.exceptions import InvalidRegistrationResponse
 from webauthn.helpers import bytes_to_base64url, base64url_to_bytes
 import os
-import numpy as np  # <-- added for keystroke anomaly computations
+import numpy as np  # <-- for keystroke anomaly computations
 
 from .models import (
     User, UserProfile, UserBehaviorProfile, WebAuthnCredential,
-    UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog, 
+    UserSession, RiskPolicy, AuditLog, Document, DocumentAccessLog,
     Notification, DeviceFingerprint
 )
 from .models_keystroke import KeystrokeDynamics
 from .webauthn_utils import (
     generate_registration_options,
-    # verify_registration_response,  # ⛔️ not used for registration verify anymore (we use library directly)
     generate_authentication_options,
     verify_authentication_response,
     options_to_json,
@@ -94,17 +93,17 @@ def get_client_ip(request):
 def get_device_info(request):
     """Extract device information from request"""
     user_agent = request.META.get('HTTP_USER_AGENT', '')
-    
+
     # Simple device detection
     device_type = 'Desktop'
     browser = 'Unknown'
     os = 'Unknown'
-    
+
     if 'Mobile' in user_agent or 'Android' in user_agent or 'iPhone' in user_agent:
         device_type = 'Mobile'
     elif 'Tablet' in user_agent or 'iPad' in user_agent:
         device_type = 'Tablet'
-    
+
     # Basic browser detection
     if 'Chrome' in user_agent:
         browser = 'Chrome'
@@ -114,7 +113,7 @@ def get_device_info(request):
         browser = 'Safari'
     elif 'Edge' in user_agent:
         browser = 'Edge'
-    
+
     # Basic OS detection
     if 'Windows' in user_agent:
         os = 'Windows'
@@ -126,7 +125,7 @@ def get_device_info(request):
         os = 'Android'
     elif 'iOS' in user_agent or 'iPhone' in user_agent or 'iPad' in user_agent:
         os = 'iOS'
-    
+
     return {
         'device_type': device_type,
         'browser': browser,
@@ -169,7 +168,7 @@ def create_new_device_notification(user, session, device_info):
     device_hash = hashlib.sha256(
         f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
     ).hexdigest()[:32]
-    
+
     device_fp, created = DeviceFingerprint.objects.get_or_create(
         user=user,
         device_id=device_hash,
@@ -182,17 +181,17 @@ def create_new_device_notification(user, session, device_info):
             'last_location': session.location,
         },
     )
-    
+
     if not created:
         device_fp.update_usage(session.ip_address, session.location)
         # If device exists and is trusted, don't send notification
         if device_fp.is_trusted:
             return
-    
+
     # Create user notification
     device_description = f"{device_info['browser']} on {device_info['os']} ({device_info['device_type']})"
     location = session.location or "Unknown location"
-    
+
     Notification.objects.create(
         user=user,
         message=f'New device login detected: {device_description} from {location}. If this wasn\'t you, please contact security immediately.',
@@ -206,7 +205,7 @@ def create_new_device_notification(user, session, device_info):
             'location': location
         }
     )
-    
+
     # Also create admin notification if user preferences allow
     if hasattr(user, 'profile') and user.profile.receive_email_alerts:
         admins = User.objects.filter(role='ADMIN', is_active=True)
@@ -223,7 +222,7 @@ def create_new_device_notification(user, session, device_info):
                     'ip_address': session.ip_address
                 }
             )
-    
+
     # Log the new device detection
     AuditLog.objects.create(
         user=user,
@@ -267,7 +266,7 @@ def log_security_event(request, event_type, details, success=False):
     """Log security-related events with detailed context"""
     user = request.user if request.user.is_authenticated else None
     username = user.username if user else request.POST.get('username', 'anonymous')
-    
+
     # Create audit log entry
     AuditLog.objects.create(
         user=user,
@@ -275,7 +274,7 @@ def log_security_event(request, event_type, details, success=False):
         details=details,
         ip_address=get_client_ip(request)
     )
-    
+
     # Log to application logs with additional context
     log_message = f"Security event: {event_type} | User: {username} | IP: {get_client_ip(request)} | Success: {success} | Details: {details}"
     if success:
@@ -283,7 +282,7 @@ def log_security_event(request, event_type, details, success=False):
     else:
         logger.warning(log_message)
 
-# ---------------- Keystroke anomaly helper (NEW) ----------------
+# ---------------- Keystroke anomaly helper ----------------
 def _extract_keystroke_stats(event_data):
     """
     event_data: list of dicts with 'down' and 'up' (timestamps in ms)
@@ -350,7 +349,6 @@ def _compute_keystroke_anomaly(user, this_session_id=None, min_history=5):
             return 0.5
 
         z = np.sqrt(((h_cur - h_mu) / h_sigma) ** 2 + ((f_cur - f_mu) / f_sigma) ** 2)
-        # Map distance → [0,1]: 0σ→0, 2σ→~0.63, 3σ→~0.78, 4σ→~0.86, asymptote to 1
         anomaly = float(1.0 - np.exp(-z / 2.0))
         return max(0.0, min(1.0, anomaly))
     except Exception as e:
@@ -367,28 +365,28 @@ def admin_register_user(request):
     password = request.POST.get('password')
     email = request.POST.get('email')
     role = request.POST.get('role', 'USER')
-    
+
     if not all([username, password, email]):
         return JsonResponse({'error': 'All fields are required'}, status=400)
-    
+
     if User.objects.filter(username=username).exists():
         return JsonResponse({'error': 'Username already exists'}, status=400)
-    
+
     user = User.objects.create_user(
-        username=username, 
-        password=password, 
+        username=username,
+        password=password,
         email=email,
-        role=role, 
+        role=role,
         is_active=False
     )
     UserBehaviorProfile.objects.create(user=user)
-    
+
     # Notify admin about pending approval
     notify_admin(
         'New User Registration',
         f'User {username} ({email}) registered and pending approval.'
     )
-    
+
     return JsonResponse({'status': 'success', 'message': 'User created. Pending admin activation.'})
 
 @login_required
@@ -428,9 +426,9 @@ def complete_profile(request):
     user_id = request.session.get('complete_profile_user')
     if not user_id:
         return redirect('core:login')
-    
+
     user = get_object_or_404(User, id=user_id)
-    
+
     if request.method == 'POST':
         form = ProfileCompletionForm(request.POST)
         is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
@@ -444,7 +442,7 @@ def complete_profile(request):
             user.first_name = form.cleaned_data['first_name']
             user.last_name = form.cleaned_data['last_name']
             user.save()
-            
+
             if 'pending_user_id' in request.session:
                 del request.session['pending_user_id']
             if 'complete_profile_user' in request.session:
@@ -452,7 +450,7 @@ def complete_profile(request):
             return render(request, 'core/pending_approval.html', {'user': user})
     else:
         form = ProfileCompletionForm()
-    
+
     return render(request, 'core/complete_profile.html', {
         'form': form,
         'user': user,
@@ -460,9 +458,9 @@ def complete_profile(request):
 
 def register_biometrics(request):
     """
-    GET: render enrollment page (with inline WebAuthn options if face not set).
-    POST (face_data): enroll face and return JSON so the client can later
-    verify WebAuthn and navigate only after BOTH are done.
+    Page-driven enrollment:
+    - POST (face_data): enroll and redirect to complete_profile
+    - GET: render page, emit WebAuthn options if face not set
     """
     user = None
     if request.user.is_authenticated:
@@ -470,56 +468,47 @@ def register_biometrics(request):
     elif request.session.get('pending_user_id'):
         user = get_object_or_404(User, id=request.session['pending_user_id'])
     if not user:
-        # For AJAX callers, return JSON; for full request, redirect.
-        if request.method == 'POST':
-            return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
         return redirect('core:login')
 
-    # If already enrolled and not being forced to re-enroll, gate as before.
+    # Already enrolled?
     if user.has_biometrics and not user.force_reenroll:
-        if request.method == 'POST':
-            return JsonResponse({'status': 'error', 'message': 'Biometrics already enrolled'}, status=400)
         messages.info(request, 'Biometrics already enrolled.')
         if request.user.is_authenticated:
             dashboard_name = 'core:admin_dashboard' if user.role == 'ADMIN' else 'core:staff_dashboard'
             return redirect(dashboard_name)
         return redirect('core:login')
-    
+
     if request.method == 'POST':
-        # --- Face enrollment (JSON response; NO redirect) ---
         if 'face_data' in request.FILES:
             try:
                 face_data = request.FILES['face_data'].read()
                 if enroll_face(user, face_data):
-                    user.save(update_fields=[])  # enroll_face likely updates fields internally
-                    # We do NOT navigate here; client will call WebAuthn verify next.
-                    # Provide a suggested "next" to keep behavior flexible.
-                    next_url = reverse('core:complete_profile')
-                    return JsonResponse({'status': 'success', 'next': next_url})
-                return JsonResponse({'status': 'error', 'message': 'Face enrollment failed'}, status=400)
+                    user.save(update_fields=[])  # enroll_face may update fields
+                    request.session['complete_profile_user'] = user.id
+                    return redirect('core:complete_profile')
+                messages.error(request, 'Face enrollment failed.')
+                return redirect('core:register_biometrics')
             except FaceAPIError as e:
-                return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-            except Exception as e:
+                messages.error(request, str(e))
+                return redirect('core:register_biometrics')
+            except Exception:
                 logger.exception("Face enrollment error")
-                return JsonResponse({'status': 'error', 'message': 'Server error during face enrollment'}, status=500)
+                messages.error(request, 'Server error during face enrollment.')
+                return redirect('core:register_biometrics')
 
-        # If POST had no face_data, treat as bad request (client only sends face here).
-        return JsonResponse({'status': 'error', 'message': 'No face data provided'}, status=400)
-    
-    # --- GET: render page with inline options if needed ---
+        messages.error(request, 'No face data provided.')
+        return redirect('core:register_biometrics')
+
+    # GET: emit WebAuthn options if user has no face yet
     options = None
     if not getattr(user, 'face_data', None):
         options = generate_registration_options(user)
-        request.session['webauthn_registration_challenge'] = bytes_to_base64url(
-            options.challenge
-        )
+        request.session['webauthn_registration_challenge'] = bytes_to_base64url(options.challenge)
 
     return render(
         request,
         'core/enroll_biometrics.html',
-        {
-            'webauthn_options': json.loads(options_to_json(options)) if options else None
-        },
+        {'webauthn_options': json.loads(options_to_json(options)) if options else None},
     )
 
 def webauthn_registration_options(request):
@@ -713,10 +702,10 @@ def login(request):
                         details='User logged in with password',
                         ip_address=get_client_ip(request)
                     )
-                    
+
                     django_login(request, user_auth)
-                    # Ensure CSRF token persists after session rotation
-                    request.session['csrftoken'] = get_token(request)
+                    # Ensure CSRF cookie exists after session rotation
+                    get_token(request)  # CsrfViewMiddleware will set the cookie on the response
 
                     # Create pending authentication session for biometric checks
                     session_key = getattr(request.session, 'session_key', None)
@@ -735,13 +724,11 @@ def login(request):
                     request.session['pending_auth_session_id'] = session_obj.id
 
                     # --- Always create or update DeviceFingerprint on login ---
-                    # Get device info and create/update DeviceFingerprint
                     device_info = get_device_info(request)
                     import hashlib
                     device_hash = hashlib.sha256(
                         f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
                     ).hexdigest()[:32]
-                    from .models import DeviceFingerprint
                     device_fp, created = DeviceFingerprint.objects.get_or_create(
                         user=user,
                         device_id=device_hash,
@@ -776,7 +763,7 @@ def login(request):
                     user.failed_login_attempts += 1
                     user.last_failed_login = timezone.now()
                     user.save(update_fields=['failed_login_attempts', 'last_failed_login'])
-                    
+
                     # Create audit log entry
                     AuditLog.objects.create(
                         user=None,
@@ -784,7 +771,7 @@ def login(request):
                         details=f'Failed login attempt for {username}',
                         ip_address=get_client_ip(request)
                     )
-                    
+
                     if is_ajax:
                         return JsonResponse({'status': 'error', 'message': 'Invalid username or password.'}, status=400)
                     messages.error(request, 'Invalid username or password.')
@@ -801,8 +788,8 @@ def login(request):
                 messages.error(request, 'Invalid username or password.')
     else:
         form = LoginForm()
-    # Store CSRF token in session for WebAuthn API calls
-    request.session['csrftoken'] = get_token(request)
+    # Ensure CSRF cookie is present for subsequent posts (e.g., biometrics)
+    get_token(request)
 
     return render(request, 'core/login.html', {'form': form})
 
@@ -815,7 +802,7 @@ def register(request):
             user.is_active = False
             user.set_password(form.cleaned_data['password1'])
             user.save()
-            
+
             # Create audit log entry
             AuditLog.objects.create(
                 user=user,
@@ -823,12 +810,12 @@ def register(request):
                 details='User registered',
                 ip_address=get_client_ip(request)
             )
-            
+
             request.session['pending_user_id'] = user.id
             return redirect('core:register_biometrics')
     else:
         form = RegistrationForm()
-    
+
     return render(request, 'core/register.html', {'form': form})
 
 @login_required
@@ -850,63 +837,62 @@ def logout(request):
         session.logout_time = timezone.now()
         session.save(update_fields=['logout_time'])
 
-    django_logout(request)  # Replace auth_logout
+    django_logout(request)
     messages.success(request, 'You have been logged out successfully.')
     return redirect('core:login')
 
 def verify_biometrics(request):
     user_id = request.session.get('pending_auth_user_id')
     session_id = request.session.get('pending_auth_session_id')
-    
+
     if not user_id or not session_id:
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'status': 'error', 'message': 'No pending authentication'}, status=400)
         return redirect('core:login')
-    
+
     user = get_object_or_404(User, id=user_id)
     session = get_object_or_404(UserSession, id=session_id)
-    
+
     if request.method == 'POST':
         image = request.FILES.get('face_image') or request.FILES.get('face_data')
-        if image:
-            face_image = image
-            try:
-                result = verify_face(user, face_image)
-                session.face_match_score = result['confidence']
-                session.save()
+        if not image:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
+            messages.error(request, 'Invalid request.')
+            return redirect('core:login')
 
-                # Finalize authentication and log the user in
-                session = finalize_authentication(request, session)
-                if session.access_granted:
-                    django_login(request, user)
-                    dashboard_url = (
-                        'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
-                    )
-                    return JsonResponse(
-                        {
-                            'status': 'success',
-                            'score': result['confidence'],
-                            'next': reverse(f'core:{dashboard_url}'),
-                        }
-                    )
-                return JsonResponse(
-                    {
-                        'status': 'denied',
-                        'message': 'Access denied due to high risk',
-                    },
-                    status=403,
-                )
-            except FaceAPIError as e:
-                logger.warning(f"Face verification failed: {e}")
-                messages.error(request, str(e))
+        try:
+            result = verify_face(user, image)
+            session.face_match_score = result['confidence']
+            session.save()
+
+            session = finalize_authentication(request, session)
+            if session.access_granted:
+                django_login(request, user)
+                dashboard_url = 'core:admin_dashboard' if user.role == 'ADMIN' else 'core:staff_dashboard'
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({'status': 'success', 'score': result['confidence'], 'next': reverse(dashboard_url)})
+                return redirect(dashboard_url)
+
+            # denied
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({'status': 'denied', 'message': 'Access denied due to high risk'}, status=403)
+            return redirect(f"{reverse('core:access_denied')}?reason=High%20risk")
+
+        except FaceAPIError as e:
+            logger.warning(f"Face verification failed: {e}")
+            messages.error(request, str(e))
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-            except Exception as e:
-                logger.exception("Unexpected face verification error")
-                messages.error(request, 'Face verification temporarily unavailable.')
+            return redirect('core:login')
+        except Exception:
+            logger.exception("Unexpected face verification error")
+            messages.error(request, 'Face verification temporarily unavailable.')
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return JsonResponse({'status': 'error', 'message': 'Face verification failed'}, status=400)
-        
-        return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
-    
+            return redirect('core:login')
+
+    # GET: render login with biometric prompt
     return render(request, 'core/login.html', {
         'user': user,
         'session_id': session_id,
@@ -936,33 +922,33 @@ def webauthn_authentication_options(request):
 def webauthn_authentication_verify(request):
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
-    
+
     user_id = request.session.get('pending_auth_user_id')
     session_id = request.session.get('pending_auth_session_id')
     if not user_id or not session_id:
         return JsonResponse({'error': 'No pending authentication'}, status=400)
-    
+
     user = User.objects.get(id=user_id)
     session = UserSession.objects.get(id=session_id)
     data = json.loads(request.body)
     challenge = request.session.get('webauthn_authentication_challenge')
     if isinstance(challenge, str):
         challenge = base64url_to_bytes(challenge)
-    
+
     try:
         credential = verify_authentication_response(user, data, challenge)
         credential.sign_count += 1
         credential.last_used_at = timezone.now()
         credential.save()
-        
+
         session.fingerprint_verified = True
         session.save()
-        
+
         # Finalize authentication
         session = finalize_authentication(request, session)
-        
+
         if session.access_granted:
-            django_login(request, user)  # Replace auth_login
+            django_login(request, user)
             dashboard_url = 'admin_dashboard' if user.role == 'ADMIN' else 'staff_dashboard'
             return JsonResponse({
                 'status': 'success',
@@ -979,10 +965,10 @@ def webauthn_authentication_verify(request):
 
 def finalize_authentication(request, session):
     user = session.user
-    
+
     # Get device information
     device_info = get_device_info(request)
-    
+
     # Behavior analysis
     behavior_profile, _ = UserBehaviorProfile.objects.get_or_create(user=user)
     current_time = timezone.now().time()
@@ -990,18 +976,18 @@ def finalize_authentication(request, session):
     device_anomaly = 0
     fingerprint_anomaly = 0
     is_new_device = False
-    
+
     if behavior_profile.typical_login_time:
-        time_diff = abs((datetime.combine(timezone.now().date(), current_time) - 
+        time_diff = abs((datetime.combine(timezone.now().date(), current_time) -
                         datetime.combine(timezone.now().date(), behavior_profile.typical_login_time)).total_seconds())
         time_anomaly = min(time_diff / 3600, 1)
-    
+
     # Enhanced device detection
     import hashlib
     device_hash = hashlib.sha256(
         f"{device_info['user_agent']}{device_info['browser']}{device_info['os']}".encode()
     ).hexdigest()[:32]
-    
+
     # Check if this is a known device
     known_device = DeviceFingerprint.objects.filter(
         user=user,
@@ -1022,7 +1008,7 @@ def finalize_authentication(request, session):
     else:
         # Known trusted device lowers anomaly
         device_anomaly = 0
-    
+
     if behavior_profile.typical_device_fingerprint and session.device_fingerprint != behavior_profile.typical_device_fingerprint:
         fingerprint_anomaly = 1
 
@@ -1041,9 +1027,9 @@ def finalize_authentication(request, session):
     except Exception as e:
         logger.warning(f"Keystroke anomaly error: {e}")
         keystroke_anomaly = 0.5
-    session.keystroke_anomaly = keystroke_anomaly  # field on model optional; if not present, it's just an attribute
+    session.keystroke_anomaly = keystroke_anomaly  # optional field on model
 
-    # Calculate risk score (now with 4th feature: keystroke_anomaly)
+    # Calculate risk score (now with keystroke_anomaly)
     session.risk_score = calculate_risk_score(
         face_match=session.face_match_score or 0,
         fingerprint_verified=session.fingerprint_verified,
@@ -1052,7 +1038,7 @@ def finalize_authentication(request, session):
     )
     if known_device and known_device.is_trusted:
         session.risk_score = max(session.risk_score - 0.1, 0)
-    
+
     # Determine risk level
     if session.risk_score < 0.3:
         session.risk_level = 'LOW'
@@ -1060,7 +1046,6 @@ def finalize_authentication(request, session):
         session.risk_level = 'MEDIUM'
     else:
         session.risk_level = 'HIGH'
-    
 
     # Admin override: allow access if override is set, then clear it (single-use)
     if getattr(user, 'admin_high_risk_override', False):
@@ -1091,7 +1076,7 @@ def finalize_authentication(request, session):
         if active_policy:
             risk_level = session.risk_level
             action = getattr(active_policy, f"{risk_level.lower()}_risk_action")
-            
+
             if action == "DENY":
                 session.access_granted = False
                 session.flagged_reason = f"{risk_level} risk session - access denied by policy"
@@ -1109,15 +1094,14 @@ def finalize_authentication(request, session):
         else:
             session.access_granted = session.risk_level != 'HIGH'
     session.save()
-    
+
     # Handle new device notifications and profile updates
     if session.access_granted:
         # Send new device notification if detected
         if is_new_device and hasattr(user, 'profile'):
-            # Only send notification if user has email alerts enabled
             if user.profile.receive_email_alerts:
                 create_new_device_notification(user, session, device_info)
-        
+
         # Update behavior profile
         if not behavior_profile.typical_login_time:
             behavior_profile.typical_login_time = current_time
@@ -1126,7 +1110,7 @@ def finalize_authentication(request, session):
         if not behavior_profile.typical_device_fingerprint:
             behavior_profile.typical_device_fingerprint = session.device_fingerprint
         behavior_profile.save()
-    
+
     return session
 
 # --- Dashboard Views ---
@@ -1136,22 +1120,22 @@ def dashboard(request):
     if not hasattr(request.user, 'profile'):
         request.session['complete_profile_user'] = request.user.id
         return redirect('core:complete_profile')
-    
+
     # Biometric enrollment gate
     if not request.user.has_biometrics:
         return redirect('core:register_biometrics')
-    
+
     user = request.user
     sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:5]
     notifications = Notification.objects.filter(user=user, read=False).order_by('-created_at')[:10]
-    
+
     context = {
         'user': user,
         'sessions': sessions,
         'notifications': notifications,
         'risk_policy': RiskPolicy.objects.filter(is_active=True).first()
     }
-    
+
     if user.role == 'ADMIN':
         pending_users = User.objects.filter(is_active=False)
         high_risk_sessions = get_latest_high_risk_sessions()
@@ -1160,7 +1144,7 @@ def dashboard(request):
             'high_risk_sessions': high_risk_sessions
         })
         return render(request, 'core/admin_dashboard.html', context)
-    
+
     return render(request, 'core/staff_dashboard.html', context)
 
 @login_required
@@ -1203,11 +1187,11 @@ def admin_dashboard(request):
     if request.user.role != 'ADMIN':
         messages.error(request, "Access denied. You don't have permission to access this page.")
         return redirect('core:login')
-    
+
     # Update last activity timestamp
     request.user.last_activity = timezone.now()
     request.user.save(update_fields=['last_activity'])
-    
+
     # Get basic stats for the dashboard
     user_count = User.objects.filter(is_active=True).count()
     active_sessions = UserSession.objects.filter(logout_time__isnull=True).count()
@@ -1289,22 +1273,20 @@ def document_list(request):
             Q(access_level='DEPT', department=user.profile.department),
             required_access_level__gte=user.profile.access_level,
         )
-    
+
     # Apply search filters
     query = request.GET.get('q', '')
-    
+
     if query:
         documents = documents.filter(Q(title__icontains=query) | Q(description__icontains=query))
-    
-    # No download restrictions for admin, and search is always applied above
-    
+
     context = {
         'documents': documents,
         'query': query,
         'show_documents': True,
         'active_tab': 'documents'
     }
-    
+
     if user.role == 'ADMIN':
         return render(request, 'core/admin_dashboard.html', context)
     return render(request, 'core/staff_dashboard.html', context)
@@ -1385,18 +1367,15 @@ def document_download(request, doc_id):
             return HttpResponseForbidden("You don't have permission to access this document")
         if doc.required_access_level < user.profile.access_level:
             return HttpResponseForbidden("You don't have permission to access this document")
-    
-    
-
 
     try:
         # Decrypt file with user-specific key
         decrypted_data = decrypt_file(doc.encrypted_file, doc.uploaded_by)
-        
+
         # Create response
         response = HttpResponse(decrypted_data, content_type='application/octet-stream')
         response['Content-Disposition'] = f'attachment; filename="{doc.original_filename}"'
-        
+
         # Log access
         DocumentAccessLog.objects.create(
             user=user,
@@ -1404,7 +1383,7 @@ def document_download(request, doc_id):
             was_successful=True,
             ip_address=get_client_ip(request)
         )
-        
+
         return response
     except (IOError, InvalidToken) as e:
         logger.error(f"Document download failed: {str(e)}")
@@ -1534,7 +1513,7 @@ def profile_settings(request):
         'auto_logout': profile.auto_logout,
         'receive_email_alerts': profile.receive_email_alerts
     })
-    
+
     context = {
         'profile': profile,
         'profile_form': form,
@@ -1543,7 +1522,7 @@ def profile_settings(request):
         'user': user,
         'show_profile_settings': True
     }
-    
+
     template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
     return render(request, template, context)
 
@@ -1632,12 +1611,12 @@ def manage_devices(request):
     user = request.user
     # Only show devices belonging to the current user
     devices = DeviceFingerprint.objects.filter(user=user).order_by('-last_seen')
-    
+
     context = {
         'devices': devices,
         'show_device_management': True
     }
-    
+
     template = 'core/admin_dashboard.html' if user.role == 'ADMIN' else 'core/staff_dashboard.html'
     return render(request, template, context)
 
@@ -1757,23 +1736,23 @@ def mark_all_notifications_read(request):
 @user_passes_test(is_admin)
 def policy_editor(request):
     policy = RiskPolicy.objects.filter(is_active=True).first()
-    
+
     if request.method == 'POST':
         form = RiskPolicyForm(request.POST, instance=policy)
         if form.is_valid():
             new_policy = form.save(commit=False)
-            
+
             # Deactivate previous policy
             if policy:
                 policy.is_active = False
                 policy.save()
-            
+
             new_policy.is_active = True
             new_policy.save()
             return redirect('core:admin_dashboard')
     else:
         form = RiskPolicyForm(instance=policy)
-    
+
     return render(request, 'core/admin_dashboard.html', {
         'form': form,
         'show_policy_editor': True
@@ -1794,18 +1773,18 @@ def audit_logs(request):
 def export_audit_logs(request):
     import csv
     from django.http import HttpResponse
-    
+
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="audit_logs.csv"'
-    
+
     # Filter params
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
     action = request.GET.get('action')
     user_id = request.GET.get('user_id')
-    
+
     logs = AuditLog.objects.all().order_by('-timestamp')
-    
+
     # Apply filters
     if start_date:
         try:
@@ -1813,23 +1792,23 @@ def export_audit_logs(request):
             logs = logs.filter(timestamp__gte=start)
         except ValueError:
             pass
-    
+
     if end_date:
         try:
             end = timezone.datetime.strptime(end_date, '%Y-%m-%d')
             logs = logs.filter(timestamp__lte=end)
         except ValueError:
             pass
-    
+
     if action:
         logs = logs.filter(action=action)
-    
+
     if user_id:
         logs = logs.filter(user_id=user_id)
-    
+
     writer = csv.writer(response)
     writer.writerow(['Timestamp', 'User', 'Action', 'Details', 'IP Address'])
-    
+
     for log in logs:
         writer.writerow([
             log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
@@ -1838,7 +1817,7 @@ def export_audit_logs(request):
             log.details,
             log.ip_address
         ])
-    
+
     return response
 
 # --- Admin Actions ---
@@ -1981,18 +1960,18 @@ def password_reset_request(request):
             return render(request, 'core/password_reset_done.html')
     else:
         form = PasswordResetForm()
-    
+
     return render(request, 'core/password_reset.html', {'form': form})
 
 def password_reset_confirm(request, user_id, token):
     user = get_object_or_404(User, id=user_id)
-    
+
     # Check token and expiration
     if user.email_verification_token != token or user.email_verification_expiration < timezone.now():
         return render(request, 'core/login.html', {
             'error': 'Password reset link is invalid or has expired.'
         })
-    
+
     if request.method == 'POST':
         form = PasswordResetConfirmForm(request.POST)
         if form.is_valid():
@@ -2001,7 +1980,7 @@ def password_reset_confirm(request, user_id, token):
             user.email_verification_token = None
             user.email_verification_expiration = None
             user.save()
-            
+
             AuditLog.objects.create(
                 user=user,
                 action='PASSWORD_RESET',
@@ -2018,7 +1997,7 @@ def password_reset_confirm(request, user_id, token):
             return redirect('core:login')
     else:
         form = PasswordResetConfirmForm()
-    
+
     return render(request, 'core/password_reset_confirm.html', {'form': form})
 
 # --- Access Denied View ---
@@ -2028,7 +2007,7 @@ def access_denied(request):
         'reason': reason,
         'show_access_denied': True
     }
-    
+
     if request.user.is_authenticated:
         template = 'core/admin_dashboard.html' if request.user.role == 'ADMIN' else 'core/staff_dashboard.html'
         return render(request, template, context)
@@ -2037,27 +2016,27 @@ def access_denied(request):
 # --- Email Update Verification ---
 def verify_email_update(request, token):
     user = get_object_or_404(User, email_verification_token=token)
-    
+
     # Check token and expiration
     if user.email_verification_expiration < timezone.now():
         return render(request, 'core/login.html', {
             'error': 'Email verification link has expired.'
         })
-    
+
     # Get the pending email from session
     new_email = request.session.get('pending_email_update')
     if not new_email:
         return render(request, 'core/login.html', {
             'error': 'Email update session has expired.'
         })
-    
+
     # Update the email
     old_email = user.email
     user.email = new_email
     user.email_verification_token = None
     user.email_verification_expiration = None
     user.save()
-    
+
     # Log the change
     AuditLog.objects.create(
         user=user,
@@ -2065,14 +2044,14 @@ def verify_email_update(request, token):
         details=f'Email changed from {old_email} to {new_email}',
         ip_address=get_client_ip(request)
     )
-    
+
     # Clear the session
     if 'pending_email_update' in request.session:
         del request.session['pending_email_update']
-    
+
     # Notify user of successful change
     messages.success(request, 'Your email has been successfully updated.')
-    
+
     # Redirect to profile if logged in, otherwise to login
     if request.user.is_authenticated:
         return redirect('core:profile_settings')
