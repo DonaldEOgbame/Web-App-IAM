@@ -19,7 +19,7 @@ from . import risk_engine
 
 class ModelTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username="tester", password="pass")
+        self.user = User.objects.create_user(username="tester", password="pass", email="tester@example.com")
 
     def _create_document(self, deleted=False):
         return Document.objects.create(
@@ -61,7 +61,7 @@ class ModelTests(TestCase):
 
     def test_device_fingerprint_unique_per_user(self):
         """Devices with the same fingerprint can be associated with different users"""
-        user2 = User.objects.create_user(username="tester2", password="pass")
+        user2 = User.objects.create_user(username="tester2", password="pass", email="tester2@example.com")
 
         DeviceFingerprint.objects.create(
             user=self.user,
@@ -161,12 +161,14 @@ class DeviceViewTests(TestCase):
         self.admin = User.objects.create_user(
             username="admin",
             password="pass",
+            email="admin@example.com",
             role="ADMIN",
             is_active=True,
         )
         self.staff = User.objects.create_user(
             username="staff",
             password="pass",
+            email="staff@example.com",
             role="STAFF",
             is_active=True,
         )

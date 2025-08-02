@@ -4,6 +4,13 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.conf import settings
 from django.utils import timezone
 
+
+ACCESS_LEVEL_CHOICES = [
+    (1, "Level 1"),
+    (2, "Level 2"),
+    (3, "Level 3"),
+]
+
 class Notification(models.Model):
     NOTIFICATION_TYPES = [
         ('INFO', 'Information'),
@@ -159,6 +166,7 @@ class UserProfile(models.Model):
     full_name = models.CharField(max_length=255)
     department = models.CharField(max_length=20, choices=DEPT_CHOICES)
     position = models.CharField(max_length=100)
+    access_level = models.PositiveSmallIntegerField(choices=ACCESS_LEVEL_CHOICES, default=1)
     phone = models.CharField(max_length=20, blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
     profile_completed = models.BooleanField(default=False)
@@ -380,15 +388,16 @@ class AuditLog(models.Model):
         return f"{self.get_action_display()} by {user} at {self.timestamp}"
 
 class Document(models.Model):
-    ACCESS_LEVEL_CHOICES = [
+    DOCUMENT_ACCESS_CHOICES = [
         ('PRIVATE', 'Private (Owner Only)'),
         ('DEPT', 'Department Access'),
     ]
-    
+
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
-    
-    access_level = models.CharField(max_length=15, choices=ACCESS_LEVEL_CHOICES, default='PRIVATE')
+
+    access_level = models.CharField(max_length=15, choices=DOCUMENT_ACCESS_CHOICES, default='PRIVATE')
+    required_access_level = models.PositiveSmallIntegerField(choices=ACCESS_LEVEL_CHOICES, default=1)
     department = models.CharField(max_length=100, blank=True, null=True)
     
     encrypted_file = models.BinaryField()
