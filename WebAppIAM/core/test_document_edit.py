@@ -36,6 +36,7 @@ class DocumentEditTests(TestCase):
                     'title': 'Doc',
                     'description': '',
                     'access_level': 'PRIVATE',
+                    'required_access_level': 1,
                     'department': '',
                     'file': new_file,
                 },

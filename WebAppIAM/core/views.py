@@ -1149,7 +1149,8 @@ def staff_dashboard(request):
     documents = Document.objects.filter(
         deleted=False,
         access_level='DEPT',
-        department=user.profile.department
+        department=user.profile.department,
+        required_access_level__lte=user.profile.access_level,
     )
     # Always show all documents for staff's department
     sessions = UserSession.objects.filter(user=user).order_by('-login_time')[:5]
@@ -1259,7 +1260,8 @@ def document_list(request):
     if user.role != 'ADMIN' and hasattr(user, 'profile'):
         documents = documents.filter(
             Q(access_level='PRIVATE', uploaded_by=user) |
-            Q(access_level='DEPT', department=user.profile.department)
+            Q(access_level='DEPT', department=user.profile.department),
+            required_access_level__lte=user.profile.access_level,
         )
     
     # Apply search filters
@@ -1351,9 +1353,11 @@ def document_download(request, doc_id):
     if user.role != 'ADMIN':
         if doc.access_level == 'PRIVATE' and doc.uploaded_by != user:
             return HttpResponseForbidden("You don't have permission to access this document")
-        if doc.access_level == 'DEPARTMENT' and (
+        if doc.access_level == 'DEPT' and (
             not hasattr(user, 'profile') or doc.department != user.profile.department
         ):
+            return HttpResponseForbidden("You don't have permission to access this document")
+        if doc.required_access_level > user.profile.access_level:
             return HttpResponseForbidden("You don't have permission to access this document")
     
     
@@ -1386,6 +1390,9 @@ def document_download(request, doc_id):
 def document_edit(request, doc_id):
     """Edit an existing document by creating a new version."""
     existing = get_object_or_404(Document, id=doc_id, deleted=False)
+
+    if request.user.role != 'ADMIN' and existing.required_access_level > request.user.profile.access_level:
+        return HttpResponseForbidden("You don't have permission to edit this document")
 
     if request.method == "POST":
         form = DocumentEditForm(request.POST, request.FILES)

@@ -614,7 +614,7 @@
                     </form>
                     <table>
                         <thead>
-                        <tr><th>Title</th><th>Department</th><th>Description</th><th>Actions</th></tr>
+                        <tr><th>Title</th><th>Department</th><th>Description</th><th>Req. Level</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
                         {% for doc in documents %}
@@ -622,12 +622,13 @@
                             <td>{{ doc.title }}</td>
                             <td>{{ doc.department }}</td>
                             <td>{{ doc.description|default:"—" }}</td>
+                            <td>{{ doc.get_required_access_level_display }}</td>
                             <td>
                                 <a class="btn btn-outline" href="{% url 'core:document_download' doc.id %}">Download</a>
                             </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="4">No documents found.</td></tr>
+                        <tr><td colspan="5">No documents found.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import PasswordChangeForm
-from .models import User, RiskPolicy, Document, UserProfile
+from .models import User, RiskPolicy, Document, UserProfile, ACCESS_LEVEL_CHOICES
 
 class RegistrationForm(forms.ModelForm):
     password1 = forms.CharField(
@@ -79,10 +79,10 @@ class DocumentUploadForm(forms.ModelForm):
         choices=UserProfile.DEPT_CHOICES,
         required=False
     )
-    
+
     class Meta:
         model = Document
-        fields = ['title', 'description', 'access_level', 'department']
+        fields = ['title', 'description', 'access_level', 'required_access_level', 'department']
         
     def save(self, commit=True):
         # Don't save the file directly, it will be encrypted in the view
@@ -100,7 +100,7 @@ class DocumentEditForm(forms.ModelForm):
 
     class Meta:
         model = Document
-        fields = ["title", "description", "access_level", "department"]
+        fields = ["title", "description", "access_level", "required_access_level", "department"]
 
     def save(self, commit=True):
         return super().save(commit=commit)
@@ -114,10 +114,14 @@ class ProfileCompletionForm(forms.ModelForm):
         max_length=30,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Last Name'})
     )
-    
+    access_level = forms.ChoiceField(
+        choices=ACCESS_LEVEL_CHOICES,
+        label='Access Level'
+    )
+
     class Meta:
         model = UserProfile
-        fields = ['department', 'position', 'phone', 'profile_picture']
+        fields = ['department', 'position', 'access_level', 'phone', 'profile_picture']
         widgets = {
             'position': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+1 (555) 555-5555'}),
@@ -135,10 +139,14 @@ class ProfileUpdateForm(forms.ModelForm):
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control'})
     )
-    
+    access_level = forms.ChoiceField(
+        choices=ACCESS_LEVEL_CHOICES,
+        label='Access Level'
+    )
+
     class Meta:
         model = UserProfile
-        fields = ['department', 'position', 'phone', 'profile_picture',
+        fields = ['department', 'position', 'access_level', 'phone', 'profile_picture',
                   'show_risk_alerts', 'auto_logout', 'receive_email_alerts']
         widgets = {
             'position': forms.TextInput(attrs={'class': 'form-control'}),
@@ -164,6 +172,7 @@ class ProfileUpdateForm(forms.ModelForm):
         # Save profile fields
         profile.department = self.cleaned_data.get('department')
         profile.position = self.cleaned_data.get('position')
+        profile.access_level = self.cleaned_data.get('access_level')
         profile.phone = self.cleaned_data.get('phone')
         profile.profile_picture = self.cleaned_data.get('profile_picture')
         profile.show_risk_alerts = self.cleaned_data.get('show_risk_alerts')
