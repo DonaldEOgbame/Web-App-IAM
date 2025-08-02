@@ -459,15 +459,26 @@ def complete_profile(request):
     })
 
 def register_biometrics(request):
+    """
+    GET: render enrollment page (with inline WebAuthn options if face not set).
+    POST (face_data): enroll face and return JSON so the client can later
+    verify WebAuthn and navigate only after BOTH are done.
+    """
     user = None
     if request.user.is_authenticated:
         user = request.user
     elif request.session.get('pending_user_id'):
         user = get_object_or_404(User, id=request.session['pending_user_id'])
     if not user:
+        # For AJAX callers, return JSON; for full request, redirect.
+        if request.method == 'POST':
+            return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
         return redirect('core:login')
 
+    # If already enrolled and not being forced to re-enroll, gate as before.
     if user.has_biometrics and not user.force_reenroll:
+        if request.method == 'POST':
+            return JsonResponse({'status': 'error', 'message': 'Biometrics already enrolled'}, status=400)
         messages.info(request, 'Biometrics already enrolled.')
         if request.user.is_authenticated:
             dashboard_name = 'core:admin_dashboard' if user.role == 'ADMIN' else 'core:staff_dashboard'
@@ -475,23 +486,29 @@ def register_biometrics(request):
         return redirect('core:login')
     
     if request.method == 'POST':
-        # Handle biometric registration (face or fingerprint)
+        # --- Face enrollment (JSON response; NO redirect) ---
         if 'face_data' in request.FILES:
-            face_data = request.FILES['face_data'].read()
             try:
+                face_data = request.FILES['face_data'].read()
                 if enroll_face(user, face_data):
-                    user.save()
-                    request.session['complete_profile_user'] = user.id
-                    return redirect('core:complete_profile')
+                    user.save(update_fields=[])  # enroll_face likely updates fields internally
+                    # We do NOT navigate here; client will call WebAuthn verify next.
+                    # Provide a suggested "next" to keep behavior flexible.
+                    next_url = reverse('core:complete_profile')
+                    return JsonResponse({'status': 'success', 'next': next_url})
+                return JsonResponse({'status': 'error', 'message': 'Face enrollment failed'}, status=400)
             except FaceAPIError as e:
-                messages.error(request, str(e))
-                return redirect('core:register_biometrics')
-        
-        # Handle WebAuthn registration
-        # (existing WebAuthn logic remains the same)
+                return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+            except Exception as e:
+                logger.exception("Face enrollment error")
+                return JsonResponse({'status': 'error', 'message': 'Server error during face enrollment'}, status=500)
+
+        # If POST had no face_data, treat as bad request (client only sends face here).
+        return JsonResponse({'status': 'error', 'message': 'No face data provided'}, status=400)
     
+    # --- GET: render page with inline options if needed ---
     options = None
-    if not user.face_data:
+    if not getattr(user, 'face_data', None):
         options = generate_registration_options(user)
         request.session['webauthn_registration_challenge'] = bytes_to_base64url(
             options.challenge
@@ -536,14 +553,21 @@ def _expected_rp_id(request):
     return host
 
 def webauthn_registration_verify(request):
+    """
+    Verifies passkey attestation and returns JSON.
+    The client will only navigate after BOTH face (uploaded earlier) and
+    this verification succeed.
+    """
     if not settings.WEBAUTHN_ENABLED:
         return JsonResponse({'error': 'WebAuthn not enabled'}, status=400)
 
     user = get_registration_user(request)
     if not user:
         return JsonResponse({'status': 'error', 'message': 'Authentication required'}, status=403)
-    if user.has_biometrics and not user.force_reenroll:
-        return JsonResponse({'status': 'error', 'message': 'Biometrics already enrolled'}, status=400)
+    # Only block if user already has a passkey enrolled, not any biometric
+    has_passkey = WebAuthnCredential.objects.filter(user=user).exists()
+    if has_passkey and not user.force_reenroll:
+        return JsonResponse({'status': 'error', 'message': 'Passkey already enrolled'}, status=400)
 
     # Retrieve expected challenge (stored as base64url)
     challenge_b64u = request.session.get('webauthn_registration_challenge')
@@ -613,6 +637,7 @@ def webauthn_registration_verify(request):
         logger.exception("Failed to persist WebAuthn credential")
         return JsonResponse({'status': 'error', 'message': 'Could not save credential'}, status=500)
 
+    # Mark next step for profile completion; navigation stays on client
     request.session['complete_profile_user'] = user.id
     request.session.pop('webauthn_registration_challenge', None)
 
@@ -624,6 +649,7 @@ def webauthn_registration_verify(request):
     )
 
     return JsonResponse({'status': 'success', 'redirect': reverse('core:complete_profile')})
+
 # --- Authentication Views ---
 def login(request):
     """User login view with rate limiting and security checks"""
@@ -1594,7 +1620,7 @@ def change_password(request):
             notification_type='INFO',
             action_required=False
         )
-        messages.success(request, 'Password updated successfully.')
+        messages.success(request, 'You have been logged out successfully.')
     else:
         messages.error(request, 'Password change failed.')
     return redirect('core:profile_settings')

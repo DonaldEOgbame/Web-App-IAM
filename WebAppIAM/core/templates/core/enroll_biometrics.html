@@ -172,7 +172,7 @@
         <div class="factor-title">Fingerprint / Passkey</div>
         <div class="badge" id="passkey-status"><span class="dot"></span> Tap to start</div>
       </div>
-      <p class="muted">Create a passkey using your device’s biometrics and a security key for password‑free logins.</p>
+      <p class="muted">Create a passkey using your device’s biometrics and a security key for password-free logins.</p>
     </div>
   </section>
 
@@ -243,8 +243,6 @@ async function getJSON(url, opts={}){
   return res.json();
 }
 async function postJSON(url, data, extra={}){
-  // Note: following redirects in fetch does NOT navigate the page.
-  // We still ignore any server redirect instructions here.
   const res = await fetch(url, {
     method:'POST', credentials:'same-origin',
     headers:{'Content-Type':'application/json','X-CSRFToken':CSRF, ...(extra.headers||{})},
@@ -269,16 +267,17 @@ const b64url = {
 /* --------------------------- State & Element Handles --------------------------- */
 const root = qs('#enroll-page');
 const urls = {
-  faceUpload: root.dataset.faceUploadUrl || '', // '' = current URL
+  faceUpload: root.dataset.faceUploadUrl || '', // POST face blob here
   passkeyOptions: root.dataset.passkeyOptionsUrl,
   passkeyVerify: root.dataset.passkeyVerifyUrl,
   next: root.dataset.nextUrl,
 };
 
-/* Force BOTH factors on the client (always “and”) */
-const requireBoth = true;
+const state = {
+  face:   { done:false, stream:null, blob:null },
+  passkey:{ done:false, payload:null }
+};
 
-const state = { face:{done:false, stream:null}, passkey:{done:false} };
 const els = {
   overall: qs('#overall-badge'),
   continue: qs('#btn-continue'),
@@ -299,8 +298,8 @@ function canProceed(){ return state.face.done && state.passkey.done; }
 
 function refreshOverall(){
   const ok = canProceed();
-  if(ok){ setBadge(els.overall,'success','All factors complete'); }
-  else if(state.face.done || state.passkey.done){ setBadge(els.overall,'warn','Partially complete'); }
+  if(ok){ setBadge(els.overall,'success','All factors ready to submit'); }
+  else if(state.face.done || state.passkey.done){ setBadge(els.overall,'warn','Partially ready'); }
   else { setBadge(els.overall,'','Ready to start'); }
   els.continue.disabled = !ok;
   els.continueHint.textContent = 'Complete both Face and Passkey to proceed';
@@ -338,6 +337,11 @@ function activate(el, fn){
   el.addEventListener('keydown', (e)=>{ if((e.key==='Enter'||e.key===' ') && !el.classList.contains('disabled')){ e.preventDefault(); fn(); }});
 }
 activate(els.overall, runDiagnostics);
+
+/* ------------------------------ Concurrency lock ------------------------------ */
+let busy = false;
+function lock(){ if(busy) return false; busy = true; els.faceCard.classList.add('disabled'); els.passkeyCard.classList.add('disabled'); return true; }
+function unlock(){ busy = false; els.faceCard.classList.remove('disabled'); els.passkeyCard.classList.remove('disabled'); }
 
 /* -------------------------------- Face Flow -------------------------------- */
 function openFaceModal(){ els.faceModal.classList.add('open'); els.faceModal.setAttribute('aria-hidden','false'); }
@@ -380,45 +384,32 @@ async function captureBlob(){
   return shots[0].blob;
 }
 async function runFaceFlow(){
-  els.faceCard.classList.add('disabled'); setBadge(els.faceStatus,null,'Preparing camera…'); openFaceModal();
+  if(!lock()){ toast('Another enrollment is in progress','warn'); return; }
+  setBadge(els.faceStatus,null,'Preparing camera…'); openFaceModal();
   const ok = await startCamera();
-  if(!ok){ closeFaceModal(); setBadge(els.faceStatus,'danger','Camera unavailable'); els.faceCard.classList.remove('disabled'); toast('Could not access your camera','danger'); return; }
+  if(!ok){ closeFaceModal(); setBadge(els.faceStatus,'danger','Camera unavailable'); unlock(); toast('Could not access your camera','danger'); return; }
 
-  const n = parseInt('3',10);
+  const n = parseInt(root.dataset.countdown || '3',10);
   const circle = els.progressCircle; const C = 2*Math.PI*54; circle.style.strokeDashoffset = C;
   for(let i=n;i>0;i--){ els.countdown.textContent = i; const progress = 1-((i-1)/n); circle.style.strokeDashoffset = C - (progress*C); await new Promise(r=>setTimeout(r,1000)); }
   els.countdown.textContent = 'Capturing…'; circle.style.strokeDashoffset = '0';
 
   try{
     const blob = await captureBlob();
-    setBadge(els.faceStatus, null, 'Uploading…');
-    const fd = new FormData(); fd.append('face_data', blob, 'face.jpg');
-    const res = await fetch(urls.faceUpload || '', { method:'POST', credentials:'same-origin', headers:{'X-CSRFToken':CSRF}, body: fd });
-
-    // Ignore any server redirect; do not navigate from here.
-    const ct = res.headers.get('content-type') || '';
-    if(ct.includes('application/json')){
-      const data = await res.json();
-      if(data.status==='ok' || data.status==='success'){
-        state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall();
-        toast('Face enrolled successfully!','success');
-      } else {
-        throw new Error(data.message || 'Server returned error');
-      }
-    }else{
-      if(res.ok){
-        state.face.done=true; setBadge(els.faceStatus,'success','Completed'); refreshOverall();
-        toast('Face enrolled successfully!','success');
-      } else {
-        throw new Error(`HTTP ${res.status}`);
-      }
-    }
+    // Stage locally; do NOT upload yet
+    state.face.blob = blob;
+    state.face.done = true;
+    setBadge(els.faceStatus,'success','Ready to submit');
+    toast('Face captured. It will be submitted with passkey.','info');
+    refreshOverall();
   }catch(err){
-    console.error('Face Enrollment Error:', err);
-    toast('Face enrollment failed: '+(err.message||'Please try again'),'danger');
+    console.error('Face Capture Error:', err);
+    toast('Face capture failed: '+(err.message||'Please try again'),'danger');
     setBadge(els.faceStatus,'danger','Failed — tap to retry');
   }finally{
-    closeFaceModal(); els.faceCard.classList.remove('disabled'); circle.style.strokeDashoffset = C;
+    closeFaceModal();
+    const C = 2*Math.PI*54; els.progressCircle.style.strokeDashoffset = C;
+    unlock();
   }
 }
 activate(els.faceCard, ()=>{
@@ -462,6 +453,7 @@ async function getPasskeyOptions(){
   }
 }
 async function registerPasskey(){
+  if(!lock()){ toast('Another enrollment is in progress','warn'); return; }
   try{
     els.passkeyCard.classList.add('disabled');
     setSpinner(els.passkeyStatus, 'Requesting options…');
@@ -489,17 +481,12 @@ async function registerPasskey(){
       payload.clientExtensionResults = cred.getClientExtensionResults?.() || {};
     }
 
-    setSpinner(els.passkeyStatus,'Verifying…');
-    const res = await postJSON(urls.passkeyVerify, payload);
-
-    const ok = res && (res.ok || res.status==='ok' || res.status==='success' || res.success===true);
-    if(!ok) throw new Error(res?.error || res?.message || 'Server verification failed');
-
+    // Stage locally; do NOT verify yet
+    state.passkey.payload = payload;
     state.passkey.done = true;
-    setBadge(els.passkeyStatus,'success','Completed'); refreshOverall();
-    toast('Passkey enrolled successfully!','success');
+    setBadge(els.passkeyStatus,'success','Ready to submit'); refreshOverall();
+    toast('Passkey created. It will be submitted with face.','info');
 
-    // No navigation here—user must click Continue after Face is also complete.
   }catch(err){
     console.error('Passkey Error:', err);
     const msg = (err.name==='NotAllowedError') ? 'Cancelled or timed out' : (err.message || 'Failed');
@@ -507,6 +494,7 @@ async function registerPasskey(){
     toast(`Passkey: ${msg}`,'danger');
   }finally{
     els.passkeyCard.classList.remove('disabled');
+    unlock();
   }
 }
 activate(els.passkeyCard, ()=>{
@@ -516,9 +504,44 @@ activate(els.passkeyCard, ()=>{
 });
 
 /* ------------------------------ Continue Button ------------------------------ */
-qs('#btn-continue').addEventListener('click', ()=>{
-  if (canProceed()) { window.location.href = urls.next; }
-  else { toast('Please complete both Face and Passkey','warn'); }
+qs('#btn-continue').addEventListener('click', async ()=>{
+  if (!canProceed()) { toast('Please complete both Face and Passkey','warn'); return; }
+
+  // UI lock
+  els.continue.disabled = true;
+  els.continue.querySelector('span').textContent = 'Submitting…';
+
+  try{
+    // 1) Upload face
+    const fd = new FormData();
+    fd.append('face_data', state.face.blob, 'face.jpg');
+    const faceRes = await fetch(urls.faceUpload || '', {
+      method:'POST', credentials:'same-origin',
+      headers:{ 'X-CSRFToken': CSRF },
+      body: fd
+    });
+    const faceJson = await faceRes.json().catch(()=> ({}));
+    if(!faceRes.ok || (faceJson.status && faceJson.status==='error')){
+      throw new Error(faceJson.message || `Face upload failed (HTTP ${faceRes.status})`);
+    }
+
+    // 2) Verify passkey
+    const passRes = await postJSON(urls.passkeyVerify, state.passkey.payload);
+    const ok = passRes && (passRes.status==='success' || passRes.ok || passRes.success===true);
+    if(!ok){
+      throw new Error(passRes?.message || 'Passkey verify failed');
+    }
+
+    // Navigate when both succeeded
+    const next = passRes.next || faceJson.next || urls.next;
+    window.location.href = next;
+
+  }catch(err){
+    console.error('Submit both error:', err);
+    toast(err.message || 'Submission failed','danger');
+    els.continue.disabled = false;
+    els.continue.querySelector('span').textContent = 'Continue';
+  }
 });
 
 /* -------------------------- Background Particles -------------------------- */
