@@ -352,6 +352,11 @@
             transition: opacity var(--transition), transform var(--transition), background var(--transition);
             font-size: 0.9rem;
         }
+         #btn_1{
+            display: flex;
+            width: 100%;
+            max-width: 200px;
+        }
         .btn:hover { opacity: 0.95; }
         .btn:active { transform: translateY(1px); }
         .btn-outline {
@@ -686,7 +691,7 @@
                             </div>
                         {% endfor %}
                         </div>
-                        <button class="btn" type="submit">Update Profile</button>
+                        <button class="btn" id="btn_1" type="submit">Update Profile</button>
                     </form>
 
                     <hr style="border-color: var(--border); margin: 24px 0;">
@@ -695,7 +700,7 @@
                     <form method="post" action="{% url 'core:change_password' %}">
                         {% csrf_token %}
                         {{ password_form.as_p }}
-                        <button class="btn" type="submit">Change Password</button>
+                        <button class="btn" id="btn_1" type="submit">Change Password</button>
                     </form>
                 </div>
             </section>
@@ -707,7 +712,7 @@
                     {% if notifications %}
                         <form id="markAllReadForm" method="post" action="{% url 'core:mark_all_notifications_read' %}">
                             {% csrf_token %}
-                            <button class="btn btn-outline" type="submit" id="markAllReadBtn">Mark all as read</button>
+                            <button class="btn btn-outline" type="submit" id="btn_1" id="markAllReadBtn">Mark all as read</button>
                         </form>
                     {% endif %}
                     <div id="notificationsList">
