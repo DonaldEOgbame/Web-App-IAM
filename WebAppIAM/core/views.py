@@ -563,7 +563,7 @@ def register_biometrics(request):
         # (existing WebAuthn logic remains the same)
     
     options = None
-    if not user.face_data:
+    if not user.webauthn_credentials.exists():
         options = generate_registration_options(user)
         request.session['webauthn_registration_challenge'] = bytes_to_base64url(
             options.challenge
@@ -809,7 +809,7 @@ def login(request):
                         if user.has_biometrics:
                             return JsonResponse({
                                 'status': 'password_ok_biometric_required',
-                                'face': bool(user.face_data),
+                                'face': bool(user.azure_face_id),
                                 'webauthn': user.webauthn_credentials.exists(),
                                 'next': next_url
                             })
