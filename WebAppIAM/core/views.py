@@ -845,8 +845,11 @@ def verify_biometrics(request):
     user_id = request.session.get('pending_auth_user_id')
     session_id = request.session.get('pending_auth_session_id')
 
+    # Always check if this is an AJAX request at the start
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
     if not user_id or not session_id:
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        if is_ajax:
             return JsonResponse({'status': 'error', 'message': 'No pending authentication'}, status=400)
         return redirect('core:login')
 
@@ -856,7 +859,7 @@ def verify_biometrics(request):
     if request.method == 'POST':
         image = request.FILES.get('face_image') or request.FILES.get('face_data')
         if not image:
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            if is_ajax:
                 return JsonResponse({'status': 'error', 'message': 'Invalid request'}, status=400)
             messages.error(request, 'Invalid request.')
             return redirect('core:login')
@@ -870,30 +873,41 @@ def verify_biometrics(request):
             if session.access_granted:
                 django_login(request, user)
                 dashboard_url = 'core:admin_dashboard' if user.role == 'ADMIN' else 'core:staff_dashboard'
-                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                if is_ajax:
                     return JsonResponse({'status': 'success', 'score': result['confidence'], 'next': reverse(dashboard_url)})
                 return redirect(dashboard_url)
 
-            # denied
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'denied', 'message': 'Access denied due to high risk'}, status=403)
+            # denied - ALWAYS return JSON for AJAX requests, never redirect
+            if is_ajax:
+                return JsonResponse({
+                    'status': 'denied', 
+                    'message': 'Access denied due to high risk',
+                    'next': f"{reverse('core:access_denied')}?reason=High%20risk"
+                })
             return redirect(f"{reverse('core:access_denied')}?reason=High%20risk")
 
         except FaceAPIError as e:
             logger.warning(f"Face verification failed: {e}")
             messages.error(request, str(e))
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            if is_ajax:
                 return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
             return redirect('core:login')
-        except Exception:
+        except Exception as e:
             logger.exception("Unexpected face verification error")
             messages.error(request, 'Face verification temporarily unavailable.')
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({'status': 'error', 'message': 'Face verification failed'}, status=400)
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': f'Face verification failed: {str(e)}'}, status=500)
             return redirect('core:login')
 
     # GET: render login with biometric prompt
     try:
+        # If it's an AJAX request, return JSON instead of HTML
+        if is_ajax:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid request method for biometric verification. POST required.'
+            }, status=400)
+            
         return render(request, 'core/login.html', {
             'user': user,
             'session_id': session_id,
@@ -902,8 +916,8 @@ def verify_biometrics(request):
         })
     except Exception as e:
         logger.exception("Error rendering biometric login page")
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'status': 'error', 'message': 'Server error during biometric verification'}, status=500)
+        if is_ajax:
+            return JsonResponse({'status': 'error', 'message': f'Server error during biometric verification: {str(e)}'}, status=500)
         messages.error(request, 'Server error during biometric verification.')
         return redirect('core:login')
 
@@ -1047,9 +1061,13 @@ def finalize_authentication(request, session):
         session.risk_score = max(session.risk_score - 0.1, 0)
 
     # Determine risk level
-    if session.risk_score < 0.3:
+    logger.info(f"Risk score for user {user.username}: {session.risk_score}")
+    logger.info(f"Face match: {session.face_match_score}, Behavior anomaly: {session.behavior_anomaly_score}")
+    logger.info(f"Time anomaly: {time_anomaly}, Device anomaly: {device_anomaly}")
+    
+    if session.risk_score < 0.3:  # Back to original threshold
         session.risk_level = 'LOW'
-    elif session.risk_score < 0.7:
+    elif session.risk_score < 0.7:  # Back to original threshold
         session.risk_level = 'MEDIUM'
     else:
         session.risk_level = 'HIGH'
