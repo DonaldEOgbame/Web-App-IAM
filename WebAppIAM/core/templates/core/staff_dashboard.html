@@ -714,7 +714,7 @@
                     {% if notifications %}
                         <form id="markAllReadForm" method="post" action="{% url 'core:mark_all_notifications_read' %}">
                             {% csrf_token %}
-                            <button class="btn btn-outline" type="submit" id="btn_1" id="markAllReadBtn">Mark all as read</button>
+                            <button class="btn btn-outline" type="submit" id="btn_1">Mark all as read</button>
                         </form>
                     {% endif %}
                     <div id="notificationsList">
@@ -760,43 +760,9 @@
     });
 
     const csrftoken = '{{ csrf_token }}';
-    // AJAX Dismiss notification
-    document.querySelectorAll('.dismissNotificationForm').forEach(function(form) {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const alertDiv = form.closest('.notification-item');
-            fetch(form.action, {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrftoken },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success' && alertDiv) {
-                    alertDiv.style.display = 'none';
-                    updateNotificationBadge();
-                }
-            });
-        });
-    });
+    // Individual notification dismiss (normal form submission with page reload)
 
-    // AJAX Mark all as read
-    const markAllForm = document.getElementById('markAllReadForm');
-    if (markAllForm) {
-        markAllForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            fetch(markAllForm.action, {
-                method: 'POST',
-                headers: { 'X-CSRFToken': csrftoken },
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    document.querySelectorAll('.notification-item').forEach(function(el){ el.style.display = 'none'; });
-                    updateNotificationBadge();
-                }
-            });
-        });
-    }
+    // Mark all as read (normal form submission with page reload)
 
     // Update notification badge count
     function updateNotificationBadge() {

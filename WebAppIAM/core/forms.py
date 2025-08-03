@@ -74,9 +74,9 @@ class CustomPasswordChangeForm(PasswordChangeForm):
 
 class DocumentUploadForm(forms.ModelForm):
     file = forms.FileField(label='File to upload')
-    # Present predefined department choices instead of a free text field
+    # Present predefined department choices including "All Departments"
     department = forms.ChoiceField(
-        choices=UserProfile.DEPT_CHOICES,
+        choices=UserProfile.DOCUMENT_DEPT_CHOICES,
         required=False
     )
 
@@ -94,7 +94,7 @@ class DocumentEditForm(forms.ModelForm):
     """Form used to edit an existing document."""
     file = forms.FileField(label="New file", required=False)
     department = forms.ChoiceField(
-        choices=UserProfile.DEPT_CHOICES,
+        choices=UserProfile.DOCUMENT_DEPT_CHOICES,
         required=False,
     )
 

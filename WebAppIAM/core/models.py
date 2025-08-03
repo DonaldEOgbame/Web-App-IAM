@@ -163,6 +163,18 @@ class UserProfile(models.Model):
         ('LEGAL', 'Legal'),
     ]
     
+    # Extended choices for document departments including "All Departments"
+    DOCUMENT_DEPT_CHOICES = [
+        ('ALL', 'All Departments'),
+        ('HR', 'Human Resources'),
+        ('FINANCE', 'Finance'),
+        ('IT', 'Information Technology'),
+        ('SALES', 'Sales'),
+        ('MARKETING', 'Marketing'),
+        ('OPERATIONS', 'Operations'),
+        ('LEGAL', 'Legal'),
+    ]
+    
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     full_name = models.CharField(max_length=255)
     department = models.CharField(max_length=20, choices=DEPT_CHOICES)
