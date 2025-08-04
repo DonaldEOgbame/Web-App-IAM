@@ -152,6 +152,31 @@ def is_admin(user):
         return False
     return user.is_superuser or getattr(user, "role", None) == "ADMIN"
 
+def has_granted_access(user):
+    """Check if user has both authentication and granted access from risk assessment"""
+    if not getattr(user, "is_authenticated", False):
+        return False
+    
+    # Get the user's current session
+    try:
+        session = UserSession.objects.filter(user=user).order_by('-login_time').first()
+        if not session:
+            return False
+        return session.access_granted
+    except UserSession.DoesNotExist:
+        return False
+
+def access_granted_required(view_func):
+    """Decorator that requires both login and granted access from risk assessment"""
+    @login_required
+    def wrapper(request, *args, **kwargs):
+        if has_granted_access(request.user):
+            return view_func(request, *args, **kwargs)
+        else:
+            # Redirect to access denied page if access not granted
+            return redirect(f"{reverse('core:access_denied')}?reason=Access%20denied%20by%20risk%20assessment")
+    return wrapper
+
 def log_security_event(request, event_type, details, success=False):
     user = request.user if request.user.is_authenticated else None
     username = user.username if user else request.POST.get('username', 'anonymous')
@@ -1020,7 +1045,7 @@ def finalize_authentication(request, session):
     return session
 
 # -------------------- Dashboards --------------------
-@login_required
+@access_granted_required
 def dashboard(request):
     """
     Generic dashboard router; preserves SPA behavior.
@@ -1090,7 +1115,7 @@ def dashboard(request):
     })
     return render(request, 'core/staff_dashboard.html', context)
 
-@login_required
+@access_granted_required
 def staff_dashboard(request):
     if request.user.role != 'STAFF':
         messages.error(request, "Access denied. You don't have permission to access this page.")
@@ -1125,7 +1150,7 @@ def staff_dashboard(request):
     })
     return render(request, 'core/staff_dashboard.html', ctx)
 
-@login_required
+@access_granted_required
 def admin_dashboard(request):
     if request.user.role != 'ADMIN':
         messages.error(request, "Access denied. You don't have permission to access this page.")
@@ -1797,10 +1822,14 @@ def password_reset_confirm(request, user_id, token):
 # -------------------- Access Denied & Email Verification --------------------
 def access_denied(request):
     reason = request.GET.get('reason', 'Access denied due to security policy')
-    context = {'reason': reason, 'show_access_denied': True}
+    
+    # Log out the user to prevent any further access attempts
     if request.user.is_authenticated:
-        return render(request, _role_template(request.user), context)
-    return render(request, 'core/login.html', context)
+        django_logout(request)
+    
+    # Add the reason as a message and redirect to login
+    messages.error(request, reason)
+    return redirect('core:login')
 
 def verify_email_update(request, token):
     user = get_object_or_404(User, email_verification_token=token)
