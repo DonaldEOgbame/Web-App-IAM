@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # 'csp',
     'core',
 ]
 
@@ -51,7 +52,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'core.security_middleware.StrictTransportSecurityMiddleware',  # HSTS middleware
-    'core.security_middleware.ContentSecurityPolicyMiddleware',  # CSP middleware
+    # 'core.security_middleware.ContentSecurityPolicyMiddleware',  # CSP middleware
     'core.security_middleware.APICSRFProtectionMiddleware',  # API CSRF protection
     'core.middleware.SessionSecurityMiddleware',  # Session security middleware
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -216,3 +217,24 @@ ML_MODELS_DIR = os.environ.get(
     "ML_MODELS_DIR",
     os.path.join(BASE_DIR, "ml_pipeline", "models", "production")
 )
+
+
+# CONTENT_SECURITY_POLICY = {
+#     "DIRECTIVES": {
+#         "default-src": ("'self'",),
+#         "img-src": (
+#             "'self'",
+#             "data:",
+#             "https://images.unsplash.com",
+#             "https://www.webopedia.com",
+#         ),
+#         "style-src": (
+#             "'self'",
+#             "'unsafe-inline'",
+#             "https://cdnjs.cloudflare.com",
+#         ),
+#     }
+# }
+
+# if DEBUG:
+#     CSP_ENABLED = False

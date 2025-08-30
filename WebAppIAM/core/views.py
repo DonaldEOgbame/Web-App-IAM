@@ -125,6 +125,25 @@ def get_device_info(request):
         'user_agent': ua
     }
 
+
+def homepage(request):
+    """
+    Homepage view for SecureCorpDocs - accessible without authentication
+    """
+    # If user is already authenticated, redirect to appropriate dashboard
+    if request.user.is_authenticated:
+        if request.user.role == 'ADMIN':
+            return redirect('core:admin_dashboard')
+        else:
+            return redirect('core:staff_dashboard')
+    
+    context = {
+        'title': 'SecureCorpDocs - Internal Document Sharing Platform',
+    }
+    
+    return render(request, 'core/homepage.html', context)
+
+
 def get_registration_user(request):
     if request.user.is_authenticated:
         return request.user
@@ -1858,3 +1877,4 @@ def verify_email_update(request, token):
     if request.user.is_authenticated:
         return _redirect_to_tab(request, 'profile')
     return redirect('core:login')
+

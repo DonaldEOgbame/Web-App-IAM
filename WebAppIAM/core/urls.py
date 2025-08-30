@@ -9,6 +9,9 @@ urlpatterns = [
     # Health Check
     path('health/', health_check, name='health_check'),
 
+    path('', views.homepage, name='homepage'),
+
+
     # Authentication URLs
     path('register/', views.register, name='register'),
     path('register/biometrics/', views.register_biometrics, name='register_biometrics'),
